@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// =====================================================================
+// TABELA: usuários do sistema
+// =====================================================================
+model User {
+  id        String   @id @default(cuid())
+  name      String?
+  email     String?  @unique
+  password  String
+  senhaTemp String?  @map("senha_temp")
+  role      String   @default("Colaborador")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("users")
+}
+
+// =====================================================================
+// TABELA: projetos de irrigação (importados via CSV)
+// =====================================================================
+model ProjetoIrrigacao {
+  id                   String    @id @default(cuid())
+  idFirebird           Int?      @unique @map("id_firebird")
+  nome                 String
+  status               String?
+  responsavel          String?
+  dataInicio           DateTime? @map("data_inicio")
+  areaTotal            Float?    @map("area_total")
+  ultimaSincronizacao  DateTime  @default(now()) @map("ultima_sincronizacao")
+
+  @@map("projetos_irrigacao")
+}
+
+// =====================================================================
+// TABELA: responsáveis (equipe de campo)
+// =====================================================================
+model Responsavel {
+  id         String   @id @default(cuid())
+  nome       String
+  cargo      String
+  origem     String   @default("MANUAL") // 'MANUAL' | 'BANCO_DADOS'
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("responsaveis")
+}
+
+// =====================================================================
+// TABELA: fases / ações de projetos
+// =====================================================================
+model FaseAcao {
+  id              String    @id @default(cuid())
+  gabarito        String
+  responsavel     String    @default("Não atribuído")
+  acao            String    @default("Cotar")
+  prazoLimite     DateTime  @map("prazo_limite")
+  status          String    @default("Dentro do programado")
+  observacoes     String?
+  projetoCliente  String?   @map("projeto_cliente")
+  isDeleted       Boolean   @default(false) @map("is_deleted")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt      @map("updated_at")
+
+  historico HistoricoFase[]
+
+  @@index([isDeleted])
+  @@index([projetoCliente], where: "projetoCliente IS NOT NULL")
+  @@index([projetoCliente, isDeleted])
+  @@map("fases_acao")
+}
+
+// =====================================================================
+// TABELA: diário de campo (logs diários por responsável)
+// =====================================================================
+model DiarioLog {
+  id              String   @id @default(cuid())
+  data            DateTime
+  responsavel     String
+  atividade       String
+  status          String   @default("Dentro do Programado")
+  observacoes     String   @default("")
+  projetoCliente  String?  @map("projeto_cliente")
+  midiaUrl        String?  @map("midia_url")
+  midiaTipo       String?  @map("midia_tipo") // 'image' | 'video'
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([data(sort: Desc)])
+  @@index([responsavel])
+  @@index([projetoCliente], where: "projetoCliente IS NOT NULL")
+  @@index([responsavel, data(sort: Desc)])
+  @@map("diario_logs")
+}
+
+// =====================================================================
+// TABELA: histórico de alterações de fases
+// =====================================================================
+model HistoricoFase {
+  id            String   @id @default(cuid())
+  faseId        String   @map("fase_id")
+  campo         String
+  valorAnterior String   @default("") @map("valor_anterior")
+  valorNovo     String   @default("") @map("valor_novo")
+  usuario       String   @default("Sistema")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  fase FaseAcao @relation(fields: [faseId], references: [id], onDelete: Cascade)
+
+  @@index([faseId])
+  @@map("historico_fases")
+}
