@@ -63,6 +63,21 @@ export default function VisaoGeralDiretorPage() {
 
   const [fases, setFases] = useState<FaseAcao[]>([]);
 
+  // Modais de Configuração e Justificativa
+  const [faseModalOpen, setFaseModalOpen] = useState(false);
+  const [faseModalProjeto, setFaseModalProjeto] = useState('');
+  const [faseModalEtapa, setFaseModalEtapa] = useState('');
+  const [faseModalDataInicio, setFaseModalDataInicio] = useState('');
+  const [faseModalPrazoLimite, setFaseModalPrazoLimite] = useState('');
+  const [savingFaseConfig, setSavingFaseConfig] = useState(false);
+
+  const [justModalOpen, setJustModalOpen] = useState(false);
+  const [justProjeto, setJustProjeto] = useState('');
+  const [justEtapa, setJustEtapa] = useState<EtapaCampo>('Valetas');
+  const [justMotivo, setJustMotivo] = useState('Chuva no dia');
+  const [justTexto, setJustTexto] = useState('');
+  const [savingJust, setSavingJust] = useState(false);
+
   // Carrega dados consolidados
   const carregarDados = useCallback(async () => {
     try {
@@ -87,6 +102,73 @@ export default function VisaoGeralDiretorPage() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleSaveFaseConfig = async () => {
+    if (!faseModalProjeto || !faseModalEtapa) return;
+    setSavingFaseConfig(true);
+    try {
+      const chaveEtapa = `${faseModalProjeto}::${faseModalEtapa}`;
+      const payload = {
+        configEtapas: {
+          ...config.configEtapas,
+          [chaveEtapa]: {
+            ...(config.configEtapas[chaveEtapa] || {}),
+            dataInicio: faseModalDataInicio,
+            prazoLimite: faseModalPrazoLimite,
+            metaDias: config.configEtapas[chaveEtapa]?.metaDias || 20,
+          }
+        }
+      };
+      const res = await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Falha ao salvar configuração da fase');
+      success('Prazo da fase configurado com sucesso!');
+      setFaseModalOpen(false);
+      carregarDados();
+    } catch (e: any) {
+      toastError(e.message || 'Erro ao salvar prazo');
+    } finally {
+      setSavingFaseConfig(false);
+    }
+  };
+
+  const handleSaveJustificativa = async () => {
+    if (!justProjeto || !justTexto.trim()) return;
+    setSavingJust(true);
+    try {
+      const novaJust: JustificativaItem = {
+        id: `just_${Date.now()}`,
+        data: new Date().toISOString().split('T')[0],
+        autor: 'Diretoria / Gestão',
+        motivo: justMotivo,
+        observacao: `[${justEtapa}] ${justTexto.trim()}`
+      };
+      const justAtuais = config.projetoJustificativas[justProjeto] || [];
+      const payload = {
+        projetoJustificativas: {
+          ...config.projetoJustificativas,
+          [justProjeto]: [novaJust, ...justAtuais]
+        }
+      };
+      const res = await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Falha ao salvar justificativa');
+      success('Justificativa registrada com sucesso!');
+      setJustModalOpen(false);
+      setJustTexto('');
+      carregarDados();
+    } catch (e: any) {
+      toastError(e.message || 'Erro ao salvar justificativa');
+    } finally {
+      setSavingJust(false);
+    }
+  };
 
   useEffect(() => {
     carregarDados();
@@ -167,8 +249,8 @@ export default function VisaoGeralDiretorPage() {
         const respConfig = config.responsaveisPorEtapa[chaveEtapa] || [];
         const respFasesAcao = fases.filter(f =>
           !f.isDeleted &&
+          f.projetoCliente &&
           f.projetoCliente.trim() === nomeProjeto.trim() &&
-          f.etapaCampo === et.key &&
           f.responsavel &&
           f.responsavel.trim() &&
           f.responsavel.trim() !== 'Não atribuído'
