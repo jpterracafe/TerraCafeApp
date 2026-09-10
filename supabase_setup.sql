@@ -93,6 +93,14 @@ CREATE TABLE IF NOT EXISTS historico_fases (
 );
 CREATE INDEX IF NOT EXISTS idx_historico_fases_fase_id ON historico_fases(fase_id);
 
+-- Configurações globais do sistema (etapas, metas, prazos finais, starts, justificativas)
+CREATE TABLE IF NOT EXISTS configuracoes_sistema (
+  chave       TEXT PRIMARY KEY,
+  valor       JSONB NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE configuracoes_sistema DISABLE ROW LEVEL SECURITY;
+
 -- Coluna de mídia no diário de logs
 ALTER TABLE diario_logs ADD COLUMN IF NOT EXISTS midia_url TEXT;
 ALTER TABLE diario_logs ADD COLUMN IF NOT EXISTS midia_tipo TEXT; -- 'image' | 'video'

@@ -300,14 +300,13 @@ export async function DELETE(req: Request) {
       if (error) throw error;
     }
 
-    // Se havia projeto/cliente e não existe mais nenhuma fase ATIVA (is_deleted=false)
-    // com esse projeto, apaga os logs do diário desse projeto
-    if (projetoCliente && projetoCliente.trim() !== "") {
+    // Se for HARD DELETE (exclusão permanente da lixeira) e não restar mais nenhuma fase do projeto,
+    // limpa os registros correspondentes do diário de campo
+    if (hard && projetoCliente && projetoCliente.trim() !== "") {
       const { data: fasesRestantes } = await db
         .from("fases_acao")
         .select("id")
         .eq("projeto_cliente", projetoCliente)
-        .eq("is_deleted", false)
         .limit(1);
 
       if (!fasesRestantes || fasesRestantes.length === 0) {

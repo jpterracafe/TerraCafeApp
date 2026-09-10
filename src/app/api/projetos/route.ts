@@ -95,6 +95,45 @@ export async function POST(req: Request) {
       console.warn("[POST /api/projetos] Aviso ao inserir no Supabase fases_acao:", insertError.message);
     }
 
+    // Salva dataInicio e prazoFinal nas configurações do sistema (Supabase)
+    try {
+      if (prazoFinal) {
+        const { data: currentPrazos } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projetos_prazo_final_v1")
+          .maybeSingle();
+
+        const mapPrazos = currentPrazos?.valor || {};
+        mapPrazos[nome] = prazoFinal;
+
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projetos_prazo_final_v1",
+          valor: mapPrazos,
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      if (dataInicio) {
+        const { data: currentStarts } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projeto_starts_v1")
+          .maybeSingle();
+
+        const mapStarts = currentStarts?.valor || {};
+        mapStarts[nome] = dataInicio;
+
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projeto_starts_v1",
+          valor: mapStarts,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch (cfgErr) {
+      console.warn("[POST /api/projetos] Erro ao sincronizar datas no configuracoes_sistema:", cfgErr);
+    }
+
     return NextResponse.json({
       ok: true,
       projeto: nome,

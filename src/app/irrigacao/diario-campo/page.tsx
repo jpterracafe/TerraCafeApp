@@ -308,16 +308,18 @@ export default function DiarioCampoTimelinePage() {
 
       if (resFases.ok) {
         const { fases } = await resFases.json();
+        const ativas = (fases ?? [])
+          .filter((f: any) => !f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
+          .map((f: any) => f.projetoCliente as string);
+        const ativasSet = new Set(ativas);
+
         deletados = new Set<string>(
           (fases ?? [])
             .filter((f: any) => f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
             .map((f: any) => f.projetoCliente as string)
+            .filter((p: string) => !ativasSet.has(p))
         );
         setProjetosDeletados(deletados);
-
-        const ativas = (fases ?? [])
-          .filter((f: any) => !f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
-          .map((f: any) => f.projetoCliente as string);
         listaProjetos.push(...ativas);
       }
 
@@ -339,11 +341,67 @@ export default function DiarioCampoTimelinePage() {
     }
   }, []);
 
-  useEffect(() => {
+  const refreshAll = useCallback(() => {
     loadUsers();
     loadLogs();
     loadProjetos();
   }, [loadUsers, loadLogs, loadProjetos]);
+
+  useEffect(() => {
+    refreshAll();
+  }, [refreshAll]);
+
+  // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
+  useEffect(() => {
+    let timerId: ReturnType<typeof setInterval> | null = null;
+    const REFRESH_MS = 30 * 1000;
+
+    const startPolling = () => {
+      if (timerId) return;
+      timerId = setInterval(() => {
+        if (!loadingLogs && !loadingProjetos) {
+          loadLogs();
+          loadProjetos();
+        }
+      }, REFRESH_MS);
+    };
+
+    const stopPolling = () => {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (!loadingLogs && !loadingProjetos) {
+          loadLogs();
+          loadProjetos();
+        }
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    const onFocus = () => {
+      if (!loadingLogs && !loadingProjetos) {
+        loadLogs();
+        loadProjetos();
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [loadLogs, loadProjetos, loadingLogs, loadingProjetos]);
 
   // ── Responsáveis da Etapa Atual (Vinculação por Etapa) ──────────────────────
   const etapaKey = `${selectedProjeto}::${selectedEtapa}`;

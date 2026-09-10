@@ -115,69 +115,98 @@ export async function POST(req: Request) {
     if (err) return err;
 
     const body = await req.json().catch(() => null);
-    if (!body || !body.tipo || !body.dados) {
-      return NextResponse.json({ error: "Parâmetros 'tipo' e 'dados' são obrigatórios." }, { status: 400 });
+    if (!body) {
+      return NextResponse.json({ error: "Corpo da requisição inválido." }, { status: 400 });
     }
 
-    const { tipo, dados } = body;
     const currentConfig = getLocalConfig();
+    const dbUpdates: Array<{ chave: string; valor: any }> = [];
 
-    let chaveDb = "";
-    let valorDb: any = null;
-
-    if (tipo === "etapas") {
-      currentConfig.configEtapas = { ...currentConfig.configEtapas, ...dados };
-      chaveDb = "diario_etapas_config_v1";
-      valorDb = currentConfig.configEtapas;
-    } else if (tipo === "starts") {
-      currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...dados };
-      chaveDb = "diario_projeto_starts_v1";
-      valorDb = currentConfig.projetoStartDates;
-    } else if (tipo === "responsaveis") {
-      currentConfig.responsaveisPorEtapa = { ...currentConfig.responsaveisPorEtapa, ...dados };
-      chaveDb = "diario_responsaveis_por_etapa_v1";
-      valorDb = currentConfig.responsaveisPorEtapa;
-    } else if (tipo === "prazos_finais") {
-      currentConfig.projetosPrazoFinal = { ...currentConfig.projetosPrazoFinal, ...dados };
-      chaveDb = "diario_projetos_prazo_final_v1";
-      valorDb = currentConfig.projetosPrazoFinal;
-    } else if (tipo === "justificativas") {
-      // dados pode ser { projeto: string, justificativa: { id, data, autor, motivo, observacao } }
-      const proj = dados.projeto;
-      const just = dados.justificativa;
-      if (proj && just) {
-        const lista = currentConfig.projetoJustificativas[proj] || [];
-        currentConfig.projetoJustificativas[proj] = [just, ...lista];
+    // Formato 1: { tipo, dados }
+    if (body.tipo && body.dados) {
+      const { tipo, dados } = body;
+      if (tipo === "etapas") {
+        currentConfig.configEtapas = { ...currentConfig.configEtapas, ...dados };
+        dbUpdates.push({ chave: "diario_etapas_config_v1", valor: currentConfig.configEtapas });
+      } else if (tipo === "starts") {
+        currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...dados };
+        dbUpdates.push({ chave: "diario_projeto_starts_v1", valor: currentConfig.projetoStartDates });
+      } else if (tipo === "responsaveis") {
+        currentConfig.responsaveisPorEtapa = { ...currentConfig.responsaveisPorEtapa, ...dados };
+        dbUpdates.push({ chave: "diario_responsaveis_por_etapa_v1", valor: currentConfig.responsaveisPorEtapa });
+      } else if (tipo === "prazos_finais") {
+        currentConfig.projetosPrazoFinal = { ...currentConfig.projetosPrazoFinal, ...dados };
+        dbUpdates.push({ chave: "diario_projetos_prazo_final_v1", valor: currentConfig.projetosPrazoFinal });
+      } else if (tipo === "justificativas") {
+        const proj = dados.projeto;
+        const just = dados.justificativa;
+        if (proj && just) {
+          const lista = currentConfig.projetoJustificativas[proj] || [];
+          currentConfig.projetoJustificativas[proj] = [just, ...lista];
+        } else {
+          currentConfig.projetoJustificativas = { ...currentConfig.projetoJustificativas, ...dados };
+        }
+        dbUpdates.push({ chave: "diario_projeto_justificativas_v1", valor: currentConfig.projetoJustificativas });
+      } else if (tipo === "progresso") {
+        currentConfig.etapasProgresso = { ...currentConfig.etapasProgresso, ...dados };
+        dbUpdates.push({ chave: "diario_etapas_progresso_v1", valor: currentConfig.etapasProgresso });
+      } else if (tipo === "status_etapas") {
+        currentConfig.etapasStatus = { ...currentConfig.etapasStatus, ...dados };
+        dbUpdates.push({ chave: "diario_etapas_status_v1", valor: currentConfig.etapasStatus });
       } else {
-        currentConfig.projetoJustificativas = { ...currentConfig.projetoJustificativas, ...dados };
+        return NextResponse.json({ error: "Tipo inválido." }, { status: 400 });
       }
-      chaveDb = "diario_projeto_justificativas_v1";
-      valorDb = currentConfig.projetoJustificativas;
-    } else if (tipo === "progresso") {
-      currentConfig.etapasProgresso = { ...currentConfig.etapasProgresso, ...dados };
-      chaveDb = "diario_etapas_progresso_v1";
-      valorDb = currentConfig.etapasProgresso;
-    } else if (tipo === "status_etapas") {
-      currentConfig.etapasStatus = { ...currentConfig.etapasStatus, ...dados };
-      chaveDb = "diario_etapas_status_v1";
-      valorDb = currentConfig.etapasStatus;
     } else {
-      return NextResponse.json({ error: "Tipo inválido." }, { status: 400 });
+      // Formato 2: Objeto parcial direto { configEtapas, projetoStartDates, ... }
+      if (body.configEtapas) {
+        currentConfig.configEtapas = { ...currentConfig.configEtapas, ...body.configEtapas };
+        dbUpdates.push({ chave: "diario_etapas_config_v1", valor: currentConfig.configEtapas });
+      }
+      if (body.projetoStartDates) {
+        currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...body.projetoStartDates };
+        dbUpdates.push({ chave: "diario_projeto_starts_v1", valor: currentConfig.projetoStartDates });
+      }
+      if (body.responsaveisPorEtapa) {
+        currentConfig.responsaveisPorEtapa = { ...currentConfig.responsaveisPorEtapa, ...body.responsaveisPorEtapa };
+        dbUpdates.push({ chave: "diario_responsaveis_por_etapa_v1", valor: currentConfig.responsaveisPorEtapa });
+      }
+      if (body.projetosPrazoFinal) {
+        currentConfig.projetosPrazoFinal = { ...currentConfig.projetosPrazoFinal, ...body.projetosPrazoFinal };
+        dbUpdates.push({ chave: "diario_projetos_prazo_final_v1", valor: currentConfig.projetosPrazoFinal });
+      }
+      if (body.projetoJustificativas) {
+        currentConfig.projetoJustificativas = { ...currentConfig.projetoJustificativas, ...body.projetoJustificativas };
+        dbUpdates.push({ chave: "diario_projeto_justificativas_v1", valor: currentConfig.projetoJustificativas });
+      }
+      if (body.etapasProgresso) {
+        currentConfig.etapasProgresso = { ...currentConfig.etapasProgresso, ...body.etapasProgresso };
+        dbUpdates.push({ chave: "diario_etapas_progresso_v1", valor: currentConfig.etapasProgresso });
+      }
+      if (body.etapasStatus) {
+        currentConfig.etapasStatus = { ...currentConfig.etapasStatus, ...body.etapasStatus };
+        dbUpdates.push({ chave: "diario_etapas_status_v1", valor: currentConfig.etapasStatus });
+      }
+
+      if (dbUpdates.length === 0) {
+        return NextResponse.json({ error: "Nenhum campo de configuração válido informado." }, { status: 400 });
+      }
     }
 
     saveLocalConfig(currentConfig);
 
-    // Tenta salvar no Supabase
-    if (chaveDb && valorDb) {
+    // Salva no Supabase se houver tabela configuracoes_sistema
+    if (dbUpdates.length > 0) {
       try {
         const db = getSupabase();
-        await db.from("configuracoes_sistema").upsert({
-          chave: chaveDb,
-          valor: valorDb,
-          updated_at: new Date().toISOString(),
-        });
+        for (const item of dbUpdates) {
+          await db.from("configuracoes_sistema").upsert({
+            chave: item.chave,
+            valor: item.valor,
+            updated_at: new Date().toISOString(),
+          });
+        }
       } catch (dbErr) {
-        // Tabela ainda não criada no banco — segue com o arquivo persistente
+        // Tabela ainda não criada no banco — segue com arquivo local
       }
     }
 

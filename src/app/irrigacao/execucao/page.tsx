@@ -237,9 +237,10 @@ function KpiCard({ label, value, sub, icon, color, alert }: {
 }
 
 const calculateDaysDifference = (targetDateStr: string) => {
+  if (!targetDateStr) return 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const targetDate = new Date(`${targetDateStr}T00:00:00Z`);
+  const targetDate = new Date(`${targetDateStr}T00:00:00`);
   const diffTime = targetDate.getTime() - today.getTime();
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
@@ -328,12 +329,17 @@ export default function ExecucaoProjetosPage() {
 
   // ── KPIs calculados ────────────────────────────────────────────────────────
   const kpiData = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
     const naoDeleted = fases.filter(f => !f.isDeleted);
     const ativas = naoDeleted.filter(f => f.status !== 'Concluído');
     const concluidas = naoDeleted.filter(f => f.status === 'Concluído');
-    const atrasadas = ativas.filter(f =>
-      new Date(`${f.prazoLimite}T00:00:00Z`).getTime() < new Date().setHours(0, 0, 0, 0)
-    );
+    const atrasadas = ativas.filter(f => {
+      if (!f.prazoLimite) return false;
+      const dPrazo = new Date(`${f.prazoLimite}T00:00:00`);
+      dPrazo.setHours(0, 0, 0, 0);
+      return dPrazo.getTime() < hoje.getTime();
+    });
     return {
       ativas: ativas.length,
       atrasadas: atrasadas.length,

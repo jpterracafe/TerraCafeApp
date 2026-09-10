@@ -230,13 +230,18 @@ export default function DashboardPage() {
       const fromApiProj: string[] = projJson.projetos ?? [];
 
       // Monta lista única de projetos ativos
-      const deletados = new Set<string>(
-        allFases.filter(f => f.isDeleted && f.projetoCliente).map(f => f.projetoCliente as string)
-      );
-
       const projetosFases = allFases
         .filter(f => !f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
         .map(f => f.projetoCliente as string);
+
+      const projetosAtivosSet = new Set(projetosFases);
+
+      const deletados = new Set<string>(
+        allFases
+          .filter(f => f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
+          .map(f => f.projetoCliente as string)
+          .filter(p => !projetosAtivosSet.has(p))
+      );
 
       const projetosDiario = allLogs
         .filter(l => l.projetoCliente && l.projetoCliente.trim() !== '')
