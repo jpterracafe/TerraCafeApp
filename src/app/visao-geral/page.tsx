@@ -7,7 +7,7 @@ import {
   Search, CheckCircle2, AlertCircle, Clock,
   Calendar, Users, RefreshCw, FileText, Loader2, Tv,
   AlertTriangle, ShieldAlert, Activity,
-  Layers, ArrowUpRight, TrendingUp
+  Layers, ArrowUpRight, TrendingUp, ChevronDown, LayoutGrid, List
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '../irrigacao/execucao/page';
@@ -434,6 +434,19 @@ export default function VisaoGeralDiretorPage() {
   }, [projetosProcessados, todasFasesAtrasadas]);
 
 
+  // Estado de expansão individual dos projetos e modo de visualização
+  const [projetosExpandidos, setProjetosExpandidos] = useState<Set<string>>(new Set());
+  const [modoView, setModoView] = useState<'resumido' | 'detalhado'>('resumido');
+
+  const toggleExpansao = (nomeProjeto: string) => {
+    setProjetosExpandidos(prev => {
+      const next = new Set(prev);
+      if (next.has(nomeProjeto)) next.delete(nomeProjeto);
+      else next.add(nomeProjeto);
+      return next;
+    });
+  };
+
   return (
     <div
       ref={scrollContainerRef}
@@ -506,132 +519,100 @@ export default function VisaoGeralDiretorPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto space-y-6">
+      <main className="max-w-7xl mx-auto space-y-4">
 
-        {/* ── KPIs Rápidos e Sucintos para o Diretor ────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Obras Ativas</span>
-            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{statsGerais.totalProjetos}</div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">em execução</span>
-          </div>
-
-          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-emerald-500/5 to-transparent hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Obras em Dia</span>
-            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">{statsGerais.emDia}</div>
-            <span className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5 block">no cronograma</span>
-          </div>
-
-          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow ${
-            statsGerais.comAtraso > 0 ? 'border-rose-500/40 bg-gradient-to-br from-rose-500/10 to-transparent' : 'border-slate-200 dark:border-[#1e293b]'
-          }`}>
-            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block mb-1">Com Atraso</span>
-            <div className={`text-3xl font-black tracking-tight ${statsGerais.comAtraso > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
-              {statsGerais.comAtraso}
-            </div>
-            <span className="text-[11px] text-rose-600/70 dark:text-rose-400/70 font-medium mt-0.5 block">
-              {statsGerais.totalFasesAtrasadas} {statsGerais.totalFasesAtrasadas === 1 ? 'fase atrasada' : 'fases atrasadas'}
-            </span>
-          </div>
-
-          <div className="bg-white dark:bg-[#0d1527] border border-purple-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-purple-500/5 to-transparent hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block mb-1">Concluídas</span>
-            <div className="text-3xl font-black text-purple-600 dark:text-purple-400 tracking-tight">{statsGerais.concluidos}</div>
-            <span className="text-[11px] text-purple-600/70 dark:text-purple-400/70 mt-0.5 block">100% entregues</span>
-          </div>
-
-          <div className="bg-white dark:bg-[#0d1527] border border-blue-500/30 rounded-2xl p-4 shadow-sm col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500/5 to-transparent hover:shadow-md transition-shadow">
-            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">Progresso Médio</span>
-            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tight">{statsGerais.progressoMedioGeral}%</div>
-            <span className="text-[11px] text-blue-600/70 dark:text-blue-400/70 mt-0.5 block">execução geral</span>
-          </div>
-        </div>
-
-        {/* ── Mural Sucinto de Fases em Atraso (se houver) ─────────────── */}
+        {/* ── Alertas de Fases em Atraso (se houver) ────────────────────── */}
         {todasFasesAtrasadas.length > 0 && (
-          <div className="bg-rose-500/10 dark:bg-rose-950/20 border-2 border-rose-500/40 dark:border-rose-500/30 rounded-2xl p-4 md:p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
-                <ShieldAlert className="w-5 h-5 shrink-0 animate-bounce" />
-                <h3 className="text-sm font-black uppercase tracking-wider">
-                  Atenção Imediata: {todasFasesAtrasadas.length} {todasFasesAtrasadas.length === 1 ? 'Fase em Atraso' : 'Fases em Atraso'}
-                </h3>
-              </div>
-              <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/20 dark:bg-rose-900/30 px-3 py-1 rounded-full shrink-0 border border-rose-500/30">
-                Cobrança de Prazos
-              </span>
+          <div className="bg-rose-500/10 dark:bg-rose-950/20 border-2 border-rose-500/40 dark:border-rose-500/30 rounded-2xl p-3.5 md:p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 animate-bounce" />
+              <h3 className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                {todasFasesAtrasadas.length} {todasFasesAtrasadas.length === 1 ? 'Fase em Atraso' : 'Fases em Atraso'} — Atenção Imediata
+              </h3>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="flex flex-wrap gap-2">
               {todasFasesAtrasadas.map((item, idx) => (
                 <div
                   key={`${item.projetoNome}-${item.etapaKey}-${idx}`}
-                  className="bg-white dark:bg-[#0d1527] border border-rose-500/40 dark:border-rose-500/30 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-3"
+                  className="flex items-center gap-2 bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl px-3 py-2 text-xs"
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="text-base shrink-0">{item.etapaIcon}</span>
-                      <strong className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                        {item.baseName}
-                      </strong>
-                    </div>
-                    <span className="text-xs text-slate-600 dark:text-slate-400 block truncate leading-relaxed">
-                      {item.etapaOrder}. {item.etapaLabel} • <strong className="text-slate-900 dark:text-white">{item.responsaveis.join(', ')}</strong>
-                    </span>
+                  <span className="shrink-0">{item.etapaIcon}</span>
+                  <div className="min-w-0">
+                    <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[120px]">{item.baseName}</span>
+                    <span className="text-[10px] text-slate-500">{item.etapaLabel}</span>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 text-white shadow-sm block mb-1">
-                      +{item.diasAtraso}d
-                    </span>
-                    <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 block">
-                      {item.progresso}%
-                    </span>
-                  </div>
+                  <span className="px-2 py-0.5 rounded font-black text-[10px] bg-rose-600 text-white shrink-0">+{item.diasAtraso}d</span>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Barra de Busca e Filtros ─────────────────────────────────── */}
-        <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-3.5 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* ── Barra de controles: busca + filtro + toggle modo ──────────── */}
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          {/* Busca */}
+          <div className="relative w-full sm:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               placeholder="Buscar obra ou responsável..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="w-full pl-9 pr-3 py-2 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
-            <span className="text-xs text-slate-400 font-bold mr-1 shrink-0">Status:</span>
-            {[
-              { id: 'todos', label: 'Todas as Obras' },
-              { id: 'atrasado', label: '🚨 Em Atraso' },
+          {/* Filtro status */}
+          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 flex-shrink-0">
+            {([
+              { id: 'todos', label: 'Todas' },
+              { id: 'atrasado', label: '🚨 Atraso' },
               { id: 'em_andamento', label: '⏳ Em Dia' },
               { id: 'concluido', label: '✅ Concluídas' },
-            ].map(f => (
+            ] as const).map(f => (
               <button
                 key={f.id}
                 type="button"
-                onClick={() => setFiltroStatus(f.id as any)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition-all ${
+                onClick={() => setFiltroStatus(f.id)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   filtroStatus === f.id
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-[#16203a] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#1f2d4e]'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {f.label}
               </button>
             ))}
           </div>
+
+          {/* Toggle Resumido / Detalhado */}
+          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 ml-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setModoView('resumido')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                modoView === 'resumido' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Modo Resumido: cards compactos lado a lado"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              Resumido
+            </button>
+            <button
+              type="button"
+              onClick={() => setModoView('detalhado')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                modoView === 'detalhado' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title="Modo Detalhado: tabela completa de fases"
+            >
+              <List className="w-3.5 h-3.5" />
+              Detalhado
+            </button>
+          </div>
         </div>
 
-        {/* ── Lista de Obras: Cada Fase e Responsável Separados com % ───── */}
+        {/* ── Lista de Obras ──────────────────────────────────────────────── */}
         {loading ? (
           <div className="text-center py-20 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl">
             <Loader2 className="w-8 h-8 text-indigo-500 animate-spin mx-auto mb-2" />
@@ -643,187 +624,286 @@ export default function VisaoGeralDiretorPage() {
             <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">Nenhuma obra encontrada</h3>
             <p className="text-xs text-slate-500 mt-0.5">Tente ajustar o filtro ou o termo de busca.</p>
           </div>
+        ) : modoView === 'resumido' ? (
+          /* ── MODO RESUMIDO: grid de cards compactos ──────────────────── */
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {projetosFiltrados.map((proj) => {
+              const expandido = projetosExpandidos.has(proj.nome);
+              return (
+                <div
+                  key={proj.nome}
+                  className={`bg-white dark:bg-[#0d1527] rounded-2xl border shadow-sm transition-all overflow-hidden ${
+                    proj.temAtraso ? 'border-rose-500/40' :
+                    proj.concluidoGeral ? 'border-emerald-500/40' :
+                    'border-slate-200 dark:border-[#1e293b]'
+                  }`}
+                >
+                  {/* Cabeçalho clicável do card */}
+                  <button
+                    type="button"
+                    onClick={() => toggleExpansao(proj.nome)}
+                    className="w-full text-left p-4 hover:bg-slate-50/70 dark:hover:bg-[#111a30]/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        {/* Nome + badges */}
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                          {proj.versao !== 'V0' && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-slate-200 dark:bg-[#16203a] text-slate-600 dark:text-slate-400 shrink-0">
+                              {proj.versao}
+                            </span>
+                          )}
+                          <h2 className="text-sm font-black text-slate-900 dark:text-white truncate">
+                            {proj.baseName}
+                          </h2>
+                          {proj.atrasado && !proj.concluidoGeral && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-600 text-white shrink-0 animate-pulse">
+                              🚨 Vencido
+                            </span>
+                          )}
+                          {proj.concluidoGeral && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-600 text-white shrink-0">
+                              ✅ Concluída
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Prazo */}
+                        <p className={`text-[11px] font-semibold mb-3 ${
+                          proj.atrasado ? 'text-rose-500' : 'text-slate-500 dark:text-slate-400'
+                        }`}>
+                          {proj.prazoFormatado !== 'Não definido'
+                            ? proj.atrasado
+                              ? `⚠️ Venceu há ${Math.abs(proj.diasRestantes)}d — Prazo: ${proj.prazoFormatado}`
+                              : `Prazo: ${proj.prazoFormatado} (${proj.diasRestantes}d restantes)`
+                            : 'Prazo não definido'}
+                        </p>
+
+                        {/* Barra de progresso geral */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${
+                                proj.concluidoGeral ? 'bg-emerald-500' :
+                                proj.temAtraso ? 'bg-rose-500' : 'bg-indigo-500'
+                              }`}
+                              style={{ width: `${proj.progressoGeral}%` }}
+                            />
+                          </div>
+                          <span className={`text-sm font-black shrink-0 ${
+                            proj.concluidoGeral ? 'text-emerald-600 dark:text-emerald-400' :
+                            proj.temAtraso ? 'text-rose-600 dark:text-rose-400' :
+                            'text-slate-900 dark:text-white'
+                          }`}>
+                            {proj.progressoGeral}%
+                          </span>
+                        </div>
+
+                        {/* Bollhas de status das 6 fases */}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {proj.fases.map(fase => (
+                            <div
+                              key={fase.key}
+                              title={`${fase.label}: ${fase.prazoBloqueado ? '⚠️ Prazo Estourado' : fase.progresso + '%'} ${fase.status}`}
+                              className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                fase.progresso >= 100
+                                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                                  : fase.prazoBloqueado
+                                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-700 dark:text-rose-300 animate-pulse'
+                                  : fase.atrasadaFase
+                                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400'
+                                  : fase.hasStarted
+                                  ? 'bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400'
+                                  : 'bg-slate-100 dark:bg-slate-800/50 border-slate-300 dark:border-slate-700 text-slate-400'
+                              }`}
+                            >
+                              <span>{fase.icon}</span>
+                              <span>{fase.prazoBloqueado ? '⚠️' : `${fase.progresso}%`}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Seta */}
+                      <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 mt-0.5 transition-transform duration-200 ${expandido ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+
+                  {/* Detalhe expandido */}
+                  {expandido && (
+                    <div className="border-t border-slate-100 dark:border-[#1e293b]">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-50/80 dark:bg-[#0a1020]/60 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#1e293b]">
+                              <th className="py-2 px-3">Fase</th>
+                              <th className="py-2 px-3">Responsável(is)</th>
+                              <th className="py-2 px-3 text-center">%</th>
+                              <th className="py-2 px-3 text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-[#1e293b] text-xs">
+                            {proj.fases.map(fase => {
+                              const isConcluida = fase.progresso >= 100;
+                              const isAtrasada = fase.atrasadaFase;
+                              return (
+                                <tr key={fase.key} className={`${isAtrasada ? 'bg-rose-500/[0.03]' : ''}`}>
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-sm">{fase.icon}</span>
+                                      <div>
+                                        <strong className="text-[11px] text-slate-900 dark:text-slate-100 block">{fase.order}. {fase.label}</strong>
+                                        {fase.dataInicioFase && (
+                                          <span className="text-[10px] text-slate-400">{new Date(`${fase.dataInicioFase}T00:00:00`).toLocaleDateString('pt-BR')} → {fase.prazoFaseFormatado}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <div className="flex flex-wrap gap-1">
+                                      {fase.responsaveis.length > 0
+                                        ? fase.responsaveis.map((r, i) => (
+                                          <span key={i} className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{r}</span>
+                                        ))
+                                        : <span className="text-slate-400 text-[10px] italic">—</span>
+                                      }
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <div className="flex flex-col items-center gap-0.5 w-16 mx-auto">
+                                      <span className={`text-xs font-black ${isConcluida ? 'text-emerald-600 dark:text-emerald-400' : fase.prazoBloqueado ? 'text-rose-500' : 'text-slate-700 dark:text-slate-200'}`}>
+                                        {fase.prazoBloqueado ? '⚠️ 99%' : `${fase.progresso}%`}
+                                      </span>
+                                      <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full ${isConcluida ? 'bg-emerald-500' : fase.prazoBloqueado ? 'bg-rose-500 animate-pulse' : isAtrasada ? 'bg-rose-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, fase.progresso)}%` }} />
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 px-3 text-right">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isConcluida ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : isAtrasada ? 'bg-rose-600 text-white' : fase.hasStarted ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                      {isConcluida ? '✓ OK' : isAtrasada ? `+${fase.diasAtraso}d` : fase.hasStarted ? `${fase.diasRestantesFase}d` : '—'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ) : (
-          <div className="space-y-5">
+          /* ── MODO DETALHADO: lista vertical com tabela completa ──────── */
+          <div className="space-y-4">
             {projetosFiltrados.map((proj) => (
               <div
                 key={proj.nome}
-                className={`bg-white dark:bg-[#0d1527] rounded-2xl border shadow-sm transition-all overflow-hidden ${
-                  proj.temAtraso
-                    ? 'border-rose-500/40'
-                    : proj.concluidoGeral
-                    ? 'border-emerald-500/30'
-                    : 'border-slate-200 dark:border-[#1e293b]'
+                className={`bg-white dark:bg-[#0d1527] rounded-2xl border shadow-sm overflow-hidden ${
+                  proj.temAtraso ? 'border-rose-500/40' :
+                  proj.concluidoGeral ? 'border-emerald-500/40' :
+                  'border-slate-200 dark:border-[#1e293b]'
                 }`}
               >
-                {/* ── Cabeçalho Conciso da Obra ───────────────────────── */}
+                {/* Cabeçalho da obra */}
                 <div className="p-4 md:p-5 bg-slate-50/70 dark:bg-[#0a1020]/70 border-b border-slate-100 dark:border-[#1e293b] flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-slate-200 dark:bg-[#16203a] text-slate-700 dark:text-slate-300">
-                        {proj.versao !== 'V0' ? proj.versao : 'OBRA'}
-                      </span>
-                      <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                        {proj.baseName}
-                      </h2>
-                      {proj.atrasado && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse">
-                          🚨 Vencido em {Math.abs(proj.diasRestantes)}d
+                      {proj.versao !== 'V0' && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-slate-200 dark:bg-[#16203a] text-slate-700 dark:text-slate-300">
+                          {proj.versao}
                         </span>
+                      )}
+                      <h2 className="text-lg font-black text-slate-900 dark:text-white">{proj.baseName}</h2>
+                      {proj.atrasado && !proj.concluidoGeral && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-rose-600 text-white animate-pulse">🚨 Vencido em {Math.abs(proj.diasRestantes)}d</span>
                       )}
                       {proj.concluidoGeral && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">
-                          ✅ 100% Concluída
-                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-600 text-white">✅ 100% Concluída</span>
                       )}
                     </div>
-
-                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
-                      {proj.dataInicio && (
-                        <span>Início: <strong>{new Date(`${proj.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}</strong></span>
-                      )}
-                      <span>Prazo Final: <strong>{proj.prazoFormatado}</strong></span>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                      {proj.dataInicio && <span>Início: <strong>{new Date(`${proj.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}</strong></span>}
+                      <span>Prazo: <strong>{proj.prazoFormatado}</strong></span>
                       {proj.prazoFinal && !proj.concluidoGeral && (
-                        <span className={proj.atrasado ? 'text-rose-500 font-bold' : 'text-slate-500'}>
-                          ({proj.atrasado ? `+${Math.abs(proj.diasRestantes)}d no prazo total` : `Restam ${proj.diasRestantes}d`})
+                        <span className={proj.atrasado ? 'text-rose-500 font-bold' : ''}>
+                          ({proj.atrasado ? `+${Math.abs(proj.diasRestantes)}d` : `Restam ${proj.diasRestantes}d`})
                         </span>
                       )}
                     </div>
                   </div>
-
-                  {/* Barra de Progresso Geral da Obra */}
                   <div className="flex items-center gap-3">
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Conclusão Total</span>
-                      <span className="text-lg font-black text-slate-900 dark:text-white">{proj.progressoGeral}%</span>
+                    <div className="text-right">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Conclusão</span>
+                      <span className="text-xl font-black text-slate-900 dark:text-white">{proj.progressoGeral}%</span>
                     </div>
-
-                    <div className="w-28 h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shrink-0">
+                    <div className="w-24 h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          proj.concluidoGeral ? 'bg-emerald-500' : proj.temAtraso ? 'bg-rose-500' : 'bg-indigo-600'
-                        }`}
+                        className={`h-full rounded-full transition-all duration-500 ${proj.concluidoGeral ? 'bg-emerald-500' : proj.temAtraso ? 'bg-rose-500' : 'bg-indigo-600'}`}
                         style={{ width: `${proj.progressoGeral}%` }}
                       />
                     </div>
                   </div>
                 </div>
 
-                {/* ── Tabela Executiva das 6 Fases (Cada Fase e Responsável Separados) ── */}
+                {/* Tabela de fases */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 dark:border-[#1e293b] bg-white dark:bg-[#0d1527] text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        <th className="py-2 px-3">Fase</th>
-                        <th className="py-2 px-3">👤 Responsável(is)</th>
-                        <th className="py-2 px-3 text-center">Progresso</th>
-                        <th className="py-2 px-3 text-right">Situação</th>
+                      <tr className="border-b border-slate-100 dark:border-[#1e293b] text-[10px] font-black uppercase tracking-wider text-slate-400">
+                        <th className="py-2 px-4">Fase</th>
+                        <th className="py-2 px-4">👤 Responsável(is)</th>
+                        <th className="py-2 px-4 text-center">Progresso</th>
+                        <th className="py-2 px-4 text-right">Situação</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-[#1e293b] text-xs">
                       {proj.fases.map((fase) => {
                         const isConcluida = fase.progresso >= 100;
                         const isAtrasada = fase.atrasadaFase;
-
                         return (
-                          <tr
-                            key={fase.key}
-                            className={`transition-colors hover:bg-slate-50/70 dark:hover:bg-[#111a30]/50 ${
-                              isAtrasada ? 'bg-rose-500/[0.04]' : ''
-                            }`}
-                          >
-                            {/* 1. Fase + datas inline */}
-                            <td className="py-2.5 px-3">
+                          <tr key={fase.key} className={`transition-colors hover:bg-slate-50/70 dark:hover:bg-[#111a30]/50 ${isAtrasada ? 'bg-rose-500/[0.04]' : ''}`}>
+                            <td className="py-2.5 px-4">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm shrink-0">{fase.icon}</span>
                                 <div>
-                                  <strong className="font-bold text-slate-900 dark:text-slate-100 block text-[11px]">
-                                    {fase.order}. {fase.label}
-                                  </strong>
+                                  <strong className="font-bold text-slate-900 dark:text-slate-100 block text-[11px]">{fase.order}. {fase.label}</strong>
                                   {fase.dataInicioFase ? (
-                                    <span className="text-[10px] text-slate-400 hidden sm:block">
-                                      {new Date(`${fase.dataInicioFase}T00:00:00`).toLocaleDateString('pt-BR')} → {fase.prazoFaseFormatado}
-                                    </span>
+                                    <span className="text-[10px] text-slate-400 hidden sm:block">{new Date(`${fase.dataInicioFase}T00:00:00`).toLocaleDateString('pt-BR')} → {fase.prazoFaseFormatado}</span>
                                   ) : (
                                     <span className="text-[10px] text-slate-400 hidden sm:block">Prazo: {fase.prazoFaseFormatado}</span>
                                   )}
                                 </div>
                               </div>
                             </td>
-
-                            {/* 2. Responsável(is) */}
-                            <td className="py-2.5 px-3">
+                            <td className="py-2.5 px-4">
                               <div className="flex flex-wrap gap-1">
-                                {fase.responsaveis.length > 0 ? (
-                                  fase.responsaveis.map((resp, rIdx) => (
-                                    <span
-                                      key={rIdx}
-                                      className={`px-1.5 py-0.5 rounded font-bold text-[10px] border ${
-                                        isAtrasada
-                                          ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-500/40'
-                                          : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'
-                                      }`}
-                                    >
-                                      {resp}
-                                    </span>
+                                {fase.responsaveis.length > 0
+                                  ? fase.responsaveis.map((resp, rIdx) => (
+                                    <span key={rIdx} className={`px-1.5 py-0.5 rounded font-bold text-[10px] border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-500/40' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{resp}</span>
                                   ))
-                                ) : (
-                                  <span className="text-slate-400 italic text-[10px]">—</span>
-                                )}
+                                  : <span className="text-slate-400 italic text-[10px]">—</span>
+                                }
                               </div>
                             </td>
-
-                            {/* 3. Progresso (só leitura — editável no Diário de Campo) */}
-                            <td className="py-2.5 px-3 text-center">
-                              <div className="inline-flex flex-col items-center w-full max-w-[100px] mx-auto">
-                                <span className={`text-xs font-black mb-1 ${
-                                  isConcluida ? 'text-emerald-600 dark:text-emerald-400' :
-                                  fase.prazoBloqueado ? 'text-rose-600 dark:text-rose-400' :
-                                  isAtrasada ? 'text-rose-600 dark:text-rose-400' :
-                                  fase.progresso >= 75 ? 'text-blue-600 dark:text-blue-400' :
-                                  'text-slate-600 dark:text-slate-400'
-                                }`}>
+                            <td className="py-2.5 px-4 text-center">
+                              <div className="inline-flex flex-col items-center w-24 mx-auto">
+                                <span className={`text-xs font-black mb-1 ${isConcluida ? 'text-emerald-600 dark:text-emerald-400' : fase.prazoBloqueado ? 'text-rose-600 dark:text-rose-400' : isAtrasada ? 'text-rose-600 dark:text-rose-400' : fase.progresso >= 75 ? 'text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400'}`}>
                                   {fase.prazoBloqueado ? '⚠️ 99%' : `${fase.progresso}%`}
                                 </span>
                                 <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      isConcluida ? 'bg-emerald-500' :
-                                      fase.prazoBloqueado ? 'bg-rose-500 animate-pulse' :
-                                      isAtrasada ? 'bg-rose-500' :
-                                      fase.progresso >= 75 ? 'bg-blue-500' :
-                                      'bg-indigo-500'
-                                    }`}
-                                    style={{ width: `${Math.min(100, fase.progresso)}%` }}
-                                  />
+                                  <div className={`h-full rounded-full transition-all duration-500 ${isConcluida ? 'bg-emerald-500' : fase.prazoBloqueado ? 'bg-rose-500 animate-pulse' : isAtrasada ? 'bg-rose-500' : fase.progresso >= 75 ? 'bg-blue-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min(100, fase.progresso)}%` }} />
                                 </div>
-                                {fase.prazoBloqueado && (
-                                  <span className="text-[9px] text-rose-600 dark:text-rose-400 mt-0.5 font-bold">Prazo Estourado</span>
-                                )}
-                                {!fase.prazoBloqueado && fase.totalLogs > 0 && (
-                                  <span className="text-[9px] text-slate-400 mt-0.5">{fase.totalLogs} reg.</span>
-                                )}
+                                {fase.prazoBloqueado && <span className="text-[9px] text-rose-600 dark:text-rose-400 mt-0.5 font-bold">Prazo Estourado</span>}
+                                {!fase.prazoBloqueado && fase.totalLogs > 0 && <span className="text-[9px] text-slate-400 mt-0.5">{fase.totalLogs} reg.</span>}
                               </div>
                             </td>
-
-                            {/* 4. Situação */}
-                            <td className="py-2.5 px-3 text-right">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider inline-block ${
-                                isConcluida
-                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
-                                  : isAtrasada
-                                  ? 'bg-rose-600 text-white'
-                                  : fase.hasStarted
-                                  ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                              }`}>
-                                {isConcluida
-                                  ? '✓ Concluída'
-                                  : isAtrasada
-                                  ? `+${fase.diasAtraso}d Atraso`
-                                  : fase.hasStarted
-                                  ? `Restam ${fase.diasRestantesFase}d`
-                                  : 'Não Iniciada'}
+                            <td className="py-2.5 px-4 text-right">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider inline-block ${isConcluida ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : isAtrasada ? 'bg-rose-600 text-white' : fase.hasStarted ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                {isConcluida ? '✓ Concluída' : isAtrasada ? `+${fase.diasAtraso}d Atraso` : fase.hasStarted ? `Restam ${fase.diasRestantesFase}d` : 'Não Iniciada'}
                               </span>
                             </td>
                           </tr>
