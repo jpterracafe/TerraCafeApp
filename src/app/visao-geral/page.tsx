@@ -539,29 +539,45 @@ export default function VisaoGeralDiretorPage() {
               {todasFasesAtrasadas.map((item, idx) => (
                 <div
                   key={`${item.projetoNome}-${item.etapaKey}-${idx}`}
-                  className="flex items-center justify-between gap-3 bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl p-3 text-xs"
+                  className="bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl p-4 flex flex-col gap-3"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-base shrink-0">{item.etapaIcon}</span>
-                    <div className="min-w-0">
-                      <span className="font-black text-slate-900 dark:text-white block truncate">{item.baseName}</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
-                        {item.etapaOrder}. {item.etapaLabel}
-                      </span>
-                      {item.responsaveis.length > 0 && (
-                        <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300 block truncate">
-                          👤 {item.responsaveis.join(', ')}
+                  {/* Topo: ícone + info + badge de atraso */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <span className="text-xl shrink-0 mt-0.5">{item.etapaIcon}</span>
+                      <div className="min-w-0">
+                        <span className="font-black text-sm text-slate-900 dark:text-white block truncate">{item.baseName}</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                          {item.etapaOrder}. {item.etapaLabel}
                         </span>
-                      )}
+                        {item.responsaveis.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {item.responsaveis.map((r, i) => (
+                              <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                                {r}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 text-white block mb-1">
+                    <span className="px-3 py-1.5 rounded-xl text-sm font-black bg-rose-600 text-white shrink-0 shadow-sm">
                       +{item.diasAtraso}d
                     </span>
-                    <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 block">
-                      {item.progresso}%
-                    </span>
+                  </div>
+
+                  {/* Barra de conclusão */}
+                  <div>
+                    <div className="flex items-center justify-between text-[11px] mb-1.5">
+                      <span className="text-slate-500 dark:text-slate-400 font-semibold">Conclusão da fase</span>
+                      <span className="font-black text-rose-600 dark:text-rose-400">{item.progresso}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-rose-100 dark:bg-rose-950/30 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-rose-500 transition-all duration-500"
+                        style={{ width: `${Math.min(100, item.progresso)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}
