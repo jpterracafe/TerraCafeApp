@@ -524,24 +524,45 @@ export default function VisaoGeralDiretorPage() {
         {/* ── Alertas de Fases em Atraso (se houver) ────────────────────── */}
         {todasFasesAtrasadas.length > 0 && (
           <div className="bg-rose-500/10 dark:bg-rose-950/20 border-2 border-rose-500/40 dark:border-rose-500/30 rounded-2xl p-3.5 md:p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 animate-bounce" />
-              <h3 className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                {todasFasesAtrasadas.length} {todasFasesAtrasadas.length === 1 ? 'Fase em Atraso' : 'Fases em Atraso'} — Atenção Imediata
-              </h3>
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 animate-bounce" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                  {todasFasesAtrasadas.length} {todasFasesAtrasadas.length === 1 ? 'Fase em Atraso' : 'Fases em Atraso'} — Atenção Imediata
+                </h3>
+              </div>
+              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/15 px-2.5 py-1 rounded-full border border-rose-500/30 shrink-0">
+                Cobrança de Prazos
+              </span>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {todasFasesAtrasadas.map((item, idx) => (
                 <div
                   key={`${item.projetoNome}-${item.etapaKey}-${idx}`}
-                  className="flex items-center gap-2 bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-3 bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl p-3 text-xs"
                 >
-                  <span className="shrink-0">{item.etapaIcon}</span>
-                  <div className="min-w-0">
-                    <span className="font-bold text-slate-900 dark:text-white block truncate max-w-[120px]">{item.baseName}</span>
-                    <span className="text-[10px] text-slate-500">{item.etapaLabel}</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-base shrink-0">{item.etapaIcon}</span>
+                    <div className="min-w-0">
+                      <span className="font-black text-slate-900 dark:text-white block truncate">{item.baseName}</span>
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block truncate">
+                        {item.etapaOrder}. {item.etapaLabel}
+                      </span>
+                      {item.responsaveis.length > 0 && (
+                        <span className="text-[10px] font-semibold text-rose-700 dark:text-rose-300 block truncate">
+                          👤 {item.responsaveis.join(', ')}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded font-black text-[10px] bg-rose-600 text-white shrink-0">+{item.diasAtraso}d</span>
+                  <div className="text-right shrink-0">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 text-white block mb-1">
+                      +{item.diasAtraso}d
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 block">
+                      {item.progresso}%
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
