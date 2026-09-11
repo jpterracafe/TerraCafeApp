@@ -4,10 +4,10 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toast';
 import {
-  LayoutDashboard, Search, CheckCircle2, AlertCircle, Clock,
+  Search, CheckCircle2, AlertCircle, Clock,
   Calendar, Users, RefreshCw, FileText, Loader2, Tv, Maximize2,
   Minimize2, AlertTriangle, ShieldAlert, Sparkles, Activity,
-  Layers, ArrowUpRight, Check
+  Layers, ArrowUpRight, Check, Edit3, X, Sliders, TrendingUp
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '../irrigacao/execucao/page';
@@ -71,6 +71,23 @@ export default function VisaoGeralDiretorPage() {
   // Filtros
   const [search, setSearch] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'atrasado' | 'em_andamento' | 'concluido'>('todos');
+
+  // Modal para ajuste rápido de progresso pelo Diretor
+  const [modalProgresso, setModalProgresso] = useState<{
+    open: boolean;
+    projetoNome: string;
+    etapaKey: EtapaCampo;
+    etapaLabel: string;
+    progressoAtual: number;
+  }>({
+    open: false,
+    projetoNome: '',
+    etapaKey: 'Valetas',
+    etapaLabel: '',
+    progressoAtual: 0,
+  });
+  const [tempProgresso, setTempProgresso] = useState<number>(0);
+  const [salvandoProgresso, setSalvandoProgresso] = useState(false);
 
   // Atualiza relógio do Modo TV a cada segundo
   useEffect(() => {
@@ -207,18 +224,17 @@ export default function VisaoGeralDiretorPage() {
           f.responsavel.trim() !== 'Não atribuído'
         ).map(f => f.responsavel.trim());
 
-        const respDiarioLogs = diarioLogs
-          .filter(l =>
-            l.projetoCliente &&
-            l.projetoCliente.trim() === nomeProjeto.trim() &&
-            l.atividade &&
-            (l.atividade.trim().toLowerCase() === et.key.toLowerCase() ||
-             l.atividade.trim().toLowerCase().includes(et.key.toLowerCase()) ||
-             et.key.toLowerCase().includes(l.atividade.trim().toLowerCase())) &&
-            l.responsavel &&
-            l.responsavel.trim()
-          )
-          .flatMap(l => l.responsavel.split(',').map((r: string) => r.trim()))
+        const logsEtapa = diarioLogs.filter(l =>
+          l.projetoCliente &&
+          l.projetoCliente.trim() === nomeProjeto.trim() &&
+          l.atividade &&
+          (l.atividade.trim().toLowerCase() === et.key.toLowerCase() ||
+           l.atividade.trim().toLowerCase().includes(et.key.toLowerCase()) ||
+           et.key.toLowerCase().includes(l.atividade.trim().toLowerCase()))
+        ).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+        const respDiarioLogs = logsEtapa
+          .flatMap(l => (l.responsavel || '').split(',').map((r: string) => r.trim()))
           .filter(Boolean);
 
         let todosResponsaveis = Array.from(
@@ -236,12 +252,10 @@ export default function VisaoGeralDiretorPage() {
 
         const responsaveis = todosResponsaveis.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
-        const pctProgresso = config.etapasProgresso[chaveEtapa] ?? 0;
-        somaProgresso += pctProgresso;
-
+        // Detecção de início e prazos
         const cfgFase = config.configEtapas[chaveEtapa];
-        const hasStarted = !!cfgFase?.dataInicio;
-        const dataInicioFase = cfgFase?.dataInicio || '';
+        const hasStarted = !!cfgFase?.dataInicio || logsEtapa.length > 0;
+        const dataInicioFase = cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : '');
         const metaDiasFase = cfgFase?.metaDias || 20;
 
         let prazoLimiteFase = cfgFase?.prazoLimite || '';
@@ -250,6 +264,67 @@ export default function VisaoGeralDiretorPage() {
           dIni.setDate(dIni.getDate() + metaDiasFase);
           prazoLimiteFase = dIni.toISOString().split('T')[0];
         }
+
+        // ── CÁLCULO INTELIGENTE DO PROGRESSO (%) ─────────────────────────────
+        const hasConcluidoLog = logsEtapa.some(l => 
+          (l.status || '').toLowerCase().includes('concluído') || 
+          (l.status || '').toLowerCase().includes('concluido')
+        );
+
+        let pctProgresso = 0;
+        
+        // Prioridade 1: Valor manual definido pelo diretor (permite ajuste fino)
+        if (config.etapasProgresso && typeof config.etapasProgresso[chaveEtapa] === 'number') {
+          pctProgresso = config.etapasProgresso[chaveEtapa];
+        } 
+        // Prioridade 2: Marcação explícita de conclusão
+        else if (hasConcluidoLog || config.etapasStatus[chaveEtapa] === 'Concluída') {
+          pctProgresso = 100;
+        } 
+        // Prioridade 3: Cálculo automático baseado em múltiplos fatores
+        else if (hasStarted && dataInicioFase) {
+          const dIni = new Date(`${dataInicioFase}T00:00:00`);
+          dIni.setHours(0, 0, 0, 0);
+          const diffMs = hoje.getTime() - dIni.getTime();
+          const diasDecorridos = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+          
+          // Cálculo temporal (peso 60%)
+          const progressoTemporal = Math.min(100, Math.round((diasDecorridos / Math.max(1, metaDiasFase)) * 100));
+          
+          // Cálculo por atividade/frequência (peso 40%)
+          // Considera: se há registros recentes (últimos 7 dias), a fase está ativa
+          const diasAtras7 = new Date(hoje);
+          diasAtras7.setDate(diasAtras7.getDate() - 7);
+          const logsRecentes = logsEtapa.filter(l => new Date(l.data) >= diasAtras7).length;
+          const temAtividadeRecente = logsRecentes > 0;
+          
+          // Se há atividade recente e está dentro do prazo, considera progresso ativo
+          // Se passou do prazo e não tem atividade, mantém o progresso temporal
+          let progressoAtividade = 0;
+          if (temAtividadeRecente) {
+            // Fase com atividade recente: assume progresso mínimo de 20%
+            progressoAtividade = Math.max(20, Math.min(100, (logsEtapa.length * 15)));
+          } else if (logsEtapa.length > 0) {
+            // Fase com histórico mas sem atividade recente: progresso moderado
+            progressoAtividade = Math.min(80, logsEtapa.length * 10);
+          }
+          
+          // Combina os dois métodos de cálculo
+          pctProgresso = Math.round(
+            (progressoTemporal * 0.6) + (progressoAtividade * 0.4)
+          );
+          
+          // Limita a 95% para fases não concluídas explicitamente
+          // (permite que o diretor veja que falta validação final)
+          pctProgresso = Math.min(95, Math.max(0, pctProgresso));
+          
+          // Se passou muito do prazo (>150%) e não está concluída, fixa em 90%
+          if (progressoTemporal >= 150) {
+            pctProgresso = Math.min(pctProgresso, 90);
+          }
+        }
+
+        somaProgresso += pctProgresso;
 
         let diasRestantesFase = 0;
         let atrasadaFase = false;
@@ -292,6 +367,7 @@ export default function VisaoGeralDiretorPage() {
           atrasadaFase,
           diasAtraso,
           status,
+          totalLogs: logsEtapa.length,
         };
       });
 
@@ -395,6 +471,58 @@ export default function VisaoGeralDiretorPage() {
     };
   }, [projetosProcessados, todasFasesAtrasadas]);
 
+  // Salva ajuste manual de progresso
+  const handleSalvarProgresso = async (valor: number) => {
+    if (!modalProgresso.projetoNome || !modalProgresso.etapaKey) return;
+    const chave = `${modalProgresso.projetoNome}::${modalProgresso.etapaKey}`;
+    const clamped = Math.min(100, Math.max(0, valor));
+
+    setSalvandoProgresso(true);
+    try {
+      const novosProgressos = {
+        ...config.etapasProgresso,
+        [chave]: clamped,
+      };
+
+      setConfig(prev => ({
+        ...prev,
+        etapasProgresso: novosProgressos,
+      }));
+
+      const res = await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'progresso',
+          dados: { [chave]: clamped },
+        }),
+      });
+
+      if (res.ok) {
+        success(`Progresso de ${modalProgresso.etapaLabel} atualizado para ${clamped}%!`);
+        setModalProgresso(prev => ({ ...prev, open: false }));
+      } else {
+        toastError('Erro ao sincronizar progresso.');
+      }
+    } catch (e) {
+      console.error('[visao-geral] Erro ao salvar progresso:', e);
+      toastError('Erro ao salvar progresso.');
+    } finally {
+      setSalvandoProgresso(false);
+    }
+  };
+
+  const openModalProgresso = (projetoNome: string, etapaKey: EtapaCampo, etapaLabel: string, progressoAtual: number) => {
+    setModalProgresso({
+      open: true,
+      projetoNome,
+      etapaKey,
+      etapaLabel,
+      progressoAtual,
+    });
+    setTempProgresso(progressoAtual);
+  };
+
   return (
     <div
       ref={scrollContainerRef}
@@ -470,83 +598,83 @@ export default function VisaoGeralDiretorPage() {
       <main className="max-w-7xl mx-auto space-y-6">
 
         {/* ── KPIs Rápidos e Sucintos para o Diretor ────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Obras Ativas</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-white mt-0.5">{statsGerais.totalProjetos}</div>
-            <span className="text-[11px] text-slate-400">em andamento</span>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Obras Ativas</span>
+            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{statsGerais.totalProjetos}</div>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">em execução</span>
           </div>
 
-          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-emerald-500/5 to-transparent">
-            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Obras em Dia</span>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-0.5">{statsGerais.emDia}</div>
-            <span className="text-[11px] text-emerald-500/80">no cronograma</span>
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-emerald-500/5 to-transparent hover:shadow-md transition-shadow">
+            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block mb-1">Obras em Dia</span>
+            <div className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">{statsGerais.emDia}</div>
+            <span className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5 block">no cronograma</span>
           </div>
 
-          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm ${
+          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow ${
             statsGerais.comAtraso > 0 ? 'border-rose-500/40 bg-gradient-to-br from-rose-500/10 to-transparent' : 'border-slate-200 dark:border-[#1e293b]'
           }`}>
-            <span className="text-[10px] font-bold text-rose-500 uppercase tracking-wider block">Com Atraso</span>
-            <div className={`text-2xl font-black mt-0.5 ${statsGerais.comAtraso > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wider block mb-1">Com Atraso</span>
+            <div className={`text-3xl font-black tracking-tight ${statsGerais.comAtraso > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
               {statsGerais.comAtraso}
             </div>
-            <span className="text-[11px] text-rose-500/80 font-medium">
+            <span className="text-[11px] text-rose-600/70 dark:text-rose-400/70 font-medium mt-0.5 block">
               {statsGerais.totalFasesAtrasadas} {statsGerais.totalFasesAtrasadas === 1 ? 'fase atrasada' : 'fases atrasadas'}
             </span>
           </div>
 
-          <div className="bg-white dark:bg-[#0d1527] border border-purple-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-purple-500/5 to-transparent">
-            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">Concluídas</span>
-            <div className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-0.5">{statsGerais.concluidos}</div>
-            <span className="text-[11px] text-purple-500/80">100% entregues</span>
+          <div className="bg-white dark:bg-[#0d1527] border border-purple-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-purple-500/5 to-transparent hover:shadow-md transition-shadow">
+            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block mb-1">Concluídas</span>
+            <div className="text-3xl font-black text-purple-600 dark:text-purple-400 tracking-tight">{statsGerais.concluidos}</div>
+            <span className="text-[11px] text-purple-600/70 dark:text-purple-400/70 mt-0.5 block">100% entregues</span>
           </div>
 
-          <div className="bg-white dark:bg-[#0d1527] border border-blue-500/30 rounded-2xl p-4 shadow-sm col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500/5 to-transparent">
-            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">Progresso Médio</span>
-            <div className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-0.5">{statsGerais.progressoMedioGeral}%</div>
-            <span className="text-[11px] text-blue-500/80">execução geral</span>
+          <div className="bg-white dark:bg-[#0d1527] border border-blue-500/30 rounded-2xl p-4 shadow-sm col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500/5 to-transparent hover:shadow-md transition-shadow">
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block mb-1">Progresso Médio</span>
+            <div className="text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tight">{statsGerais.progressoMedioGeral}%</div>
+            <span className="text-[11px] text-blue-600/70 dark:text-blue-400/70 mt-0.5 block">execução geral</span>
           </div>
         </div>
 
         {/* ── Mural Sucinto de Fases em Atraso (se houver) ─────────────── */}
         {todasFasesAtrasadas.length > 0 && (
-          <div className="bg-rose-500/10 border-2 border-rose-500/40 rounded-2xl p-4 md:p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
-                <ShieldAlert className="w-5 h-5 animate-bounce" />
+          <div className="bg-rose-500/10 dark:bg-rose-950/20 border-2 border-rose-500/40 dark:border-rose-500/30 rounded-2xl p-4 md:p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2.5 text-rose-600 dark:text-rose-400">
+                <ShieldAlert className="w-5 h-5 shrink-0 animate-bounce" />
                 <h3 className="text-sm font-black uppercase tracking-wider">
                   Atenção Imediata: {todasFasesAtrasadas.length} {todasFasesAtrasadas.length === 1 ? 'Fase em Atraso' : 'Fases em Atraso'}
                 </h3>
               </div>
-              <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 bg-rose-500/20 px-2.5 py-0.5 rounded-full">
+              <span className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-500/20 dark:bg-rose-900/30 px-3 py-1 rounded-full shrink-0 border border-rose-500/30">
                 Cobrança de Prazos
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {todasFasesAtrasadas.map((item, idx) => (
                 <div
                   key={`${item.projetoNome}-${item.etapaKey}-${idx}`}
-                  className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-xl p-3 shadow-sm flex items-center justify-between gap-3"
+                  className="bg-white dark:bg-[#0d1527] border border-rose-500/40 dark:border-rose-500/30 rounded-xl p-3.5 shadow-sm hover:shadow-md transition-all flex items-center justify-between gap-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm">{item.etapaIcon}</span>
-                      <strong className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-base shrink-0">{item.etapaIcon}</span>
+                      <strong className="text-sm font-bold text-slate-900 dark:text-white truncate">
                         {item.baseName}
                       </strong>
                     </div>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block truncate">
-                      {item.etapaOrder}. {item.etapaLabel} • <strong>{item.responsaveis.join(', ')}</strong>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 block truncate leading-relaxed">
+                      {item.etapaOrder}. {item.etapaLabel} • <strong className="text-slate-900 dark:text-white">{item.responsaveis.join(', ')}</strong>
                     </span>
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-black bg-rose-600 text-white block">
-                      +{item.diasAtraso}d ATRASO
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black bg-rose-600 text-white shadow-sm block mb-1">
+                      +{item.diasAtraso}d
                     </span>
-                    <span className="text-[10px] font-mono font-bold text-slate-400 block mt-0.5">
-                      {item.progresso}% concluído
+                    <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 block">
+                      {item.progresso}%
                     </span>
                   </div>
                 </div>
@@ -745,22 +873,44 @@ export default function VisaoGeralDiretorPage() {
                               </div>
                             </td>
 
-                            {/* 4. Percentual de Conclusão */}
+                            {/* 4. Percentual de Conclusão (com clique para ajuste rápido) */}
                             <td className="py-3 px-4 text-center">
-                              <div className="inline-flex flex-col items-center w-28">
-                                <div className="flex items-center justify-between w-full text-[11px] font-black text-slate-800 dark:text-slate-200 mb-0.5">
-                                  <span>{fase.progresso}%</span>
-                                  {isConcluida && <Check className="w-3.5 h-3.5 text-emerald-500" />}
+                              <button
+                                type="button"
+                                onClick={() => openModalProgresso(proj.nome, fase.key, fase.label, fase.progresso)}
+                                className="group inline-flex flex-col items-center w-full max-w-[140px] mx-auto p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#16203a] transition-all hover:shadow-sm"
+                                title={`Progresso: ${fase.progresso}% • Clique para ajustar manualmente${fase.totalLogs > 0 ? ` • ${fase.totalLogs} registro(s) no diário` : ''}`}
+                              >
+                                <div className="flex items-center justify-between w-full mb-1.5">
+                                  <span className={`text-sm font-black ${
+                                    isConcluida ? 'text-emerald-600 dark:text-emerald-400' :
+                                    isAtrasada ? 'text-rose-600 dark:text-rose-400' :
+                                    fase.progresso >= 75 ? 'text-blue-600 dark:text-blue-400' :
+                                    fase.progresso >= 50 ? 'text-indigo-600 dark:text-indigo-400' :
+                                    'text-slate-600 dark:text-slate-400'
+                                  }`}>
+                                    {fase.progresso}%
+                                  </span>
+                                  <Edit3 className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 transition-colors" />
                                 </div>
-                                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
                                   <div
-                                    className={`h-full rounded-full ${
-                                      isConcluida ? 'bg-emerald-500' : isAtrasada ? 'bg-rose-500' : 'bg-indigo-600'
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                      isConcluida ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' : 
+                                      isAtrasada ? 'bg-gradient-to-r from-rose-600 to-rose-500' : 
+                                      fase.progresso >= 75 ? 'bg-gradient-to-r from-blue-600 to-blue-500' :
+                                      'bg-gradient-to-r from-indigo-600 to-indigo-500'
                                     }`}
-                                    style={{ width: `${fase.progresso}%` }}
+                                    style={{ width: `${Math.min(100, fase.progresso)}%` }}
                                   />
                                 </div>
-                              </div>
+                                {fase.totalLogs > 0 && (
+                                  <span className="text-[9px] text-slate-400 mt-1 flex items-center gap-0.5">
+                                    <Activity className="w-2.5 h-2.5" />
+                                    {fase.totalLogs} registro{fase.totalLogs !== 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </button>
                             </td>
 
                             {/* 5. Situação / Badge */}
@@ -795,6 +945,178 @@ export default function VisaoGeralDiretorPage() {
         )}
 
       </main>
+
+      {/* ── Modal de Ajuste Rápido de Progresso pelo Diretor ───────────── */}
+      {modalProgresso.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#1e293b]">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-black text-slate-900 dark:text-white">
+                  Ajustar Progresso da Fase
+                </h3>
+              </div>
+              <button
+                onClick={() => setModalProgresso(prev => ({ ...prev, open: false }))}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div>
+              <span className="text-xs font-bold text-slate-400 block uppercase tracking-wider mb-1">Obra & Fase</span>
+              <p className="text-sm font-bold text-slate-900 dark:text-white mb-0.5">
+                {modalProgresso.projetoNome} • {modalProgresso.etapaLabel}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                Ajuste manual do progresso. Use 100% apenas quando a fase estiver completamente concluída e validada.
+              </p>
+            </div>
+
+            {/* Slider e Valor */}
+            <div className="space-y-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Nível de Conclusão:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`text-3xl font-black transition-colors ${
+                    tempProgresso === 100 ? 'text-emerald-600 dark:text-emerald-400' :
+                    tempProgresso >= 75 ? 'text-blue-600 dark:text-blue-400' :
+                    tempProgresso >= 50 ? 'text-indigo-600 dark:text-indigo-400' :
+                    tempProgresso >= 25 ? 'text-amber-600 dark:text-amber-400' :
+                    'text-slate-600 dark:text-slate-400'
+                  }`}>
+                    {tempProgresso}%
+                  </span>
+                  {tempProgresso === 100 && (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 animate-bounce" />
+                  )}
+                </div>
+              </div>
+
+              {/* Barra visual do progresso */}
+              <div className="w-full h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    tempProgresso === 100 ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' :
+                    tempProgresso >= 75 ? 'bg-gradient-to-r from-blue-600 to-blue-500' :
+                    tempProgresso >= 50 ? 'bg-gradient-to-r from-indigo-600 to-indigo-500' :
+                    tempProgresso >= 25 ? 'bg-gradient-to-r from-amber-500 to-amber-400' :
+                    'bg-gradient-to-r from-slate-500 to-slate-400'
+                  }`}
+                  style={{ width: `${tempProgresso}%` }}
+                />
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={tempProgresso}
+                onChange={(e) => setTempProgresso(Number(e.target.value))}
+                className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-500"
+                style={{
+                  background: `linear-gradient(to right, #4f46e5 0%, #4f46e5 ${tempProgresso}%, rgb(226 232 240) ${tempProgresso}%, rgb(226 232 240) 100%)`
+                }}
+              />
+
+              {/* Botões Rápidos */}
+              <div className="grid grid-cols-5 gap-1.5 pt-2">
+                {[0, 25, 50, 75, 100].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setTempProgresso(val)}
+                    className={`py-2 rounded-lg text-xs font-bold border transition-all ${
+                      tempProgresso === val
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md scale-105'
+                        : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] hover:scale-105'
+                    }`}
+                  >
+                    {val === 100 ? (
+                      <span className="flex items-center justify-center gap-1">
+                        100% <Check className="w-3 h-3" />
+                      </span>
+                    ) : `${val}%`}
+                  </button>
+                ))}
+              </div>
+
+              {/* Dica contextual baseada no valor */}
+              <div className={`p-3 rounded-lg border text-[11px] leading-relaxed ${
+                tempProgresso === 100 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
+                  : tempProgresso >= 75
+                  ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                  : tempProgresso >= 50
+                  ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
+                  : tempProgresso >= 25
+                  ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                  : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                {tempProgresso === 100 && (
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase Concluída:</strong> Todas as atividades foram finalizadas e validadas.</span>
+                  </span>
+                )}
+                {tempProgresso >= 75 && tempProgresso < 100 && (
+                  <span className="flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase Avançada:</strong> Trabalho próximo da conclusão, requer validação final.</span>
+                  </span>
+                )}
+                {tempProgresso >= 50 && tempProgresso < 75 && (
+                  <span className="flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase em Andamento:</strong> Trabalho em execução, ritmo normal esperado.</span>
+                  </span>
+                )}
+                {tempProgresso >= 25 && tempProgresso < 50 && (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase Inicial:</strong> Trabalho começou, requer acompanhamento próximo.</span>
+                  </span>
+                )}
+                {tempProgresso < 25 && tempProgresso > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase Iniciando:</strong> Primeiras atividades em curso.</span>
+                  </span>
+                )}
+                {tempProgresso === 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 shrink-0" />
+                    <span><strong>Fase não Iniciada:</strong> Aguardando início das atividades.</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Ações */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#1e293b]">
+              <button
+                type="button"
+                onClick={() => setModalProgresso(prev => ({ ...prev, open: false }))}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#16203a]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={salvandoProgresso}
+                onClick={() => handleSalvarProgresso(tempProgresso)}
+                className="px-5 py-2 rounded-xl text-xs font-black bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm flex items-center gap-1.5"
+              >
+                {salvandoProgresso ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                <span>Salvar Progresso</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
