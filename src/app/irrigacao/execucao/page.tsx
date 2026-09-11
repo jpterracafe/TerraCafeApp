@@ -1,35 +1,37 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
+import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { 
-  ChevronRight, 
   Calendar, 
-  Plus, 
-  Filter, 
-  Search,
-  X,
-  User,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  FileText,
-  Edit2,
-  Trash2,
-  Briefcase,
-  History,
-  BarChart3,
-  Layers,
-  CheckCircle2,
-  Activity,
-  RotateCcw,
+  Search, 
+  X, 
+  User, 
+  AlertTriangle, 
+  CheckCircle2, 
+  Clock, 
+  FileText, 
+  Briefcase, 
+  Layers, 
+  Activity, 
+  RefreshCw,
+  ExternalLink,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  Droplets,
+  Plus,
+  ShieldAlert,
+  ArrowRight
 } from 'lucide-react';
-import Link from 'next/link';
-import { FaseAcao, StatusType, ActionType } from './mockFases';
+import { EtapaCampo, RegistroDiarioCampo } from '../types';
 
-// ── Helpers para controle de versões de projetos (V0, V1, V2, V3...) ────────
+// ── Helpers para controle de versões de projetos (mantidos para compatibilidade) ──
 export function extractProjectBaseName(name: string): string {
   if (!name) return '';
   return name.replace(/\s*\([vV]\d+\)$/, '').trim();
@@ -52,1018 +54,760 @@ export function incrementProjectVersion(name: string): string {
   return `${name.trim()} (V1)`;
 }
 
-// Ordem dos status como etapas de progresso
-const STATUS_ORDEM: StatusType[] = [
-  'Dentro do programado',
-  'Comercial/Ajustes',
-  'Aguardando material',
-  'Problema técnico',
-  'Concluído',
+// ── As 6 Fases Oficiais do Diário de Campo ──────────────────────────────────
+export const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: string; order: number }[] = [
+  { key: 'Valetas',                     label: 'Valetas',                     icon: '⛏️', desc: 'Abertura e nivelamento de valas', order: 1 },
+  { key: 'montagem campo',              label: 'Montagem Campo',              icon: '🌱', desc: 'Tubulações, gotejadores e conexões', order: 2 },
+  { key: 'casa de bombas',              label: 'Casa de Bombas',              icon: '⚙️', desc: 'Bombas, filtros e cabeçal', order: 3 },
+  { key: 'elétrica',                    label: 'Elétrica',                    icon: '⚡', desc: 'Quadros elétricos e automação', order: 4 },
+  { key: 'lavagem do sistema e testes',  label: 'Lavagem & Testes',            icon: '💧', desc: 'Limpeza, teste de pressão e estanqueidade', order: 5 },
+  { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
 
-// Abreviações para caber na barra
-const STATUS_LABEL: Record<StatusType, string> = {
-  'Dentro do programado': 'Programado',
-  'Comercial/Ajustes':    'Comercial',
-  'Problema técnico':     'Problema',
-  'Aguardando material':  'Aguardando',
-  'Concluído':            'Concluído',
-};
-
-// Cores por status — hex para não ser purgado pelo Tailwind
-const STATUS_COLOR: Record<StatusType, { hex: string; label: string }> = {
-  'Dentro do programado': { hex: '#10b981', label: 'text-emerald-400' },
-  'Comercial/Ajustes':    { hex: '#f59e0b', label: 'text-amber-400'   },
-  'Problema técnico':     { hex: '#f43f5e', label: 'text-rose-400'    },
-  'Aguardando material':  { hex: '#eab308', label: 'text-yellow-400'  },
-  'Concluído':            { hex: '#3b82f6', label: 'text-blue-400'    },
-};
-
-// Ordem das fases como pipeline
-const FASES_ORDEM_BARRA = [
-  '01 - Estudo preliminar',
-  '02 - Aprovação do cliente ou retorno',
-  '03 - Projeto executivo',
-  '04 - Compra',
-  '05 - Execução',
-];
-
-const FASES_COR = [
-  '#6366f1', // 01 indigo
-  '#f59e0b', // 02 amber
-  '#06b6d4', // 03 cyan
-  '#3b82f6', // 04 blue
-  '#10b981', // 05 emerald
-];
-
-const FASES_LABEL: Record<string, string> = {
-  '01 - Estudo preliminar':             'Estudo',
-  '02 - Aprovação do cliente ou retorno': 'Aprovação',
-  '03 - Projeto executivo':             'Projeto',
-  '04 - Compra':                        'Compra',
-  '05 - Execução':                      'Execução',
-};
-
-function FasePipelineBar({ gabarito }: { gabarito: string }) {
-  let currentIdx = FASES_ORDEM_BARRA.indexOf(gabarito);
-  if (currentIdx === -1) {
-    const l = (gabarito || '').toLowerCase();
-    if (l.includes('estudo')) currentIdx = 0;
-    else if (l.includes('aprova') || l.includes('retorno') || l.includes('comercial') || l.includes('análise')) currentIdx = 1;
-    else if (l.includes('executivo') || l.includes('projeto')) currentIdx = 2;
-    else if (l.includes('compra')) currentIdx = 3;
-    else if (l.includes('execu') || l.includes('campo') || l.includes('instala')) currentIdx = 4;
-  }
-
-  return (
-    <div className="mb-2.5 w-full">
-      {/* Segmentos das fases - MAIOR em destaque */}
-      <div className="flex items-center gap-1.5 mb-1.5">
-        {FASES_ORDEM_BARRA.map((fase, idx) => {
-          const isCurrent = idx === currentIdx;
-          const cor = FASES_COR[idx];
-          return (
-            <div
-              key={fase}
-              title={fase}
-              className="relative flex-1 rounded-full transition-all duration-300"
-              style={{
-                height: isCurrent ? '12px' : '8px',
-                backgroundColor: isCurrent ? cor : 'rgba(148,163,184,0.18)',
-                boxShadow: isCurrent ? `0 0 10px ${cor}88` : 'none',
-              }}
-            >
-              {isCurrent && (
-                <span
-                  className="absolute -top-[3.5px] left-1/2 -translate-x-1/2 w-4.5 h-4.5 rounded-full border-2 border-white dark:border-[#0d1527] shadow"
-                  style={{ backgroundColor: cor, boxShadow: `0 0 0 3px ${cor}44` }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {/* Nomes das fases */}
-      <div className="flex gap-1">
-        {FASES_ORDEM_BARRA.map((fase, idx) => {
-          const isCurrent = idx === currentIdx;
-          return (
-            <div key={fase} className="flex-1 text-center" title={fase}>
-              <span
-                className={`text-[9.5px] leading-tight block truncate ${
-                  isCurrent ? 'font-bold' : 'text-slate-400 dark:text-slate-500'
-                }`}
-                style={{ color: isCurrent ? FASES_COR[idx] : undefined }}
-              >
-                {FASES_LABEL[fase]}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+interface EtapaConfigItem {
+  dataInicio: string;
+  metaDias: number;
+  prazoLimite?: string;
+  hasStarted?: boolean;
 }
 
-function FaseProgressBar({ status }: { status: StatusType }) {
-  const currentIdx = STATUS_ORDEM.indexOf(status);
-  const corData = STATUS_COLOR[status] ?? STATUS_COLOR['Dentro do programado'];
-  const { hex } = corData;
-
-  return (
-    <div className="w-full">
-      {/* Segmentos de status - MAIS COMPACTO / MENOR que o de fase */}
-      <div className="flex items-center gap-1 mb-1">
-        {STATUS_ORDEM.map((s, idx) => {
-          const isCurrent = idx === currentIdx;
-          const corStatus = STATUS_COLOR[s]?.hex ?? hex;
-          return (
-            <div
-              key={s}
-              title={s}
-              className="relative flex-1 rounded-full transition-all duration-300"
-              style={{
-                height: isCurrent ? '7px' : '4px',
-                backgroundColor: isCurrent ? corStatus : 'rgba(148,163,184,0.14)',
-                boxShadow: isCurrent ? `0 0 6px ${corStatus}66` : 'none',
-              }}
-            >
-              {isCurrent && (
-                <span
-                  className="absolute -top-[2.5px] left-1/2 -translate-x-1/2 w-3 h-3 rounded-full border-2 border-white dark:border-[#0d1527] shadow"
-                  style={{ backgroundColor: corStatus, boxShadow: `0 0 0 2px ${corStatus}33` }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {/* Nomes dos status */}
-      <div className="flex gap-1">
-        {STATUS_ORDEM.map((s, idx) => {
-          const isCurrent = idx === currentIdx;
-          const corStatus = STATUS_COLOR[s]?.hex ?? hex;
-          return (
-            <div key={s} className="flex-1 text-center" title={s}>
-              <span
-                className={`text-[8.5px] leading-tight block truncate transition-all ${
-                  isCurrent ? 'font-semibold' : 'text-slate-400/80 dark:text-slate-500/80'
-                }`}
-                style={{ color: isCurrent ? corStatus : undefined }}
-              >
-                {STATUS_LABEL[s]}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+interface SystemConfigResponse {
+  configEtapas: Record<string, EtapaConfigItem>;
+  projetoStartDates: Record<string, string>;
+  responsaveisPorEtapa: Record<string, string[]>;
+  projetosPrazoFinal: Record<string, string>;
+  etapasProgresso: Record<string, number>;
+  etapasStatus: Record<string, string>;
 }
 
-function KpiCard({ label, value, sub, icon, color, alert }: {
-  label: string; value: number | string; sub: string; icon: React.ReactNode; color: string; alert?: boolean;
-}) {
-  return (
-    <div className={`bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4 md:p-5 border-l-4 ${color} shadow-md shadow-black/5 transition-all duration-300 hover:-translate-y-0.5`}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{label}</p>
-        {icon}
-      </div>
-      <p className={`text-2xl md:text-3xl font-bold ${alert ? 'text-rose-500 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>{value}</p>
-      <p className="text-xs text-slate-400 mt-1">{sub}</p>
-    </div>
-  );
-}
-
-const calculateDaysDifference = (targetDateStr: string) => {
-  if (!targetDateStr) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const targetDate = new Date(`${targetDateStr}T00:00:00`);
-  const diffTime = targetDate.getTime() - today.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-};
-
-export default function ExecucaoProjetosPage() {
+export default function PainelOperacionalObrasPage() {
+  const router = useRouter();
   const { success, error: toastError } = useToast();
-  const [fases, setFases] = useState<FaseAcao[]>([]);
-  const [todosResponsaveis, setTodosResponsaveis] = useState<string[]>([]);
-  const [totalLogsHoje, setTotalLogsHoje] = useState(0);
-  const [loading, setLoading] = useState(true);
 
-  // ── Carrega fases, responsáveis e logs do banco ───────────────────────────
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+
+  // Dados do sistema
+  const [projetosList, setProjetosList] = useState<string[]>([]);
+  const [config, setConfig] = useState<SystemConfigResponse>({
+    configEtapas: {},
+    projetoStartDates: {},
+    responsaveisPorEtapa: {},
+    projetosPrazoFinal: {},
+    etapasProgresso: {},
+    etapasStatus: {},
+  });
+  const [diarioLogs, setDiarioLogs] = useState<RegistroDiarioCampo[]>([]);
+
+  // Filtros
+  const [search, setSearch] = useState('');
+  const [filtroProjeto, setFiltroProjeto] = useState<string>('todos');
+  const [filtroEtapa, setFiltroEtapa] = useState<string>('todos');
+  const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'em_andamento' | 'atrasado' | 'concluido' | 'nao_iniciado'>('todos');
+
+  // Carrega dados consolidados do Diário de Campo e Projetos
   const loadData = useCallback(async () => {
-    setLoading(true);
     try {
-      const [fasesRes, respRes, logsRes] = await Promise.all([
-        fetch('/api/fases'),
-        fetch('/api/responsaveis'),
-        fetch('/api/diario-logs'),
+      const [resProj, resConfig, resLogs] = await Promise.all([
+        fetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
+        fetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
+        fetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
-      if (fasesRes.ok) {
-        const d = await fasesRes.json();
-        setFases(d.fases ?? []);
+
+      setProjetosList(resProj.projetos ?? []);
+      if (resConfig) {
+        setConfig(resConfig);
       }
-      if (respRes.ok) {
-        const d = await respRes.json();
-        setTodosResponsaveis((d.responsaveis ?? []).map((r: any) => r.nome));
-      }
-      if (logsRes.ok) {
-        const d = await logsRes.json();
-        const hojeLocal = new Date().toISOString().split('T')[0];
-        const countHoje = (d.logs ?? []).filter((l: any) => l.data === hojeLocal).length;
-        setTotalLogsHoje(countHoje);
-      }
+      setDiarioLogs(resLogs.logs ?? []);
+      setLastUpdate(new Date());
     } catch (e) {
       console.error('[execucao] Erro ao carregar dados:', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-  // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
+  // Auto-refresh a cada 30 segundos
   useEffect(() => {
     let timerId: ReturnType<typeof setInterval> | null = null;
-    const REFRESH_MS = 30 * 1000;
-
     const startPolling = () => {
       if (timerId) return;
       timerId = setInterval(() => {
-        if (!loading) loadData();
-      }, REFRESH_MS);
+        if (!loading && !refreshing) loadData();
+      }, 30000);
     };
 
     const stopPolling = () => {
-      if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
-      }
+      if (timerId) { clearInterval(timerId); timerId = null; }
     };
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!loading) loadData();
+        if (!loading && !refreshing) loadData();
         startPolling();
       } else {
         stopPolling();
       }
     };
 
-    const onFocus = () => {
-      if (!loading) loadData();
-    };
-
     startPolling();
     document.addEventListener('visibilitychange', onVisibility);
-    window.addEventListener('focus', onFocus);
-
     return () => {
       stopPolling();
       document.removeEventListener('visibilitychange', onVisibility);
-      window.removeEventListener('focus', onFocus);
     };
-  }, [loadData, loading]);
+  }, [loadData, loading, refreshing]);
 
-  // ── KPIs calculados ────────────────────────────────────────────────────────
-  const kpiData = useMemo(() => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  // Processa dados dos projetos e das 6 etapas reais
+  const projetosProcessados = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    const naoDeleted = fases.filter(f => !f.isDeleted);
-    const ativas = naoDeleted.filter(f => f.status !== 'Concluído');
-    const concluidas = naoDeleted.filter(f => f.status === 'Concluído');
-    const atrasadas = ativas.filter(f => {
-      if (!f.prazoLimite) return false;
-      const dPrazo = new Date(`${f.prazoLimite}T00:00:00`);
-      dPrazo.setHours(0, 0, 0, 0);
-      return dPrazo.getTime() < hoje.getTime();
+
+    return projetosList.map(nomeProjeto => {
+      const baseName = extractProjectBaseName(nomeProjeto);
+      const versao = getProjectVersion(nomeProjeto);
+      const prazoFinal = config.projetosPrazoFinal[nomeProjeto] || '';
+      const dataInicio = config.projetoStartDates[nomeProjeto] || '';
+
+      // Cálculos de prazo total do projeto
+      let diasRestantesTotal = 0;
+      let atrasadoTotal = false;
+      let prazoFinalFormatado = 'Não definido';
+
+      if (prazoFinal) {
+        const dPrazo = new Date(`${prazoFinal}T00:00:00`);
+        prazoFinalFormatado = dPrazo.toLocaleDateString('pt-BR');
+        dPrazo.setHours(0, 0, 0, 0);
+        const diffMs = dPrazo.getTime() - hoje.getTime();
+        diasRestantesTotal = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        atrasadoTotal = diasRestantesTotal < 0;
+      }
+
+      // Processamento individual das 6 fases
+      let somaProgresso = 0;
+      let qtdFasesEmAndamento = 0;
+      let qtdFasesAtrasadas = 0;
+      let qtdFasesConcluidas = 0;
+
+      const fases = ETAPAS_OFICIAIS.map(et => {
+        const chaveEtapa = `${nomeProjeto}::${et.key}`;
+        const cfgFase = config.configEtapas[chaveEtapa];
+        const pctProgresso = config.etapasProgresso[chaveEtapa] ?? 0;
+        somaProgresso += pctProgresso;
+
+        // Logs específicos desta etapa e projeto
+        const logsEtapa = diarioLogs.filter(l =>
+          l.projetoCliente &&
+          l.projetoCliente.trim() === nomeProjeto.trim() &&
+          l.atividade &&
+          (l.atividade.toLowerCase() === et.key.toLowerCase() ||
+           l.atividade.toLowerCase().includes(et.key.toLowerCase()) ||
+           et.key.toLowerCase().includes(l.atividade.toLowerCase()))
+        ).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+
+        const ultimoLog = logsEtapa[0] || null;
+
+        // Responsáveis da etapa (Config + Logs)
+        const respConfig = config.responsaveisPorEtapa[chaveEtapa] || [];
+        const respLogs = logsEtapa
+          .flatMap(l => (l.responsavel || '').split(',').map(r => r.trim()))
+          .filter(Boolean);
+
+        let todosResp = Array.from(new Set([...respConfig, ...respLogs])).filter(Boolean);
+        if (todosResp.length > 1 && todosResp.includes('Administrador')) {
+          todosResp = todosResp.filter(r => r !== 'Administrador');
+        }
+
+        const hasStarted = !!cfgFase?.dataInicio || logsEtapa.length > 0;
+        const dataInicioFase = cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : '');
+        const metaDiasFase = cfgFase?.metaDias || 20;
+
+        let prazoLimiteFase = cfgFase?.prazoLimite || '';
+        if (!prazoLimiteFase && hasStarted && dataInicioFase) {
+          const dIni = new Date(`${dataInicioFase}T00:00:00`);
+          dIni.setDate(dIni.getDate() + metaDiasFase);
+          prazoLimiteFase = dIni.toISOString().split('T')[0];
+        }
+
+        let diasRestantesFase = 0;
+        let atrasadaFase = false;
+        let diasAtraso = 0;
+        let prazoFaseFormatado = 'Não iniciado';
+
+        if (hasStarted && prazoLimiteFase) {
+          const dFim = new Date(`${prazoLimiteFase}T00:00:00`);
+          dFim.setHours(0, 0, 0, 0);
+          prazoFaseFormatado = dFim.toLocaleDateString('pt-BR');
+          diasRestantesFase = Math.ceil((dFim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+          atrasadaFase = diasRestantesFase < 0 && pctProgresso < 100;
+          if (atrasadaFase) {
+            diasAtraso = Math.abs(diasRestantesFase);
+          }
+        }
+
+        let situacaoFase: 'concluido' | 'atrasado' | 'em_andamento' | 'nao_iniciado' = 'nao_iniciado';
+        if (pctProgresso >= 100) {
+          situacaoFase = 'concluido';
+          qtdFasesConcluidas++;
+        } else if (atrasadaFase) {
+          situacaoFase = 'atrasado';
+          qtdFasesAtrasadas++;
+        } else if (hasStarted) {
+          situacaoFase = 'em_andamento';
+          qtdFasesEmAndamento++;
+        }
+
+        return {
+          ...et,
+          progresso: pctProgresso,
+          hasStarted,
+          dataInicioFase,
+          prazoLimiteFase,
+          prazoFaseFormatado,
+          metaDiasFase,
+          diasRestantesFase,
+          atrasadaFase,
+          diasAtraso,
+          situacaoFase,
+          responsaveis: todosResp,
+          totalLogs: logsEtapa.length,
+          ultimoLog,
+        };
+      });
+
+      const progressoGeral = Math.round(somaProgresso / ETAPAS_OFICIAIS.length);
+      const concluidoGeral = progressoGeral >= 100;
+
+      return {
+        nome: nomeProjeto,
+        baseName,
+        versao,
+        prazoFinal,
+        prazoFinalFormatado,
+        dataInicio,
+        diasRestantesTotal,
+        atrasadoTotal,
+        progressoGeral,
+        concluidoGeral,
+        qtdFasesEmAndamento,
+        qtdFasesAtrasadas,
+        qtdFasesConcluidas,
+        fases,
+      };
     });
+  }, [projetosList, config, diarioLogs]);
+
+  // Estatísticas e KPIs Operacionais
+  const kpis = useMemo(() => {
+    const hojeStr = new Date().toISOString().split('T')[0];
+    const totalLogsHoje = diarioLogs.filter(l => l.data === hojeStr).length;
+
+    let totalFasesAndamento = 0;
+    let totalFasesAtrasadas = 0;
+    let totalFasesConcluidas = 0;
+
+    projetosProcessados.forEach(p => {
+      totalFasesAndamento += p.qtdFasesEmAndamento;
+      totalFasesAtrasadas += p.qtdFasesAtrasadas;
+      totalFasesConcluidas += p.qtdFasesConcluidas;
+    });
+
     return {
-      ativas: ativas.length,
-      atrasadas: atrasadas.length,
-      concluidas: concluidas.length,
+      totalProjetos: projetosProcessados.length,
+      totalFasesAndamento,
+      totalFasesAtrasadas,
+      totalFasesConcluidas,
+      totalLogsHoje,
+      totalLogsGeral: diarioLogs.length,
     };
-  }, [fases]);
+  }, [projetosProcessados, diarioLogs]);
 
-  // ── Modais / state ────────────────────────────────────────────────────────
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [novoGabarito, setNovoGabarito] = useState<string>('01 - Estudo preliminar');
-  const [novoProjetoCliente, setNovoProjetoCliente] = useState('');
-  const [novoResponsavel, setNovoResponsavel] = useState('');
-  const [novaAcao, setNovaAcao] = useState<ActionType>('Cotar');
-  const [novoPrazo, setNovoPrazo] = useState('');
-  const [novoStatus, setNovoStatus] = useState<StatusType>('Dentro do programado');
-  const [novaObservacao, setNovaObservacao] = useState('');
-  const [faseToDelete, setFaseToDelete] = useState<FaseAcao | null>(null);
-  // Ao abrir o modal de deletar, calcula todas as fases do mesmo projeto
-  const fasesDoProjetoParaDeletar = useMemo(() => {
-    if (!faseToDelete) return [];
-    const proj = faseToDelete.projetoCliente?.trim() || '';
-    if (!proj) return [faseToDelete]; // sem projeto: só essa fase
-    return fases.filter(f => !f.isDeleted && (f.projetoCliente?.trim() || '') === proj);
-  }, [faseToDelete, fases]);
-  const [filterStatus, setFilterStatus] = useState<string>('Todos');
-  const [filterBusca, setFilterBusca] = useState<string>('');
-  const [filterProjeto, setFilterProjeto] = useState<string>('Todos');
-  const [activeTab, setActiveTab] = useState<'Em Andamento' | 'Concluído'>('Em Andamento');
-  const [savingNovo, setSavingNovo] = useState(false);
+  // Filtro inteligente de projetos e etapas
+  const projetosFiltrados = useMemo(() => {
+    const q = search.toLowerCase().trim();
 
-  // Edit state
-  const [editingFase, setEditingFase] = useState<FaseAcao | null>(null);
-  const [editGabarito, setEditGabarito] = useState('');
-  const [editProjetoCliente, setEditProjetoCliente] = useState('');
-  const [editResponsavel, setEditResponsavel] = useState('');
-  const [editPrazoLimite, setEditPrazoLimite] = useState('');
-  const [editStatus, setEditStatus] = useState<string>('Dentro do programado');
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [historico, setHistorico] = useState<{id:string;campo:string;valorNovo:string;usuario:string;criadoEm:string}[]>([]);
-  const [loadingHistorico, setLoadingHistorico] = useState(false);
-
-  const openEditModal = (fase: FaseAcao) => {
-    setEditingFase(fase);
-    setEditGabarito(fase.gabarito);
-    setEditProjetoCliente(fase.projetoCliente ?? '');
-    setEditResponsavel(fase.responsavel);
-    setEditPrazoLimite(fase.prazoLimite);
-    setEditStatus(fase.status);
-    // Carrega histórico
-    setHistorico([]);
-    setLoadingHistorico(true);
-    fetch(`/api/historico-fases?faseId=${fase.id}`)
-      .then(r => r.ok ? r.json() : { historico: [] })
-      .then(d => setHistorico(d.historico ?? []))
-      .catch(() => setHistorico([]))
-      .finally(() => setLoadingHistorico(false));
-  };
-
-  // ── Salvar edição ──────────────────────────────────────────────────────────
-  const handleSaveEdit = async () => {
-    if (!editingFase) return;
-    setSavingEdit(true);
-    try {
-      // Verifica se houve retorno da Fase 2 (Aprovação / Retorno) para Fase 1 (Estudo)
-      const eraFase2 = editingFase.gabarito.includes('02') || 
-        editingFase.gabarito.toLowerCase().includes('aprova') || 
-        editingFase.gabarito.toLowerCase().includes('retorno');
-      const vaiPraFase1 = editGabarito.includes('01') || 
-        editGabarito.toLowerCase().includes('estudo');
-      const isRetornoRollback = eraFase2 && vaiPraFase1;
-
-      let projetoClienteFinal = editProjetoCliente;
-      if (isRetornoRollback) {
-        projetoClienteFinal = incrementProjectVersion(editProjetoCliente || '');
-      }
-
-      // Auto-registra responsável novo
-      if (editResponsavel && editResponsavel !== 'Não atribuído' && !todosResponsaveis.includes(editResponsavel)) {
-        const r = await fetch('/api/responsaveis', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nome: editResponsavel, cargo: 'Atribuição Automática', origem: 'MANUAL' }),
-        });
-        if (r.ok) {
-          setTodosResponsaveis(prev => [...prev, editResponsavel]);
+    return projetosProcessados
+      .filter(p => {
+        if (filtroProjeto !== 'todos' && p.nome !== filtroProjeto) {
+          return false;
         }
-      }
 
-      const res = await fetch('/api/fases', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingFase.id,
-          gabarito: editGabarito,
-          projetoCliente: projetoClienteFinal,
-          responsavel: editResponsavel,
-          prazoLimite: editPrazoLimite,
-          status: isRetornoRollback ? 'Comercial/Ajustes' : editStatus,
-          acao: isRetornoRollback ? 'Revisar' : undefined,
-          observacoes: isRetornoRollback 
-            ? (editingFase.observacoes ? `${editingFase.observacoes} (Retorno -> ${getProjectVersion(projetoClienteFinal)})` : `Retorno do cliente -> ${getProjectVersion(projetoClienteFinal)}`)
-            : undefined,
-        }),
-      });
-      if (res.ok) {
-        const { fase } = await res.json();
-        setFases(prev => prev.map(f => f.id === fase.id ? fase : f));
-        if (isRetornoRollback) {
-          success(`Retorno registrado! Projeto avançou para ${getProjectVersion(projetoClienteFinal)}.`);
-        } else {
-          success('Fase atualizada com sucesso!');
+        // Filtro por texto na busca
+        if (q) {
+          const matchNome = p.nome.toLowerCase().includes(q);
+          const matchResp = p.fases.some(f => f.responsaveis.some(r => r.toLowerCase().includes(q)));
+          const matchLog = p.fases.some(f => (f.ultimoLog?.observacoes || '').toLowerCase().includes(q));
+          if (!matchNome && !matchResp && !matchLog) return false;
         }
-      } else {
-        toastError('Erro ao salvar as alterações.');
-      }
-    } catch (e) {
-      console.error('[execucao] Erro ao salvar edição:', e);
-      toastError('Erro ao salvar as alterações.');
-    } finally {
-      setSavingEdit(false);
-      setEditingFase(null);
-    }
-  };
 
-  // ── Salvar nova fase ───────────────────────────────────────────────────────
-  const handleSaveNovo = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!novoPrazo) return;
-    setSavingNovo(true);
-    try {
-      const res = await fetch('/api/fases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gabarito: novoGabarito,
-          projetoCliente: novoProjetoCliente,
-          responsavel: novoResponsavel || 'Não atribuído',
-          acao: novaAcao,
-          prazoLimite: novoPrazo,
-          status: novoStatus,
-          observacoes: novaObservacao,
-        }),
+        // Filtro por Situação
+        if (filtroSituacao === 'atrasado' && p.qtdFasesAtrasadas === 0 && !p.atrasadoTotal) return false;
+        if (filtroSituacao === 'em_andamento' && p.qtdFasesEmAndamento === 0) return false;
+        if (filtroSituacao === 'concluido' && !p.concluidoGeral) return false;
+        if (filtroSituacao === 'nao_iniciado' && p.progressoGeral > 0) return false;
+
+        return true;
+      })
+      .map(p => {
+        // Se houver filtro de etapa específico, filtra as fases exibidas
+        if (filtroEtapa !== 'todos') {
+          return {
+            ...p,
+            fases: p.fases.filter(f => f.key === filtroEtapa),
+          };
+        }
+        return p;
       });
-      if (res.ok) {
-        const { fase } = await res.json();
-        setFases(prev => [fase, ...prev]);
-        success('Nova ação criada com sucesso!');
-      } else {
-        toastError('Erro ao criar a ação.');
-      }
-    } catch (e) {
-      console.error('[execucao] Erro ao criar fase:', e);
-      toastError('Erro ao criar a ação.');
-    } finally {
-      setSavingNovo(false);
-      setNovoGabarito('01 - Estudo preliminar');
-      setNovoProjetoCliente('');
-      setNovoResponsavel('');
-      setNovaAcao('Cotar');
-      setNovoPrazo('');
-      setNovoStatus('Dentro do programado');
-      setNovaObservacao('');
-      setIsModalOpen(false);
-    }
-  };
-
-  // ── Mover projeto inteiro para lixeira (soft delete em todas as fases) ──────
-  const handleTrashFase = async () => {
-    if (!faseToDelete || fasesDoProjetoParaDeletar.length === 0) return;
-    try {
-      const resultados = await Promise.all(
-        fasesDoProjetoParaDeletar.map(f =>
-          fetch('/api/fases', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: f.id, isDeleted: true }),
-          })
-        )
-      );
-      const todasOk = resultados.every(r => r.ok);
-      if (todasOk) {
-        const ids = fasesDoProjetoParaDeletar.map(f => f.id);
-        setFases(prev => prev.map(f => ids.includes(f.id) ? { ...f, isDeleted: true } : f));
-        const nomeProjeto = faseToDelete.projetoCliente?.trim() || '';
-        success(nomeProjeto
-          ? `Projeto "${nomeProjeto}" movido para a lixeira.`
-          : 'Ação movida para a lixeira.'
-        );
-      } else {
-        toastError('Erro ao mover para a lixeira.');
-      }
-    } catch (e) {
-      console.error('[execucao] Erro ao mover para lixeira:', e);
-      toastError('Erro ao mover para a lixeira.');
-    } finally {
-      setFaseToDelete(null);
-    }
-  };
-
-  const filteredFases = useMemo(() => fases.filter(f => {
-    const matchTab     = activeTab === 'Em Andamento' ? (f.status !== 'Concluído' && !f.isDeleted) : (f.status === 'Concluído' && !f.isDeleted);
-    const matchStatus  = filterStatus === 'Todos' || f.status === filterStatus;
-    const matchBusca   = filterBusca === '' || 
-      (f.projetoCliente ?? '').toLowerCase().includes(filterBusca.toLowerCase()) ||
-      f.gabarito.toLowerCase().includes(filterBusca.toLowerCase()) ||
-      f.acao.toLowerCase().includes(filterBusca.toLowerCase());
-    const matchProjeto = filterProjeto === 'Todos' || (f.projetoCliente ?? '') === filterProjeto;
-    return matchTab && matchStatus && matchBusca && matchProjeto;
-  }), [fases, activeTab, filterStatus, filterBusca, filterProjeto]);
-
-  // Lista única de projetos para o select de filtro
-  const projetosUnicos = useMemo(() => {
-    const set = new Set(fases.filter(f => !f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '').map(f => f.projetoCliente as string));
-    return Array.from(set).sort();
-  }, [fases]);
-
-  // ── Paginação ──────────────────────────────────────────────────────────────
-  const PAGE_SIZE = 15;
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Reset para página 1 quando filtros mudam
-  const prevFilters = React.useRef({ activeTab, filterStatus, filterBusca, filterProjeto });
-  useEffect(() => {
-    const f = prevFilters.current;
-    if (f.activeTab !== activeTab || f.filterStatus !== filterStatus || f.filterBusca !== filterBusca || f.filterProjeto !== filterProjeto) {
-      setCurrentPage(1);
-      prevFilters.current = { activeTab, filterStatus, filterBusca, filterProjeto };
-    }
-  }, [activeTab, filterStatus, filterBusca, filterProjeto]);
-
-  const totalPages   = Math.max(1, Math.ceil(filteredFases.length / PAGE_SIZE));
-  const pagedFases   = useMemo(() => filteredFases.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE), [filteredFases, currentPage]);
-
-  const getStatusColor = (status: StatusType) => {
-    switch(status) {
-      case 'Dentro do programado': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-      case 'Problema técnico':     return 'bg-rose-500/10 text-rose-400 border-rose-500/20';
-      case 'Aguardando material':  return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
-      case 'Comercial/Ajustes':    return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-      case 'Concluído':            return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      default:                     return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
-    }
-  };
-
-  const getActionBadge = (acao: ActionType) => (
-    <span className="px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded border border-slate-300 dark:border-slate-700">
-      {acao}
-    </span>
-  );
-
-  const renderDaysDiffBadge = (prazo: string, status: StatusType) => {
-    if (status === 'Concluído') return <span className="text-slate-500 text-sm">-</span>;
-    const diff = calculateDaysDifference(prazo);
-    return diff >= 0 ? (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-        <Clock className="w-3.5 h-3.5" />+{diff} dias no prazo
-      </span>
-    ) : (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-500/10 text-rose-400 border border-rose-500/20">
-        <AlertTriangle className="w-3.5 h-3.5" />{Math.abs(diff)} dias negativos (Atrasado)
-      </span>
-    );
-  };
+  }, [projetosProcessados, search, filtroProjeto, filtroEtapa, filtroSituacao]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans">
-      
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-        <div>
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400 mb-2">
-            <span>Portal</span>
-            <ChevronRight className="w-4 h-4" />
-            <span>Irrigação</span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-blue-600 dark:text-blue-400 font-medium">Execução de Projetos</span>
-          </nav>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Painel Operacional</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <LogoutButton />
-          <Link href="/irrigacao/lixeira" className="p-3 rounded-full border bg-white dark:bg-[#0d1527] border-slate-200 dark:border-[#1e293b] text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-sm" title="Lixeira">
-            <Trash2 className="w-5 h-5" />
-          </Link>
-          <div className="flex items-center gap-3 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] p-2 rounded-lg">
-            <Calendar className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-            <span className="text-sm font-medium">Projeto Ativo: Terra Café</span>
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 p-4 md:p-8 font-sans transition-colors">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* ── Topbar & Navegação ────────────────────────────────────────── */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 dark:bg-[#0d1527]/80 backdrop-blur-md p-4 md:p-6 rounded-2xl border border-slate-200/80 dark:border-[#1e293b]/80 shadow-sm">
+          <div className="flex items-center gap-3">
+            <BackButton fallback="/visao-geral" />
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  Irrigação & Obras
+                </span>
+                <span className="text-xs text-slate-400">• Atualizado {lastUpdate.toLocaleTimeString('pt-BR')}</span>
+              </div>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>⚡ Painel Operacional de Obras</span>
+              </h1>
+              <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Acompanhamento em tempo real das 6 fases oficiais e apontamentos do Diário de Campo.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
+              title="Recarregar dados"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+
+            <Link
+              href="/irrigacao/diario-campo"
+              className="px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1.5 transition-all shadow-emerald-500/20"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Diário de Campo</span>
+            </Link>
+
+            <Link
+              href="/visao-geral"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600/10 dark:bg-indigo-500/10 hover:bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 flex items-center gap-1.5 transition-all"
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Aba Diretor</span>
+            </Link>
+
+            <ThemeToggle />
+            <LogoutButton />
           </div>
         </div>
-      </div>
 
-      {/* ── KPIs ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <KpiCard label="Ações Ativas"    value={kpiData.ativas}     sub="em andamento"       icon={<Layers        className="w-5 h-5 text-blue-400"    />} color="border-l-blue-500" />
-        <KpiCard label="Atrasadas"       value={kpiData.atrasadas}  sub="fora do prazo"      icon={<AlertTriangle className="w-5 h-5 text-rose-400"    />} color="border-l-rose-500" alert={kpiData.atrasadas > 0} />
-        <KpiCard label="Concluídas"      value={kpiData.concluidas} sub="finalizadas"        icon={<CheckCircle2  className="w-5 h-5 text-emerald-400" />} color="border-l-emerald-500" />
-        <KpiCard label="Registros Hoje"  value={totalLogsHoje}      sub="no diário de campo" icon={<Activity      className="w-5 h-5 text-amber-400"   />} color="border-l-amber-500" />
-      </div>
-
-      {/* TABS */}
-      <div className="flex items-center gap-2 mb-4 bg-white dark:bg-[#0d1527] p-1.5 rounded-lg border border-slate-200 dark:border-[#1e293b] w-fit">
-        <button onClick={() => setActiveTab('Em Andamento')} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'Em Andamento' ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#111a30]'}`}>
-          Em Andamento
-        </button>
-        <button onClick={() => setActiveTab('Concluído')} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'Concluído' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/20' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#111a30]'}`}>
-          Concluídos
-        </button>
-      </div>
-
-      {/* FILTERS & ACTIONS */}
-      <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-t-xl p-4 flex items-center justify-between gap-3 overflow-x-auto">
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="relative w-48">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-            <input type="text" placeholder="Buscar projeto ou fase..." value={filterBusca} onChange={(e) => setFilterBusca(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
+        {/* ── Cards de KPIs Operacionais ───────────────────────────────── */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-xs font-medium">Projetos Ativos</span>
+              <Layers className="w-4 h-4 text-slate-400" />
+            </div>
+            <div className="text-2xl font-black text-slate-900 dark:text-white">
+              {kpis.totalProjetos}
+            </div>
+            <span className="text-[11px] text-slate-400">obras cadastradas</span>
           </div>
-          <div className="relative">
-            <Filter className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg pl-9 pr-8 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 appearance-none transition-colors cursor-pointer whitespace-nowrap">
-              <option value="Todos">Todos os Status</option>
-              <option value="Dentro do programado">Dentro do programado</option>
-              <option value="Comercial/Ajustes">Comercial/Ajustes</option>
-              <option value="Aguardando material">Aguardando material</option>
-              <option value="Problema técnico">Problema técnico</option>
-              <option value="Concluído">Concluído</option>
+
+          <div className="bg-white dark:bg-[#0d1527] border border-blue-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-blue-500/5 to-transparent">
+            <div className="flex items-center justify-between text-blue-500 mb-1">
+              <span className="text-xs font-bold">Fases em Execução</span>
+              <Clock className="w-4 h-4 text-blue-500 animate-pulse" />
+            </div>
+            <div className="text-2xl font-black text-blue-600 dark:text-blue-400">
+              {kpis.totalFasesAndamento}
+            </div>
+            <span className="text-[11px] text-blue-500/80">em andamento normal</span>
+          </div>
+
+          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm ${
+            kpis.totalFasesAtrasadas > 0 
+              ? 'border-rose-500/40 bg-gradient-to-br from-rose-500/10 to-transparent' 
+              : 'border-slate-200 dark:border-[#1e293b]'
+          }`}>
+            <div className="flex items-center justify-between text-rose-500 mb-1">
+              <span className="text-xs font-bold">Fases em Atraso</span>
+              <AlertTriangle className={`w-4 h-4 ${kpis.totalFasesAtrasadas > 0 ? 'animate-bounce text-rose-500' : 'text-slate-400'}`} />
+            </div>
+            <div className={`text-2xl font-black ${kpis.totalFasesAtrasadas > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+              {kpis.totalFasesAtrasadas}
+            </div>
+            <span className="text-[11px] text-rose-500/80 font-medium">requerem atenção</span>
+          </div>
+
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/30 rounded-2xl p-4 shadow-sm bg-gradient-to-br from-emerald-500/5 to-transparent">
+            <div className="flex items-center justify-between text-emerald-500 mb-1">
+              <span className="text-xs font-bold">Fases Concluídas</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+              {kpis.totalFasesConcluidas}
+            </div>
+            <span className="text-[11px] text-emerald-500/80">100% finalizadas</span>
+          </div>
+
+          <div className="bg-white dark:bg-[#0d1527] border border-purple-500/30 rounded-2xl p-4 shadow-sm col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-500/5 to-transparent">
+            <div className="flex items-center justify-between text-purple-500 mb-1">
+              <span className="text-xs font-bold">Apontamentos Hoje</span>
+              <FileText className="w-4 h-4 text-purple-500" />
+            </div>
+            <div className="text-2xl font-black text-purple-600 dark:text-purple-400">
+              {kpis.totalLogsHoje}
+            </div>
+            <span className="text-[11px] text-purple-500/80">{kpis.totalLogsGeral} no total</span>
+          </div>
+        </div>
+
+        {/* ── Barra de Filtros e Busca ──────────────────────────────────── */}
+        <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm flex flex-col md:flex-row items-center gap-3">
+          <div className="relative flex-1 w-full">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar por projeto, responsável ou observação..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            {/* Filtro Projeto */}
+            <select
+              value={filtroProjeto}
+              onChange={(e) => setFiltroProjeto(e.target.value)}
+              className="px-3 py-2 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
+            >
+              <option value="todos">Todos os Projetos ({projetosList.length})</option>
+              {projetosList.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+
+            {/* Filtro Etapa Oficial */}
+            <select
+              value={filtroEtapa}
+              onChange={(e) => setFiltroEtapa(e.target.value)}
+              className="px-3 py-2 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
+            >
+              <option value="todos">Todas as 6 Fases</option>
+              {ETAPAS_OFICIAIS.map(et => (
+                <option key={et.key} value={et.key}>{et.icon} {et.order}. {et.label}</option>
+              ))}
+            </select>
+
+            {/* Filtro Situação */}
+            <select
+              value={filtroSituacao}
+              onChange={(e) => setFiltroSituacao(e.target.value as any)}
+              className="px-3 py-2 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
+            >
+              <option value="todos">Todas as Situações</option>
+              <option value="em_andamento">⚡ Em Andamento</option>
+              <option value="atrasado">🚨 Com Atraso</option>
+              <option value="concluido">✅ Concluídas</option>
+              <option value="nao_iniciado">⚪ Não Iniciadas</option>
             </select>
           </div>
-          {projetosUnicos.length > 0 && (
-            <div className="relative">
-              <Briefcase className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-              <select value={filterProjeto} onChange={(e) => setFilterProjeto(e.target.value)} className="bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg pl-9 pr-8 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 appearance-none transition-colors cursor-pointer whitespace-nowrap">
-                <option value="Todos">Todos os Projetos</option>
-                {projetosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-          )}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/admin/dashboard" className="flex items-center justify-center gap-1.5 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
-            <BarChart3 className="w-4 h-4" />Dashboards
-          </Link>
-          <Link href="/irrigacao/responsaveis" className="flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-[#1e293b] px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap">
-            <User className="w-4 h-4" />Responsáveis
-          </Link>
-          <Link href="/irrigacao/diario-campo" className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition-all shadow-lg shadow-blue-900/20 whitespace-nowrap">
-            <FileText className="w-4 h-4" />Diário de Campo
-          </Link>
-        </div>
-      </div>
 
-      {/* TABLE */}
-      <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] border-t-0 rounded-b-xl overflow-x-auto shadow-xl shadow-black/30">
-        <table className="w-full min-w-[1000px] text-sm text-left">
-          <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-[#0b1329] border-b border-slate-200 dark:border-[#1e293b]">
-            <tr>
-              <th className="px-6 py-4 font-medium">Gabarito / Fase</th>
-              <th className="px-6 py-4 font-medium">Projeto / Cliente</th>
-              {/* <th className="px-6 py-4 font-medium">Ação</th> */}
-              <th className="px-6 py-4 font-medium">Prazo Limite</th>
-              <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium">Contagem (Dias)</th>
-              <th className="px-6 py-4 font-medium text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-[#1e293b]">
-            {loading && (
-              <>
-                {[...Array(6)].map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-6 py-5">
-                      <div className="space-y-2">
-                        <div className="animate-pulse h-2 bg-slate-200 dark:bg-[#1e293b] rounded w-32" />
-                        <div className="animate-pulse h-1.5 bg-slate-200 dark:bg-[#1e293b] rounded w-40 mt-3" />
-                        <div className="animate-pulse h-1 bg-slate-200 dark:bg-[#1e293b] rounded w-40" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-5"><div className="animate-pulse h-3 bg-slate-200 dark:bg-[#1e293b] rounded w-28" /></td>
-                    {/* <td className="px-6 py-5"><div className="animate-pulse h-3 bg-slate-200 dark:bg-[#1e293b] rounded w-20" /></td> */}
-                    <td className="px-6 py-5"><div className="animate-pulse h-6 bg-slate-200 dark:bg-[#1e293b] rounded-full w-24" /></td>
-                    <td className="px-6 py-5"><div className="animate-pulse h-6 bg-slate-200 dark:bg-[#1e293b] rounded-full w-28" /></td>
-                    <td className="px-6 py-5"><div className="animate-pulse h-6 bg-slate-200 dark:bg-[#1e293b] rounded-full w-20" /></td>
-                    <td className="px-6 py-5">
-                      <div className="flex gap-1 justify-center">
-                        <div className="animate-pulse h-8 w-8 bg-slate-200 dark:bg-[#1e293b] rounded-lg" />
-                        <div className="animate-pulse h-8 w-8 bg-slate-200 dark:bg-[#1e293b] rounded-lg" />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </>
-            )}
-            {!loading && pagedFases.map((fase) => (
-              <tr key={fase.id} className="hover:bg-slate-100 dark:hover:bg-[#111a30] transition-colors">
-                <td className="px-6 py-4 font-medium text-slate-900 dark:text-white min-w-[260px] max-w-[290px]" title={fase.gabarito}>
-                  <FasePipelineBar gabarito={fase.gabarito} />
-                  <FaseProgressBar status={fase.status} />
-                  {fase.observacoes && <div className="text-xs text-slate-500 mt-1 font-normal truncate" title={fase.observacoes}>Obs: {fase.observacoes}</div>}
-                </td>
-                <td className="px-6 py-4 text-slate-600 dark:text-slate-300 max-w-[200px]">
-                  {fase.projetoCliente ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate block font-medium" title={fase.projetoCliente}>
-                        {extractProjectBaseName(fase.projetoCliente)}
+        {/* ── Lista de Projetos com Pipeline das 6 Fases Oficiais ───────── */}
+        {loading ? (
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-12 text-center">
+            <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin mx-auto mb-3" />
+            <p className="text-sm font-medium text-slate-500">Carregando painel operacional das obras...</p>
+          </div>
+        ) : projetosFiltrados.length === 0 ? (
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-12 text-center">
+            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Nenhum projeto encontrado com os filtros atuais</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              Experimente limpar o campo de busca ou selecionar &quot;Todos os Projetos&quot;.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {projetosFiltrados.map((projeto) => (
+              <div
+                key={projeto.nome}
+                className="bg-white dark:bg-[#0d1527] border border-slate-200/90 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-md transition-all hover:border-slate-300 dark:hover:border-slate-700"
+              >
+                {/* Header do Projeto */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-[#1e293b]">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1e293b]">
+                        {projeto.versao !== 'V0' ? `${projeto.versao}` : 'PROJETO'}
                       </span>
-                      <span 
-                        title={`Versão: ${getProjectVersion(fase.projetoCliente)}`}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
-                          getProjectVersion(fase.projetoCliente) === 'V0'
-                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                            : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                      <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
+                        {projeto.baseName}
+                      </h2>
+                      {projeto.atrasadoTotal && (
+                        <span className="px-2 py-0.5 rounded-md text-xs font-black bg-rose-600 text-white animate-pulse shadow-sm">
+                          🚨 Obra em Atraso ({Math.abs(projeto.diasRestantesTotal)}d)
+                        </span>
+                      )}
+                      {projeto.concluidoGeral && (
+                        <span className="px-2 py-0.5 rounded-md text-xs font-black bg-emerald-600 text-white shadow-sm">
+                          ✅ Obra Concluída
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mt-1.5 flex-wrap">
+                      {projeto.dataInicio && (
+                        <span>Início: <strong>{new Date(`${projeto.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}</strong></span>
+                      )}
+                      <span>Prazo Final: <strong>{projeto.prazoFinalFormatado}</strong></span>
+                      {projeto.prazoFinal && !projeto.concluidoGeral && (
+                        <span className={projeto.atrasadoTotal ? 'text-rose-500 font-bold' : 'text-slate-500'}>
+                          {projeto.atrasadoTotal ? `Vencido há ${Math.abs(projeto.diasRestantesTotal)} dias` : `Restam ${projeto.diasRestantesTotal} dias`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Progresso Geral & Botão Diário */}
+                  <div className="flex items-center gap-3 self-start md:self-auto">
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Progresso Geral</span>
+                      <span className="text-lg font-black text-slate-900 dark:text-white">{projeto.progressoGeral}%</span>
+                    </div>
+
+                    <div className="w-24 h-2.5 bg-slate-100 dark:bg-[#16203a] rounded-full overflow-hidden shrink-0 border border-slate-200/50 dark:border-[#1e293b]">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          projeto.concluidoGeral ? 'bg-emerald-500' : projeto.atrasadoTotal ? 'bg-rose-500' : 'bg-blue-500'
+                        }`}
+                        style={{ width: `${projeto.progressoGeral}%` }}
+                      />
+                    </div>
+
+                    <Link
+                      href={`/irrigacao/diario-campo`}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1 transition-all"
+                      title="Abrir no Diário de Campo"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Apontar</span>
+                    </Link>
+                  </div>
+                </div>
+
+                {/* ── Pipeline Visual das 6 Fases ───────────────────────── */}
+                <div className="my-4 p-3 bg-slate-50 dark:bg-[#0a0f1d] rounded-xl border border-slate-200/60 dark:border-[#1e293b]/60">
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    <span>Esteira Oficial das 6 Fases de Campo</span>
+                    <span>{projeto.qtdFasesConcluidas}/6 Concluídas</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    {projeto.fases.map((fase) => {
+                      let bgCard = 'bg-white dark:bg-[#111a30] text-slate-400 border-slate-200 dark:border-[#1e293b]';
+                      let dotColor = 'bg-slate-300 dark:bg-slate-700';
+
+                      if (fase.situacaoFase === 'concluido') {
+                        bgCard = 'bg-emerald-500/10 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+                        dotColor = 'bg-emerald-500';
+                      } else if (fase.situacaoFase === 'atrasado') {
+                        bgCard = 'bg-rose-500/15 text-rose-600 dark:text-rose-300 border-rose-500/40 animate-pulse';
+                        dotColor = 'bg-rose-500';
+                      } else if (fase.situacaoFase === 'em_andamento') {
+                        bgCard = 'bg-blue-500/10 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30';
+                        dotColor = 'bg-blue-500 animate-ping';
+                      }
+
+                      return (
+                        <div
+                          key={fase.key}
+                          className={`p-2 rounded-lg border text-center transition-all ${bgCard}`}
+                        >
+                          <div className="flex items-center justify-center gap-1 mb-0.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                            <span className="text-[11px]">{fase.icon}</span>
+                            <span className="text-[11px] font-bold truncate">{fase.order}. {fase.label}</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold block">
+                            {fase.progresso}%
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* ── Cards / Grade Operacional das Fases ────────────────── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+                  {projeto.fases.map((fase) => {
+                    const isConcluida = fase.situacaoFase === 'concluido';
+                    const isAtrasada = fase.situacaoFase === 'atrasado';
+                    const isAndamento = fase.situacaoFase === 'em_andamento';
+
+                    return (
+                      <div
+                        key={fase.key}
+                        className={`rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
+                          isAtrasada
+                            ? 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-500/40'
+                            : isConcluida
+                            ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/30'
+                            : isAndamento
+                            ? 'bg-blue-50/30 dark:bg-blue-950/10 border-blue-500/30'
+                            : 'bg-slate-50/50 dark:bg-[#0c1324] border-slate-200 dark:border-[#1e293b]'
                         }`}
                       >
-                        {getProjectVersion(fase.projetoCliente)}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-slate-400 italic text-xs">—</span>
-                  )}
-                </td>
-                {/* <td className="px-6 py-4">{getActionBadge(fase.acao)}</td> */}
-                <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                  {new Date(`${fase.prazoLimite}T00:00:00Z`).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(fase.status)}`}>
-                    {fase.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">{renderDaysDiffBadge(fase.prazoLimite, fase.status)}</td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex items-center justify-center gap-1">
-                    <button onClick={() => openEditModal(fase)} className="p-3 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors" title="Editar">
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => setFaseToDelete(fase)} className="p-3 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors" title={fase.projetoCliente?.trim() ? 'Mover Projeto para Lixeira' : 'Mover para Lixeira'}>
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {!loading && filteredFases.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">Nenhuma ação encontrada para os filtros aplicados.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                        <div>
+                          {/* Cabeçalho da Fase */}
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div>
+                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                                Fase {fase.order} de 6
+                              </span>
+                              <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                                <span>{fase.icon}</span>
+                                <span>{fase.label}</span>
+                              </h4>
+                            </div>
 
-      {/* PAGINAÇÃO */}
-      {filteredFases.length > PAGE_SIZE && (
-        <div className="flex items-center justify-between mt-4 px-1">
-          <span className="text-xs text-slate-400">
-            Mostrando {Math.min((currentPage - 1) * PAGE_SIZE + 1, filteredFases.length)}–{Math.min(currentPage * PAGE_SIZE, filteredFases.length)} de {filteredFases.length} ações
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-              className="px-2 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] text-slate-500 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-all"
-            >«</button>
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] text-slate-500 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-all"
-            >Anterior</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-              .reduce<(number | '...')[]>((acc, p, i, arr) => {
-                if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('...');
-                acc.push(p);
-                return acc;
-              }, [])
-              .map((p, i) =>
-                p === '...'
-                  ? <span key={`e${i}`} className="px-2 text-slate-400 text-xs">…</span>
-                  : <button
-                      key={p}
-                      onClick={() => setCurrentPage(p as number)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${currentPage === p ? 'bg-blue-600 border-blue-600 text-white shadow' : 'bg-slate-100 dark:bg-[#111a30] border-slate-200 dark:border-[#1e293b] text-slate-500 hover:bg-slate-200 dark:hover:bg-[#1e293b]'}`}
-                    >{p}</button>
-              )}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] text-slate-500 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-all"
-            >Próxima</button>
-            <button
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-              className="px-2 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] text-slate-500 disabled:opacity-40 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-all"
-            >»</button>
-          </div>
-        </div>
-      )}
+                            {/* Badge de Situação */}
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide shrink-0 ${
+                              isConcluida
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                : isAtrasada
+                                ? 'bg-rose-600 text-white shadow-sm'
+                                : isAndamento
+                                ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                            }`}>
+                              {isConcluida
+                                ? 'Concluída'
+                                : isAtrasada
+                                ? `+${fase.diasAtraso}d Atraso`
+                                : isAndamento
+                                ? `Restam ${fase.diasRestantesFase}d`
+                                : 'Não Iniciada'}
+                            </span>
+                          </div>
 
-      {/* EDIT MODAL */}
-      {editingFase && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Editar Fase</h3>
-              <button onClick={() => setEditingFase(null)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Fase (Gabarito)</label>
-                <select value={editGabarito} onChange={(e) => setEditGabarito(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors">
-                  <option value="01 - Estudo preliminar">01 - Estudo preliminar</option>
-                  <option value="02 - Aprovação do cliente ou retorno">02 - Aprovação do cliente ou retorno</option>
-                  <option value="03 - Projeto executivo">03 - Projeto executivo</option>
-                  <option value="04 - Compra">04 - Compra</option>
-                  <option value="05 - Execução">05 - Execução</option>
-                </select>
-              </div>
+                          {/* Prazos da Fase */}
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5 mb-2.5">
+                            <div className="flex justify-between">
+                              <span>Prazo Limite:</span>
+                              <strong className="text-slate-700 dark:text-slate-200">{fase.prazoFaseFormatado}</strong>
+                            </div>
+                            {fase.dataInicioFase && (
+                              <div className="flex justify-between">
+                                <span>Início:</span>
+                                <span>{new Date(`${fase.dataInicioFase}T00:00:00`).toLocaleDateString('pt-BR')}</span>
+                              </div>
+                            )}
+                          </div>
 
-              {/* Aviso de Retorno do Cliente (V0 -> V1 -> V2...) */}
-              {editingFase && (
-                editingFase.gabarito.includes('02') || 
-                editingFase.gabarito.toLowerCase().includes('aprova') || 
-                editingFase.gabarito.toLowerCase().includes('retorno')
-              ) && (
-                editGabarito.includes('01') || 
-                editGabarito.toLowerCase().includes('estudo')
-              ) && (
-                <div className="p-3.5 bg-amber-500/15 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-950 dark:text-amber-200 animate-in fade-in duration-200">
-                  <RotateCcw className="w-4 h-4 text-amber-500 shrink-0 mt-0.5 animate-spin" style={{ animationIterationCount: 1 }} />
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold">Retorno do Cliente Detectado:</span>
-                      <span className="px-1.5 py-0.5 rounded bg-blue-500 text-white font-extrabold text-[10px]">
-                        {getProjectVersion(editingFase.projetoCliente || '')}
-                      </span>
-                      <span>➔</span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white font-extrabold text-[10px]">
-                        {getProjectVersion(incrementProjectVersion(editingFase.projetoCliente || ''))}
-                      </span>
-                    </div>
-                    <p className="text-[11px] opacity-90 mt-1">
-                      Como a fase está retornando de Aprovação para Estudo preliminar, o projeto passará automaticamente para <strong>{getProjectVersion(incrementProjectVersion(editingFase.projetoCliente || ''))}</strong> e o status para <strong>Comercial/Ajustes</strong>.
-                    </p>
-                  </div>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Projeto / Cliente</label>
-                <input type="text" value={editProjetoCliente} onChange={(e) => setEditProjetoCliente(e.target.value)} placeholder="Ex: Fazenda São João, Cliente: Marcos" className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Novo Prazo Limite</label>
-                  <input type="date" value={editPrazoLimite} onChange={(e) => setEditPrazoLimite(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" style={{ colorScheme: 'dark' }} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Status</label>
-                  <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors">
-                    <option value="Dentro do programado">Dentro do programado</option>
-                    <option value="Comercial/Ajustes">Comercial/Ajustes</option>
-                    <option value="Aguardando material">Aguardando material</option>
-                    <option value="Problema técnico">Problema técnico</option>
-                    <option value="Concluído">Concluído</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] flex justify-end gap-3">
-              <button onClick={() => setEditingFase(null)} className="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors">Cancelar</button>
-              <button onClick={handleSaveEdit} disabled={savingEdit} className="px-5 py-2.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 transition-all disabled:opacity-70 flex items-center gap-2">
-                {savingEdit && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                Salvar Alterações
-              </button>
-            </div>
+                          {/* Responsáveis da Fase */}
+                          <div className="p-2 rounded-lg bg-white/80 dark:bg-[#16203a]/80 border border-slate-200/60 dark:border-[#1e293b]/60 mb-2.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                              👤 Equipe Responsável:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {fase.responsaveis.length > 0 ? (
+                                fase.responsaveis.map((resp, rIdx) => (
+                                  <span
+                                    key={rIdx}
+                                    className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] text-slate-800 dark:text-slate-200"
+                                  >
+                                    {resp}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">Equipe de campo padrão</span>
+                              )}
+                            </div>
+                          </div>
 
-            {/* HISTÓRICO */}
-            <div className="border-t border-slate-200 dark:border-[#1e293b] mt-2 pt-4 px-6 pb-4">
-              <h4 className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-3 flex items-center gap-2">
-                <History className="w-3.5 h-3.5" />Histórico de Alterações
-              </h4>
-              {loadingHistorico && <p className="text-xs text-slate-500 italic">Carregando...</p>}
-              {!loadingHistorico && historico.length === 0 && (
-                <p className="text-xs text-slate-500 italic">Nenhuma alteração registrada ainda.</p>
-              )}
-              {!loadingHistorico && historico.length > 0 && (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {historico.map(h => (
-                    <div key={h.id} className="flex items-start gap-2 text-xs">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                      <div className="min-w-0">
-                        <span className="text-slate-700 dark:text-slate-200 font-medium">{h.campo}</span>
-                        <span className="text-slate-400"> → </span>
-                        <span className="text-slate-600 dark:text-slate-300 break-words">{h.valorNovo || '—'}</span>
-                        <div className="text-slate-400 text-[10px] mt-0.5">
-                          {h.usuario} · {new Date(h.criadoEm).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}
+                          {/* Último Apontamento no Diário */}
+                          {fase.ultimoLog && (
+                            <div className="p-2 rounded-lg bg-slate-100/70 dark:bg-[#070c18]/70 border border-slate-200/50 dark:border-[#1e293b]/50 text-[11px] mb-2.5">
+                              <div className="flex items-center justify-between text-slate-400 mb-0.5">
+                                <span className="font-bold">📝 Último Apontamento:</span>
+                                <span>{new Date(`${fase.ultimoLog.data}T00:00:00`).toLocaleDateString('pt-BR')}</span>
+                              </div>
+                              <p className="text-slate-700 dark:text-slate-300 line-clamp-2 italic">
+                                &quot;{fase.ultimoLog.observacoes || fase.ultimoLog.status}&quot;
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Barra de Progresso da Fase & Ação */}
+                        <div className="pt-2 border-t border-slate-200/50 dark:border-[#1e293b]/50">
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <span className="text-slate-400">Progresso da Fase:</span>
+                            <span className="font-black text-slate-800 dark:text-slate-200">{fase.progresso}%</span>
+                          </div>
+                          <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mb-2.5">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                isConcluida ? 'bg-emerald-500' : isAtrasada ? 'bg-rose-500' : 'bg-blue-500'
+                              }`}
+                              style={{ width: `${fase.progresso}%` }}
+                            />
+                          </div>
+
+                          <Link
+                            href="/irrigacao/diario-campo"
+                            className="w-full py-1.5 px-2.5 rounded-lg text-xs font-bold text-center bg-white dark:bg-[#16203a] hover:bg-slate-100 dark:hover:bg-[#1f2d4e] border border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1 transition-all"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Registrar no Diário</span>
+                            <ArrowRight className="w-3 h-3 text-slate-400 ml-auto" />
+                          </Link>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DRAWER - NOVA AÇÃO */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white/95 dark:bg-[#0d1527]/95 backdrop-blur-2xl h-full border-l border-slate-200 dark:border-[#1e293b] shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Cadastrar Nova Ação</h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 transition-colors"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6 flex-1 overflow-y-auto space-y-6">
-              <form id="nova-acao-form" onSubmit={handleSaveNovo} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Fase (Gabarito)</label>
-                  <select value={novoGabarito} onChange={(e) => setNovoGabarito(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors">
-                    <option value="01 - Estudo preliminar">01 - Estudo preliminar</option>
-                    <option value="02 - Aprovação do cliente ou retorno">02 - Aprovação do cliente ou retorno</option>
-                    <option value="03 - Projeto executivo">03 - Projeto executivo</option>
-                    <option value="04 - Compra">04 - Compra</option>
-                    <option value="05 - Execução">05 - Execução</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Projeto / Cliente</label>
-                  <input type="text" value={novoProjetoCliente} onChange={(e) => setNovoProjetoCliente(e.target.value)} placeholder="Ex: Fazenda São João, Cliente: Marcos" className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
-                </div>
-                {/* Campo Ação oculto temporariamente conforme solicitado (mantido para fácil reativação) */}
-                {/* <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Ação</label>
-                    <select value={novaAcao} onChange={(e) => setNovaAcao(e.target.value as ActionType)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors">
-                      <option value="Cotar">Cotar</option>
-                      <option value="Comprar">Comprar</option>
-                      <option value="Instalar">Instalar</option>
-                      <option value="Vistoriar">Vistoriar</option>
-                      <option value="Aprovar">Aprovar</option>
-                      <option value="Revisar">Revisar</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Prazo Limite</label>
-                    <input type="date" required value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" style={{ colorScheme: 'dark' }} />
-                  </div>
-                </div> */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Prazo Limite</label>
-                  <input type="date" required value={novoPrazo} onChange={(e) => setNovoPrazo(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" style={{ colorScheme: 'dark' }} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Status Inicial</label>
-                  <select value={novoStatus} onChange={(e) => setNovoStatus(e.target.value as StatusType)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors">
-                    <option value="Dentro do programado">Dentro do programado</option>
-                    <option value="Comercial/Ajustes">Comercial/Ajustes</option>
-                    <option value="Aguardando material">Aguardando material</option>
-                    <option value="Problema técnico">Problema técnico</option>
-                    <option value="Concluído">Concluído</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Observações Técnicas</label>
-                  <textarea rows={4} value={novaObservacao} onChange={(e) => setNovaObservacao(e.target.value)} placeholder="Adicione detalhes, justificativas de atraso, etc." className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors resize-none" />
-                </div>
-              </form>
-            </div>
-            <div className="p-6 border-t border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] flex justify-end gap-3">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors">Cancelar</button>
-              <button type="submit" form="nova-acao-form" disabled={savingNovo} className="px-5 py-2.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 transition-all disabled:opacity-70 flex items-center gap-2">
-                {savingNovo && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                Salvar Ação
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DELETE CONFIRM */}
-      {faseToDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-rose-500/10 flex items-center justify-center mb-4 border border-rose-500/20">
-                <AlertTriangle className="w-8 h-8 text-rose-500" />
               </div>
-              {faseToDelete.projetoCliente?.trim() ? (
-                <>
-                  <div className="flex flex-wrap items-center justify-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Mover Projeto para a Lixeira</h3>
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                      {fasesDoProjetoParaDeletar.length} fase{fasesDoProjetoParaDeletar.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-3">
-                    O projeto <strong className="inline-flex items-center gap-1.5 text-slate-900 dark:text-white bg-slate-100 dark:bg-[#1e293b] px-2 py-0.5 rounded-md">{faseToDelete.projetoCliente}</strong> será movido para a lixeira com todas as suas fases abaixo. Esta ação pode ser desfeita depois na Lixeira.
-                  </p>
-                  <div className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 mb-5 text-left space-y-1 max-h-40 overflow-y-auto">
-                    {fasesDoProjetoParaDeletar.map(f => (
-                      <div key={f.id} className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
-                        <span className="font-medium">{f.gabarito}</span>
-                        <span className="text-slate-400 ml-auto">{f.responsavel}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Mover para a Lixeira</h3>
-                  <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">
-                    Você tem certeza de que deseja enviar a fase <strong className="text-slate-900 dark:text-white">{faseToDelete.gabarito}</strong> para a lixeira?
-                  </p>
-                </>
-              )}
-              <div className="flex items-center gap-3 w-full">
-                <button onClick={() => setFaseToDelete(null)} className="flex-1 px-4 py-3 rounded-lg text-sm font-medium bg-slate-100 dark:bg-[#111a30] text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors border border-slate-200 dark:border-[#1e293b]">Cancelar</button>
-                <button onClick={handleTrashFase} className="flex-1 px-4 py-3 rounded-lg text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-900/20 transition-all">
-                  {faseToDelete.projetoCliente?.trim() ? `Mover Projeto (${fasesDoProjetoParaDeletar.length})` : 'Sim, Mover'}
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+
+      </div>
     </div>
   );
 }
