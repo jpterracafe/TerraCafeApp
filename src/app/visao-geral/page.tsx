@@ -71,6 +71,7 @@ export default function VisaoGeralDiretorPage() {
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'atrasado' | 'em_andamento' | 'concluido'>('todos');
 
   const [fases, setFases] = useState<FaseAcao[]>([]);
+  const [diarioLogs, setDiarioLogs] = useState<any[]>([]);
 
   // Atualiza relógio do Modo TV a cada segundo
   useEffect(() => {
@@ -86,10 +87,11 @@ export default function VisaoGeralDiretorPage() {
   // Carrega dados consolidados
   const carregarDados = useCallback(async () => {
     try {
-      const [resProj, resConfig, resFases] = await Promise.all([
+      const [resProj, resConfig, resFases, resLogs] = await Promise.all([
         fetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
         fetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
         fetch('/api/fases').then(r => r.ok ? r.json() : { fases: [] }),
+        fetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
 
       const lista = resProj.projetos ?? [];
@@ -100,6 +102,7 @@ export default function VisaoGeralDiretorPage() {
       }
 
       setFases(resFases.fases ?? []);
+      setDiarioLogs(resLogs.logs ?? []);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('[visao-geral] Erro ao carregar dados:', err);
@@ -230,9 +233,35 @@ export default function VisaoGeralDiretorPage() {
           f.responsavel.trim() !== 'Não atribuído'
         ).map(f => f.responsavel.trim());
 
-        const responsaveis = Array.from(
-          new Set([...respFasesAcao, ...respConfig.map(r => (r || '').trim()).filter(Boolean)])
-        ).filter(Boolean).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        const respDiarioLogs = diarioLogs
+          .filter(l =>
+            l.projetoCliente &&
+            l.projetoCliente.trim() === nomeProjeto.trim() &&
+            l.atividade &&
+            (l.atividade.trim().toLowerCase() === et.key.toLowerCase() ||
+             l.atividade.trim().toLowerCase().includes(et.key.toLowerCase()) ||
+             et.key.toLowerCase().includes(l.atividade.trim().toLowerCase())) &&
+            l.responsavel &&
+            l.responsavel.trim()
+          )
+          .flatMap(l => l.responsavel.split(',').map((r: string) => r.trim()))
+          .filter(Boolean);
+
+        let todosResponsaveis = Array.from(
+          new Set([
+            ...respConfig.map(r => (r || '').trim()).filter(Boolean),
+            ...respFasesAcao,
+            ...respDiarioLogs,
+          ])
+        ).filter(Boolean);
+
+        // Se houver responsáveis reais atribuídos ou registrados no diário (além do Administrador genérico),
+        // remove "Administrador" para dar destaque ao responsável de campo correto
+        if (todosResponsaveis.length > 1 && todosResponsaveis.includes('Administrador')) {
+          todosResponsaveis = todosResponsaveis.filter(r => r !== 'Administrador');
+        }
+
+        const responsaveis = todosResponsaveis.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
         const pctProgresso = config.etapasProgresso[chaveEtapa] ?? 0;
         somaProgresso += pctProgresso;
@@ -308,7 +337,7 @@ export default function VisaoGeralDiretorPage() {
         fases: fasesDetalhadas,
       };
     });
-  }, [projetosList, config, fases]);
+  }, [projetosList, config, fases, diarioLogs]);
 
   // Lista unificada de TODAS as Fases em Atraso no Sistema (Para o Mural de Atenção da TV)
   const todasFasesAtrasadas = useMemo(() => {

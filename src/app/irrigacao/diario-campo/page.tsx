@@ -409,19 +409,6 @@ export default function DiarioCampoTimelinePage() {
     return responsaveisPorEtapa[etapaKey] ?? [];
   }, [responsaveisPorEtapa, etapaKey]);
 
-  // Se nenhum responsável estiver atribuído ainda na etapa, pré-atribui o primeiro responsável se existir
-  useEffect(() => {
-    if (selectedProjeto && users.length > 0 && (!responsaveisPorEtapa[etapaKey] || responsaveisPorEtapa[etapaKey].length === 0)) {
-      setResponsaveisPorEtapa(prev => {
-        if (prev[etapaKey] && prev[etapaKey].length > 0) return prev;
-        return {
-          ...prev,
-          [etapaKey]: [users[0].name],
-        };
-      });
-    }
-  }, [selectedProjeto, users, etapaKey, responsaveisPorEtapa]);
-
   const toggleResponsavelNaEtapa = (nome: string) => {
     const atuais = responsaveisPorEtapa[etapaKey] ?? [];
     const novos = atuais.includes(nome)
