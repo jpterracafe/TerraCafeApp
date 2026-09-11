@@ -95,18 +95,13 @@ export default function DiarioCampoTimelinePage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
 
-  // Guard: só Agricultor e Desenvolvedor acessam o diário de campo diretamente
-  // Diretor e Admin são redirecionados para suas páginas
+  // Guard: requer autenticação, mas qualquer role pode acessar o diário
   useEffect(() => {
     if (sessionStatus === 'loading') return;
     if (sessionStatus === 'unauthenticated') {
       router.replace('/login');
-      return;
     }
-    const role = (session?.user as any)?.role;
-    if (role === 'Diretor') router.replace('/visao-geral');
-    else if (role === 'Admin' || role === 'Desenvolvedor') router.replace('/admin/usuarios');
-  }, [sessionStatus, session, router]);
+  }, [sessionStatus, router]);
 
   // Dados principais
   const [registros, setRegistros] = useState<RegistroDiarioCampo[]>([]);
