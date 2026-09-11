@@ -159,6 +159,11 @@ export default function DiarioCampoTimelinePage() {
   const [iniciarEtapaPrazoLimite, setIniciarEtapaPrazoLimite] = useState('');
   const [iniciarEtapaMetaDias, setIniciarEtapaMetaDias] = useState(20);
 
+  // Modal Concluir Fase
+  const [isConcluirFaseModalOpen, setIsConcluirFaseModalOpen] = useState(false);
+  const [concluindoFase, setConcluindoFase] = useState(false);
+  const [observacaoConclusao, setObservacaoConclusao] = useState('');
+
   // Carrega configurações de contadores, start de projetos e responsáveis por etapa (Nuvem + LocalStorage)
   useEffect(() => {
     // 1. Leitura rápida do cache local
@@ -409,6 +414,21 @@ export default function DiarioCampoTimelinePage() {
     return responsaveisPorEtapa[etapaKey] ?? [];
   }, [responsaveisPorEtapa, etapaKey]);
 
+  // ── Verifica se a etapa atual está concluída ──────────────────────────────────
+  const isFaseConcluida = useMemo(() => {
+    // Verifica se há configuração de progresso salvo
+    const progressoSalvo = configEtapas[etapaKey];
+    
+    // Verifica logs com status "Concluído"
+    const temLogConcluido = registros.some(r => 
+      r.projetoCliente === selectedProjeto &&
+      (r.atividade === selectedEtapa || r.atividade.toLowerCase().includes(selectedEtapa.toLowerCase())) &&
+      (r.status || '').toLowerCase().includes('concluído')
+    );
+
+    return temLogConcluido;
+  }, [configEtapas, etapaKey, registros, selectedProjeto, selectedEtapa]);
+
   const toggleResponsavelNaEtapa = (nome: string) => {
     const atuais = responsaveisPorEtapa[etapaKey] ?? [];
     const novos = atuais.includes(nome)
@@ -600,6 +620,96 @@ export default function DiarioCampoTimelinePage() {
     saveEtapaConfigToStorage(updated);
     setIsIniciarEtapaModalOpen(false);
     success(`Início e prazo da fase "${selectedEtapa}" configurados com sucesso!`);
+  };
+
+  // ── Handler para Concluir Fase ──────────────────────────────────────────────
+  const handleConcluirFase = async () => {
+    if (!selectedProjeto || !selectedEtapa) {
+      toastError('Selecione um projeto e uma etapa.');
+      return;
+    }
+
+    if (currentEtapaResponsaveis.length === 0) {
+      toastError('Atribua pelo menos um responsável a esta etapa antes de concluí-la.');
+      return;
+    }
+
+    setConcluindoFase(true);
+    try {
+      const chaveEtapa = `${selectedProjeto}::${selectedEtapa}`;
+      const hojeStr = new Date().toISOString().split('T')[0];
+      const responsaveisStr = currentEtapaResponsaveis.join(', ');
+
+      // 1. Salvar progresso 100% via API
+      const resProgresso = await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'progresso',
+          dados: { [chaveEtapa]: 100 }
+        })
+      });
+
+      // 2. Salvar status "Concluída" via API
+      const resStatus = await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'status_etapas',
+          dados: { [chaveEtapa]: 'Concluída' }
+        })
+      });
+
+      if (!resProgresso.ok || !resStatus.ok) {
+        throw new Error('Erro ao atualizar status de conclusão');
+      }
+
+      // 3. Registrar no diário de campo com status especial "Concluído"
+      const logConclusao: Partial<RegistroDiarioCampo> = {
+        data: hojeStr,
+        responsavel: responsaveisStr,
+        atividade: selectedEtapa,
+        status: 'Concluído',
+        observacoes: observacaoConclusao.trim() || `✅ Fase "${selectedEtapa}" marcada como CONCLUÍDA pela equipe de campo.`,
+        projetoCliente: selectedProjeto,
+      };
+
+      const resLog = await fetch('/api/diario-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logConclusao)
+      });
+
+      if (resLog.ok) {
+        const novoLog = await resLog.json();
+        setRegistros(prev => [novoLog, ...prev]);
+      }
+
+      // 4. Atualizar localStorage e estado local
+      const updatedConfig = {
+        ...configEtapas,
+        [chaveEtapa]: {
+          ...configEtapas[chaveEtapa],
+          hasStarted: true,
+        }
+      };
+      saveEtapaConfigToStorage(updatedConfig);
+
+      setIsConcluirFaseModalOpen(false);
+      setObservacaoConclusao('');
+      success(`🎉 Fase "${selectedEtapa}" marcada como CONCLUÍDA! Progresso atualizado para 100%.`);
+      
+      // Recarregar dados para refletir mudanças
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+
+    } catch (err) {
+      console.error('[concluir-fase] Erro:', err);
+      toastError('Erro ao marcar fase como concluída. Tente novamente.');
+    } finally {
+      setConcluindoFase(false);
+    }
   };
 
   const handleOpenConfigModal = () => {
@@ -796,6 +906,12 @@ export default function DiarioCampoTimelinePage() {
 
     if (currentEtapaResponsaveis.length === 0) {
       toastError(`Selecione ao menos um responsável da equipe para a etapa "${selectedEtapa}".`);
+      return;
+    }
+
+    // ✅ Validação: não permitir registros em fases concluídas
+    if (isFaseConcluida) {
+      toastError(`⚠️ A fase "${selectedEtapa}" já está marcada como concluída (100%). Para fazer novos registros, entre em contato com o diretor para reabrir a fase.`);
       return;
     }
 
@@ -1334,37 +1450,65 @@ export default function DiarioCampoTimelinePage() {
                     const isActive = selectedEtapa === etapa.key;
                     const count = logsCountByEtapa[etapa.key] || 0;
                     const respDestaEtapa = responsaveisPorEtapa[`${selectedProjeto}::${etapa.key}`] || [];
+                    
+                    // Verifica se esta etapa específica está concluída
+                    const etapaFaseConcluida = registros.some(
+                      r => r.projetoCliente === selectedProjeto && 
+                           r.atividade === etapa.key && 
+                           r.status === 'Concluído'
+                    );
 
                     return (
                       <button
                         key={etapa.key}
                         type="button"
                         onClick={() => setSelectedEtapa(etapa.key)}
-                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-sm transition-all border ${
+                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-sm transition-all border relative ${
                           isActive
-                            ? 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/30'
+                            ? etapaFaseConcluida
+                              ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/30'
+                              : 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/30'
+                            : etapaFaseConcluida
+                            ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-400'
                             : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 hover:border-blue-400/50 hover:bg-slate-100 dark:hover:bg-[#111a30]'
                         }`}
                       >
+                        {etapaFaseConcluida && (
+                          <CheckCircle2 className={`w-4 h-4 absolute top-1 right-1 ${isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                        )}
                         <span className="text-base">{etapa.icon}</span>
                         <div className="text-left">
                           <div className="flex items-center gap-2">
                             <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${
-                              isActive ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                              isActive 
+                                ? 'bg-white/20 text-white' 
+                                : etapaFaseConcluida
+                                ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
                             }`}>
                               0{idx + 1}
                             </span>
                             <span className="font-semibold">{etapa.label}</span>
                           </div>
                           {respDestaEtapa.length > 0 && (
-                            <span className={`text-[10px] block truncate max-w-[130px] mt-0.5 ${isActive ? 'text-blue-100' : 'text-slate-400'}`}>
+                            <span className={`text-[10px] block truncate max-w-[130px] mt-0.5 ${
+                              isActive 
+                                ? 'text-blue-100' 
+                                : etapaFaseConcluida
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-slate-400'
+                            }`}>
                               {respDestaEtapa.join(', ')}
                             </span>
                           )}
                         </div>
                         {count > 0 && (
                           <span className={`text-xs px-2 py-0.5 rounded-full font-bold ml-1 ${
-                            isActive ? 'bg-white text-blue-700' : 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
+                            isActive 
+                              ? 'bg-white text-blue-700' 
+                              : etapaFaseConcluida
+                              ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                              : 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
                           }`}>
                             {count}
                           </span>
@@ -1376,27 +1520,50 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── CARD DE CONTADOR INDEPENDENTE DA ETAPA ATIVA ── */}
-              <div className="bg-gradient-to-br from-white via-slate-50 to-blue-50/40 dark:from-[#0d1527] dark:via-[#0c1426] dark:to-[#111c36] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-xl relative overflow-hidden">
+              <div className={`bg-gradient-to-br p-5 md:p-6 rounded-2xl border shadow-xl relative overflow-hidden transition-all duration-300 ${
+                isFaseConcluida
+                  ? 'from-emerald-50 via-emerald-100/50 to-emerald-50 dark:from-emerald-950/30 dark:via-emerald-900/20 dark:to-emerald-950/20 border-emerald-500/50 dark:border-emerald-500/30'
+                  : 'from-white via-slate-50 to-blue-50/40 dark:from-[#0d1527] dark:via-[#0c1426] dark:to-[#111c36] border-slate-200 dark:border-[#1e293b]'
+              }`}>
+                {/* Badge de Status no Canto Superior Direito */}
+                {isFaseConcluida && (
+                  <div className="absolute top-4 right-4 z-20">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-black shadow-lg shadow-emerald-500/40 animate-pulse">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>100% CONCLUÍDA</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-500" />
+                      <Clock className={`w-4 h-4 ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-500'}`} />
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Contador da Etapa: <strong className="text-slate-900 dark:text-white capitalize">{selectedEtapa}</strong>
+                        Contador da Etapa: <strong className={`capitalize ${isFaseConcluida ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>{selectedEtapa}</strong>
                       </span>
                     </div>
                     <div className="flex items-baseline gap-3">
-                      <span className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white">
+                      <span className={`text-3xl md:text-4xl font-extrabold tracking-tight ${
+                        isFaseConcluida 
+                          ? 'text-emerald-600 dark:text-emerald-400' 
+                          : 'text-slate-900 dark:text-white'
+                      }`}>
                         Dia {statsContador.diasDecorridos}
                       </span>
                       <span className="text-sm font-semibold text-slate-400">
                         / meta de {statsContador.metaDias} dias
                       </span>
+                      {isFaseConcluida && (
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-1 rounded-md">
+                          ✓ Finalizada
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                       <span>Início da etapa: <strong className="text-slate-700 dark:text-slate-200">{new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}</strong></span>
                       <span>•</span>
-                      <span>Prazo da Fase: <strong className="text-blue-600 dark:text-blue-400">{statsContador.prazoLimiteFormatado}</strong></span>
+                      <span>Prazo da Fase: <strong className={isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}>{statsContador.prazoLimiteFormatado}</strong></span>
                       {projetosPrazoFinal[selectedProjeto] && (
                         <>
                           <span>•</span>
@@ -1430,26 +1597,78 @@ export default function DiarioCampoTimelinePage() {
                     <button
                       type="button"
                       onClick={handleOpenIniciarEtapaModal}
-                      className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-blue-500/10 border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 flex items-center gap-1.5 shadow-sm transition-all"
-                      title="Definir início e prazo desta fase específica"
+                      disabled={isFaseConcluida}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 shadow-sm transition-all ${
+                        isFaseConcluida
+                          ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                          : statsContador.hasStarted
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                          : 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20'
+                      }`}
+                      title={
+                        isFaseConcluida
+                          ? 'Fase concluída - configuração bloqueada'
+                          : statsContador.hasStarted
+                          ? `Fase iniciada em ${statsContador.dataInicio} com meta de ${statsContador.metaDias} dias. Clique para ajustar.`
+                          : 'Definir início e prazo desta fase específica'
+                      }
                     >
-                      <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                      Definir Início / Prazo da Fase
+                      <Calendar className={`w-3.5 h-3.5 ${
+                        isFaseConcluida 
+                          ? 'text-slate-400' 
+                          : statsContador.hasStarted 
+                          ? 'text-emerald-500' 
+                          : 'text-blue-500'
+                      }`} />
+                      {statsContador.hasStarted ? '✓ Fase Configurada' : 'Definir Início / Prazo da Fase'}
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setJustificativaMotivo('Chuva no dia');
-                        setJustificativaTexto('');
-                        setIsJustificativaModalOpen(true);
+                        if (!isFaseConcluida) {
+                          setJustificativaMotivo('Chuva no dia');
+                          setJustificativaTexto('');
+                          setIsJustificativaModalOpen(true);
+                        }
                       }}
-                      className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/15 border border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 flex items-center gap-1.5 shadow-sm transition-all"
-                      title="Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor Paulo"
+                      disabled={isFaseConcluida}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 shadow-sm transition-all ${
+                        isFaseConcluida
+                          ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                          : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
+                      }`}
+                      title={
+                        isFaseConcluida
+                          ? 'Fase concluída - justificativas bloqueadas'
+                          : 'Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor Paulo'
+                      }
                     >
-                      <CloudRain className="w-4 h-4 text-amber-500" />
+                      <CloudRain className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-amber-500'}`} />
                       Registrar Justificativa / Ocorrência
                     </button>
+
+                    {/* Botão Concluir Fase */}
+                    {!isFaseConcluida ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setObservacaoConclusao('');
+                          setIsConcluirFaseModalOpen(true);
+                        }}
+                        className="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 border-2 border-emerald-400/50"
+                        title="Marcar esta fase como 100% concluída"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Concluir Fase</span>
+                        <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">100%</span>
+                      </button>
+                    ) : (
+                      <div className="px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>✅ Fase Concluída</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1457,21 +1676,35 @@ export default function DiarioCampoTimelinePage() {
                 <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10">
                   <div className="flex justify-between items-center text-xs text-slate-500 mb-1.5">
                     <span className="flex items-center gap-1">
-                      <span>Evolução do tempo na etapa</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 font-semibold">
-                        🔒 Meta Fixa Inalterável ({statsContador.metaDias}d)
-                      </span>
+                      <span>{isFaseConcluida ? 'Fase concluída' : 'Evolução do tempo na etapa'}</span>
+                      {!isFaseConcluida && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 font-semibold">
+                          🔒 Meta Fixa Inalterável ({statsContador.metaDias}d)
+                        </span>
+                      )}
                     </span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">{statsContador.pct}% do prazo previsto</span>
+                    <span className={`font-semibold ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {isFaseConcluida ? '100% Concluída ✓' : `${statsContador.pct}% do prazo previsto`}
+                    </span>
                   </div>
-                  <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
-                        statsContador.atrasado ? 'bg-rose-500' : 'bg-gradient-to-r from-blue-500 to-emerald-500'
+                        isFaseConcluida
+                          ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 animate-pulse'
+                          : statsContador.atrasado 
+                          ? 'bg-rose-500' 
+                          : 'bg-gradient-to-r from-blue-500 to-emerald-500'
                       }`}
-                      style={{ width: `${Math.min(100, statsContador.pct)}%` }}
+                      style={{ width: isFaseConcluida ? '100%' : `${Math.min(100, statsContador.pct)}%` }}
                     />
                   </div>
+                  {isFaseConcluida && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-2 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      Esta fase foi marcada como 100% concluída pela equipe de campo
+                    </p>
+                  )}
                 </div>
 
                 {/* Justificativas Registradas para este Projeto */}
@@ -1504,16 +1737,38 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── BOTOEIRA RÁPIDA DE STATUS CLICÁVEL & FORMULÁRIO ── */}
-              <form onSubmit={handleSalvarDiario} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-xl space-y-5">
+              <form onSubmit={handleSalvarDiario} className={`rounded-2xl p-5 md:p-6 shadow-xl space-y-5 transition-all ${
+                isFaseConcluida
+                  ? 'bg-slate-100 dark:bg-slate-900/20 border-2 border-slate-300 dark:border-slate-700 opacity-60'
+                  : 'bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b]'
+              }`}>
+                {/* Aviso de fase concluída */}
+                {isFaseConcluida && (
+                  <div className="bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-500/50 dark:border-emerald-500/30 rounded-xl p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100 mb-1">
+                          ✅ Fase Concluída - Registro Bloqueado
+                        </h4>
+                        <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                          Esta fase foi marcada como 100% concluída. Para fazer novos registros, entre em contato com o diretor para reabrir a fase.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1e293b] pb-3">
                   <div className="flex items-center gap-2">
-                    <Plus className="w-4 h-4 text-blue-500" />
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      Registrar Andamento em <span className="text-blue-500 capitalize">{selectedEtapa}</span>
+                    <Plus className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-blue-500'}`} />
+                    <h3 className={`text-base font-bold ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                      Registrar Andamento em <span className={`capitalize ${isFaseConcluida ? 'text-slate-500' : 'text-blue-500'}`}>{selectedEtapa}</span>
+                      {isFaseConcluida && <span className="ml-2 text-xs font-normal">(bloqueado)</span>}
                     </h3>
                   </div>
                   <span className="text-xs text-slate-400 hidden sm:inline">
-                    Não precisa digitar sempre: clique no status do dia!
+                    {isFaseConcluida ? 'Fase concluída' : 'Não precisa digitar sempre: clique no status do dia!'}
                   </span>
                 </div>
 
@@ -1526,60 +1781,69 @@ export default function DiarioCampoTimelinePage() {
                     {/* Botão: Dentro do programado */}
                     <button
                       type="button"
-                      onClick={() => setStatusRapido('Dentro do programado')}
+                      onClick={() => !isFaseConcluida && setStatusRapido('Dentro do programado')}
+                      disabled={isFaseConcluida}
                       className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
-                        statusRapido === 'Dentro do programado'
+                        isFaseConcluida
+                          ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
+                          : statusRapido === 'Dentro do programado'
                           ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 shadow-lg shadow-emerald-900/10 ring-2 ring-emerald-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-emerald-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           Programado
                         </span>
-                        <CheckCircle2 className={`w-5 h-5 ${statusRapido === 'Dentro do programado' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                        <CheckCircle2 className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Dentro do programado' ? 'text-emerald-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className="font-bold text-base text-slate-900 dark:text-white">Dentro do programado</p>
+                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Dentro do programado</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Ritmo normal de obra e sem gargalos</p>
                     </button>
 
                     {/* Botão: Acima */}
                     <button
                       type="button"
-                      onClick={() => setStatusRapido('Acima')}
+                      onClick={() => !isFaseConcluida && setStatusRapido('Acima')}
+                      disabled={isFaseConcluida}
                       className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
-                        statusRapido === 'Acima'
+                        isFaseConcluida
+                          ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
+                          : statusRapido === 'Acima'
                           ? 'border-blue-500 bg-blue-500/10 text-blue-950 dark:text-blue-100 shadow-lg shadow-blue-900/10 ring-2 ring-blue-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-blue-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-blue-600 dark:text-blue-400'}`}>
                           Adiantado
                         </span>
-                        <TrendingUp className={`w-5 h-5 ${statusRapido === 'Acima' ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <TrendingUp className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Acima' ? 'text-blue-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className="font-bold text-base text-slate-900 dark:text-white">Acima do previsto</p>
+                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Acima do previsto</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Rendimento alto e avanço adiantado</p>
                     </button>
 
                     {/* Botão: Abaixo */}
                     <button
                       type="button"
-                      onClick={() => setStatusRapido('Abaixo')}
+                      onClick={() => !isFaseConcluida && setStatusRapido('Abaixo')}
+                      disabled={isFaseConcluida}
                       className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
-                        statusRapido === 'Abaixo'
+                        isFaseConcluida
+                          ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
+                          : statusRapido === 'Abaixo'
                           ? 'border-rose-500 bg-rose-500/10 text-rose-950 dark:text-rose-100 shadow-lg shadow-rose-900/10 ring-2 ring-rose-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-rose-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
                           Atrasado
                         </span>
-                        <TrendingDown className={`w-5 h-5 ${statusRapido === 'Abaixo' ? 'text-rose-500' : 'text-slate-400'}`} />
+                        <TrendingDown className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Abaixo' ? 'text-rose-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className="font-bold text-base text-slate-900 dark:text-white">Abaixo do previsto</p>
+                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Abaixo do previsto</p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">Ritmo lento, clima ou aguardo de insumos</p>
                     </button>
                   </div>
@@ -1592,20 +1856,29 @@ export default function DiarioCampoTimelinePage() {
                   </label>
                   <textarea
                     rows={2}
-                    placeholder="Se desejar escrever algo específico sobre o dia de hoje, detalhe aqui (opcional)..."
+                    placeholder={isFaseConcluida ? "Campo desabilitado - fase concluída" : "Se desejar escrever algo específico sobre o dia de hoje, detalhe aqui (opcional)..."}
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}
-                    className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors resize-none"
+                    disabled={isFaseConcluida}
+                    className={`w-full border rounded-xl p-3 text-sm transition-colors resize-none ${
+                      isFaseConcluida
+                        ? 'bg-slate-100 dark:bg-slate-900/20 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500'
+                    }`}
                   />
                 </div>
 
                 {/* Anexo de Foto/Vídeo e Botão Salvar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                   <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer border border-slate-200 dark:border-[#1e293b]">
-                      <Paperclip className="w-4 h-4 text-blue-500" />
-                      <span>Anexar Foto / Vídeo</span>
-                      <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMidiaChange} />
+                    <label className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                      isFaseConcluida
+                        ? 'bg-slate-100 dark:bg-slate-900/20 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed'
+                        : 'bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] cursor-pointer'
+                    }`}>
+                      <Paperclip className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-blue-500'}`} />
+                      <span>{isFaseConcluida ? 'Anexo Bloqueado' : 'Anexar Foto / Vídeo'}</span>
+                      {!isFaseConcluida && <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMidiaChange} />}
                     </label>
 
                     {midiaPreview && (
@@ -1627,13 +1900,22 @@ export default function DiarioCampoTimelinePage() {
 
                   <button
                     type="submit"
-                    disabled={saving || uploadingMidia}
-                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-900/25 transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+                    disabled={saving || uploadingMidia || isFaseConcluida}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isFaseConcluida
+                        ? 'bg-slate-400 dark:bg-slate-700 text-slate-200 dark:text-slate-400 cursor-not-allowed opacity-50'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-900/25 disabled:opacity-60'
+                    }`}
                   >
                     {(saving || uploadingMidia) ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>Salvando registro...</span>
+                      </>
+                    ) : isFaseConcluida ? (
+                      <>
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>Fase Concluída - Registro Bloqueado</span>
                       </>
                     ) : (
                       <>
@@ -2594,6 +2876,150 @@ export default function DiarioCampoTimelinePage() {
         </div>
       )}
 
+    </div>
+  );
+}
+
+      {/* ── MODAL: CONCLUIR FASE ──────────────────────────────────────────── */}
+      {isConcluirFaseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-white/20">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black">Concluir Fase</h3>
+                    <p className="text-sm text-emerald-50 opacity-90">Marcar como 100% concluída</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsConcluirFaseModalOpen(false)}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* Informações da Fase */}
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/15">
+                    <span className="text-2xl">
+                      {ETAPAS_CAMPO.find(e => e.key === selectedEtapa)?.icon || '📋'}
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                      {selectedProjeto}
+                    </p>
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white capitalize mb-2">
+                      {selectedEtapa}
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-500 dark:text-slate-400 block">Início:</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 dark:text-slate-400 block">Dias Decorridos:</span>
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {statsContador.diasDecorridos} / {statsContador.metaDias} dias
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Aviso Importante */}
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-900 dark:text-blue-100 leading-relaxed space-y-1">
+                    <p className="font-bold">Ao concluir esta fase:</p>
+                    <ul className="list-disc list-inside space-y-0.5 text-blue-800 dark:text-blue-200">
+                      <li>O progresso será atualizado para <strong>100%</strong></li>
+                      <li>A fase aparecerá como <strong>"Concluída"</strong> em todos os painéis</li>
+                      <li>Um registro será criado no diário de campo</li>
+                      <li>O diretor será notificado da conclusão</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Observações Finais */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Observações Finais da Conclusão (opcional):
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Ex: Fase concluída dentro do prazo. Todas as valetas niveladas e aprovadas pela equipe técnica..."
+                  value={observacaoConclusao}
+                  onChange={(e) => setObservacaoConclusao(e.target.value)}
+                  className="w-full bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 resize-none placeholder:text-slate-400"
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Esta mensagem ficará registrada permanentemente no histórico da fase.
+                </p>
+              </div>
+
+              {/* Responsáveis */}
+              {currentEtapaResponsaveis.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-slate-500">Responsáveis:</span>
+                  {currentEtapaResponsaveis.map((resp, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2 py-1 rounded-md text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300"
+                    >
+                      {resp}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-5 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsConcluirFaseModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConcluirFase}
+                disabled={concluindoFase}
+                className="px-6 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {concluindoFase ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Concluindo...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Sim, Concluir Fase</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
