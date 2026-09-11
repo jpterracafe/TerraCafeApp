@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
@@ -90,6 +92,21 @@ const getStatusConfig = (status: StatusDiario | string) => {
 
 export default function DiarioCampoTimelinePage() {
   const { success, error: toastError } = useToast();
+  const { data: session, status: sessionStatus } = useSession();
+  const router = useRouter();
+
+  // Guard: só Agricultor e Desenvolvedor acessam o diário de campo diretamente
+  // Diretor e Admin são redirecionados para suas páginas
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
+    if (sessionStatus === 'unauthenticated') {
+      router.replace('/login');
+      return;
+    }
+    const role = (session?.user as any)?.role;
+    if (role === 'Diretor') router.replace('/visao-geral');
+    else if (role === 'Admin' || role === 'Desenvolvedor') router.replace('/admin/usuarios');
+  }, [sessionStatus, session, router]);
 
   // Dados principais
   const [registros, setRegistros] = useState<RegistroDiarioCampo[]>([]);
@@ -175,6 +192,12 @@ export default function DiarioCampoTimelinePage() {
   // Progresso manual editável por fase no Diário de Campo
   const [progressoManual, setProgressoManual] = useState<Record<string, number>>({});
   const [savingProgresso, setSavingProgresso] = useState(false);
+
+  // Modal: Adicionar novo responsável ao sistema
+  const [isAddResponsavelModalOpen, setIsAddResponsavelModalOpen] = useState(false);
+  const [novoResponsavelNome, setNovoResponsavelNome] = useState('');
+  const [novoResponsavelEmail, setNovoResponsavelEmail] = useState('');
+  const [savingNovoResponsavel, setSavingNovoResponsavel] = useState(false);
 
   // Carrega configurações de contadores, start de projetos e responsáveis por etapa (Nuvem + LocalStorage)
   useEffect(() => {
@@ -759,6 +782,62 @@ export default function DiarioCampoTimelinePage() {
       toastError('Erro ao marcar fase como concluída. Tente novamente.');
     } finally {
       setConcluindoFase(false);
+    }
+  };
+
+  // ── Adicionar Novo Responsável ao Sistema ────────────────────────────────────
+  const handleAdicionarResponsavel = async () => {
+    const nome = novoResponsavelNome.trim();
+    if (!nome) {
+      toastError('Informe o nome do responsável.');
+      return;
+    }
+    setSavingNovoResponsavel(true);
+    try {
+      // Cria o usuário com role Agricultor via API de admin
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nome,
+          email: novoResponsavelEmail.trim() || `${nome.toLowerCase().replace(/\s+/g, '.')}@terracafe.local`,
+          cargo: 'Agricultor',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Após criar, recarrega a lista de usuários
+        const resUsers = await fetch('/api/usuarios-roles');
+        if (resUsers.ok) {
+          const usersData = await resUsers.json();
+          setUsers(usersData.users || []);
+        }
+        // Atribui automaticamente à etapa atual se projeto selecionado
+        if (selectedProjeto) {
+          const chave = `${selectedProjeto}::${selectedEtapa}`;
+          const novos = [...(responsaveisPorEtapa[chave] ?? []), nome];
+          const updated = { ...responsaveisPorEtapa, [chave]: novos };
+          saveResponsaveisPorEtapaToStorage(updated);
+        }
+        setIsAddResponsavelModalOpen(false);
+        setNovoResponsavelNome('');
+        setNovoResponsavelEmail('');
+        // Mostra a senha temporária gerada para o admin compartilhar
+        if (data.user?.senhaTemp) {
+          success(`✅ Responsável "${nome}" criado! Senha temporária: ${data.user.senhaTemp}`);
+        } else {
+          success(`✅ Responsável "${nome}" adicionado com sucesso!`);
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toastError(err.error || 'Erro ao criar responsável.');
+      }
+    } catch (e) {
+      console.error('[diario] Erro ao criar responsável:', e);
+      toastError('Erro ao criar responsável. Tente novamente.');
+    } finally {
+      setSavingNovoResponsavel(false);
     }
   };
 
@@ -1477,6 +1556,14 @@ export default function DiarioCampoTimelinePage() {
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       >
                         Limpar
+                      </button>
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <button
+                        type="button"
+                        onClick={() => { setNovoResponsavelNome(''); setNovoResponsavelEmail(''); setIsAddResponsavelModalOpen(true); }}
+                        className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" /> Novo Responsável
                       </button>
                     </div>
                   </div>
@@ -3015,6 +3102,97 @@ export default function DiarioCampoTimelinePage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: ADICIONAR NOVO RESPONSÁVEL ─────────────────────────────── */}
+      {isAddResponsavelModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-500/15">
+                  <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white">Novo Responsável</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Cadastrar e atribuir à etapa atual</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddResponsavelModalOpen(false)}
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3.5 text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                <strong>Como funciona:</strong> O responsável será cadastrado no sistema com o role <em>Agricultor</em>. Uma senha temporária será gerada — copie e envie a ele para o primeiro acesso.
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Nome completo <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex: João Silva"
+                  value={novoResponsavelNome}
+                  onChange={e => setNovoResponsavelNome(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  E-mail <span className="text-slate-400 font-normal">(opcional — usado para login)</span>
+                </label>
+                <input
+                  type="email"
+                  placeholder="joao.silva@email.com"
+                  value={novoResponsavelEmail}
+                  onChange={e => setNovoResponsavelEmail(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl px-3 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Se não informado, um e-mail automático será gerado.</p>
+              </div>
+
+              {selectedProjeto && (
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                  ✅ Será automaticamente vinculado à etapa <strong className="capitalize">{selectedEtapa}</strong> do projeto <strong>{selectedProjeto}</strong>.
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsAddResponsavelModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAdicionarResponsavel}
+                disabled={savingNovoResponsavel || !novoResponsavelNome.trim()}
+                className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingNovoResponsavel ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /><span>Cadastrando...</span></>
+                ) : (
+                  <><Plus className="w-4 h-4" /><span>Cadastrar Responsável</span></>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

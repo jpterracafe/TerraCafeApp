@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { useToast } from '@/components/Toast';
 import {
   Search, CheckCircle2, AlertCircle, Clock,
@@ -42,7 +43,21 @@ const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: str
 
 export default function VisaoGeralDiretorPage() {
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const { success, error: toastError } = useToast();
+
+  // Guard: só Diretor e Desenvolvedor podem ver esta página
+  useEffect(() => {
+    if (sessionStatus === 'loading') return;
+    if (sessionStatus === 'unauthenticated') {
+      router.replace('/login');
+      return;
+    }
+    const role = (session?.user as any)?.role;
+    if (role && role !== 'Diretor' && role !== 'Desenvolvedor' && role !== 'Admin') {
+      router.replace('/irrigacao/diario-campo');
+    }
+  }, [sessionStatus, session, router]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -454,6 +469,12 @@ export default function VisaoGeralDiretorPage() {
         modoTV ? 'p-4 md:p-6 overflow-y-auto' : 'p-4 md:p-8'
       }`}
     >
+      {/* Guard de sessão — não renderiza enquanto verifica */}
+      {(sessionStatus === 'loading' || (sessionStatus === 'authenticated' && (session?.user as any)?.role && !['Diretor','Desenvolvedor','Admin'].includes((session?.user as any)?.role))) && (
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+        </div>
+      )}
       {/* ── Topbar Executiva & Controles ────────────────────────────────── */}
       <header className="max-w-7xl mx-auto mb-6 bg-white/90 dark:bg-[#0d1527]/90 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-slate-200 dark:border-[#1e293b] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

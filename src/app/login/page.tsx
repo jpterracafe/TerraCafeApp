@@ -26,9 +26,14 @@ export default function LoginPage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       const role = (session.user as any).role;
-      if (role === 'Desenvolvedor') {
+      if (role === 'Desenvolvedor' || role === 'Admin') {
         router.replace('/admin/usuarios');
+      } else if (role === 'Diretor') {
+        router.replace('/visao-geral');
+      } else if (role === 'Agricultor') {
+        router.replace('/irrigacao/diario-campo');
       } else {
+        // Colaborador e outros roles vão para execução
         router.replace('/irrigacao/execucao');
       }
     }
