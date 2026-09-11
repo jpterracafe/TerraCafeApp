@@ -50,6 +50,14 @@ const getInitials = (name: string) => {
 
 const getStatusConfig = (status: StatusDiario | string) => {
   const s = (status || '').toLowerCase();
+  if (s.includes('configuração') || s.includes('configuracao') || s.includes('atualizada') || s.includes('atualizado')) {
+    return {
+      color: 'text-violet-500 bg-violet-500/10 border-violet-500/25',
+      badgeBg: 'bg-violet-500/20 text-violet-500 border-violet-500/30',
+      icon: Calendar,
+      label: 'Configuração Atualizada',
+    };
+  }
   if (s.includes('dentro') || s.includes('programado') || s.includes('concluído')) {
     return { 
       color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/25', 
@@ -164,6 +172,10 @@ export default function DiarioCampoTimelinePage() {
   const [concluindoFase, setConcluindoFase] = useState(false);
   const [observacaoConclusao, setObservacaoConclusao] = useState('');
 
+  // Progresso manual editável por fase no Diário de Campo
+  const [progressoManual, setProgressoManual] = useState<Record<string, number>>({});
+  const [savingProgresso, setSavingProgresso] = useState(false);
+
   // Carrega configurações de contadores, start de projetos e responsáveis por etapa (Nuvem + LocalStorage)
   useEffect(() => {
     // 1. Leitura rápida do cache local
@@ -182,6 +194,9 @@ export default function DiarioCampoTimelinePage() {
 
       const savedJust = localStorage.getItem('diario_projeto_justificativas_v1');
       if (savedJust) setProjetoJustificativas(JSON.parse(savedJust));
+
+      const savedProgresso = localStorage.getItem('diario_etapas_progresso_v1');
+      if (savedProgresso) setProgressoManual(JSON.parse(savedProgresso));
     } catch (e) {
       console.error('[diario] Erro ao ler configs do localStorage:', e);
     }
@@ -210,6 +225,11 @@ export default function DiarioCampoTimelinePage() {
           if (data.projetoJustificativas && Object.keys(data.projetoJustificativas).length > 0) {
             setProjetoJustificativas(prev => ({ ...prev, ...data.projetoJustificativas }));
             try { localStorage.setItem('diario_projeto_justificativas_v1', JSON.stringify(data.projetoJustificativas)); } catch (_) {}
+          }
+          // Carrega progresso manual salvo
+          if (data.etapasProgresso && Object.keys(data.etapasProgresso).length > 0) {
+            setProgressoManual(prev => ({ ...prev, ...data.etapasProgresso }));
+            try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(data.etapasProgresso)); } catch (_) {}
           }
         }
       })
@@ -618,6 +638,36 @@ export default function DiarioCampoTimelinePage() {
       }
     };
     saveEtapaConfigToStorage(updated);
+
+    // ── Registra aviso no histórico sobre mudança de datas ─────────────────
+    const hojeStr = new Date().toISOString().split('T')[0];
+    const antigo = configEtapas[currentConfigKey];
+    const mudouInicio = antigo?.dataInicio && antigo.dataInicio !== iniciarEtapaDataInicio;
+    const mudouPrazo  = antigo?.prazoLimite && antigo.prazoLimite !== iniciarEtapaPrazoLimite;
+    if (mudouInicio || mudouPrazo || !antigo?.hasStarted) {
+      const partes: string[] = [];
+      if (!antigo?.hasStarted) partes.push(`Fase iniciada em ${new Date(`${iniciarEtapaDataInicio}T00:00:00`).toLocaleDateString('pt-BR')} com prazo até ${new Date(`${iniciarEtapaPrazoLimite}T00:00:00`).toLocaleDateString('pt-BR')} (${diffDias} dias)`);
+      else {
+        if (mudouInicio) partes.push(`Início alterado de ${new Date(`${antigo.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${iniciarEtapaDataInicio}T00:00:00`).toLocaleDateString('pt-BR')}`);
+        if (mudouPrazo)  partes.push(`Prazo alterado de ${new Date(`${antigo.prazoLimite!}T00:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${iniciarEtapaPrazoLimite}T00:00:00`).toLocaleDateString('pt-BR')}`);
+      }
+      const resp = currentEtapaResponsaveis.length > 0 ? currentEtapaResponsaveis.join(', ') : 'Equipe';
+      fetch('/api/diario-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: hojeStr,
+          responsavel: resp,
+          atividade: selectedEtapa,
+          status: 'Configuração Atualizada',
+          observacoes: `📅 ${partes.join(' | ')}`,
+          projetoCliente: selectedProjeto,
+        }),
+      }).then(r => r.ok ? r.json() : null)
+        .then(res => { if (res?.log) setRegistros(prev => [res.log, ...prev]); })
+        .catch(() => {});
+    }
+
     setIsIniciarEtapaModalOpen(false);
     success(`Início e prazo da fase "${selectedEtapa}" configurados com sucesso!`);
   };
@@ -709,6 +759,31 @@ export default function DiarioCampoTimelinePage() {
       toastError('Erro ao marcar fase como concluída. Tente novamente.');
     } finally {
       setConcluindoFase(false);
+    }
+  };
+
+  // ── Salvar Progresso Manual por Fase (Diário de Campo) ──────────────────────
+  const handleSalvarProgresso = async (valor: number) => {
+    if (!selectedProjeto || !selectedEtapa) return;
+    const chaveEtapa = `${selectedProjeto}::${selectedEtapa}`;
+    const clampado = Math.min(100, Math.max(0, valor));
+
+    // Atualiza localmente
+    const updated = { ...progressoManual, [chaveEtapa]: clampado };
+    setProgressoManual(updated);
+    try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(updated)); } catch (_) {}
+
+    setSavingProgresso(true);
+    try {
+      await fetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'progresso', dados: { [chaveEtapa]: clampado } }),
+      });
+    } catch (_) {
+      console.warn('[diario] Erro ao salvar progresso');
+    } finally {
+      setSavingProgresso(false);
     }
   };
 
@@ -1707,6 +1782,65 @@ export default function DiarioCampoTimelinePage() {
                   )}
                 </div>
 
+                {/* ── Progresso da Fase (editável pela equipe de campo) ── */}
+                {!isFaseConcluida && (
+                  <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        Conclusão da Fase (% real)
+                      </span>
+                      <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                        {progressoManual[currentConfigKey] !== undefined
+                          ? `${progressoManual[currentConfigKey]}%`
+                          : 'Automático'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2.5">
+                      Arraste para atualizar o quanto da fase está realmente concluído. Se não mudar, o sistema calcula pelo tempo.
+                    </p>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={progressoManual[currentConfigKey] ?? statsContador.pct}
+                      onChange={e => {
+                        const v = Number(e.target.value);
+                        const chave = currentConfigKey;
+                        const updated = { ...progressoManual, [chave]: v };
+                        setProgressoManual(updated);
+                        try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(updated)); } catch (_) {}
+                      }}
+                      onMouseUp={e => handleSalvarProgresso(Number((e.target as HTMLInputElement).value))}
+                      onTouchEnd={e => handleSalvarProgresso(Number((e.currentTarget as HTMLInputElement).value))}
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-500"
+                      style={{
+                        background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${progressoManual[currentConfigKey] ?? statsContador.pct}%, #e2e8f0 ${progressoManual[currentConfigKey] ?? statsContador.pct}%, #e2e8f0 100%)`,
+                      }}
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                      <span>0%</span>
+                      <div className="flex gap-2">
+                        {[25, 50, 75].map(v => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => handleSalvarProgresso(v)}
+                            className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-blue-500/20 text-slate-600 dark:text-slate-400 hover:text-blue-600 transition-colors"
+                          >{v}%</button>
+                        ))}
+                      </div>
+                      <span>100%</span>
+                    </div>
+                    {savingProgresso && (
+                      <p className="text-[10px] text-blue-500 mt-1 flex items-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Salvando...
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Justificativas Registradas para este Projeto */}
                 {projetoJustificativas[selectedProjeto] && projetoJustificativas[selectedProjeto].length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10">
@@ -2013,6 +2147,7 @@ export default function DiarioCampoTimelinePage() {
                     {filteredLogs.map((log) => {
                       const conf = getStatusConfig(log.status);
                       const Icon = conf.icon;
+                      const isConfigUpdate = (log.status || '').toLowerCase().includes('configuração') || (log.status || '').toLowerCase().includes('atualizada');
                       const dateObj = new Date(`${log.data}T00:00:00`);
                       const isToday = log.data === new Date().toISOString().split('T')[0];
                       const dataFormatada = isToday 
@@ -2024,11 +2159,19 @@ export default function DiarioCampoTimelinePage() {
                       return (
                         <div key={log.id} className="relative pl-7 md:pl-8 group">
                           {/* Marcador na linha do tempo */}
-                          <div className="absolute -left-[17px] top-1.5 w-8 h-8 rounded-full border-4 border-white dark:border-[#0d1527] bg-slate-100 dark:bg-[#111a30] flex items-center justify-center shadow-md">
+                          <div className={`absolute -left-[17px] top-1.5 w-8 h-8 rounded-full border-4 flex items-center justify-center shadow-md ${
+                            isConfigUpdate
+                              ? 'border-violet-200 dark:border-violet-900 bg-violet-100 dark:bg-violet-950'
+                              : 'border-white dark:border-[#0d1527] bg-slate-100 dark:bg-[#111a30]'
+                          }`}>
                             <Icon className={`w-4 h-4 ${conf.color.split(' ')[0]}`} />
                           </div>
 
-                          <div className="bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4.5 hover:border-blue-500/40 transition-colors shadow-sm relative space-y-2.5">
+                          <div className={`border rounded-xl p-4.5 hover:border-blue-500/40 transition-colors shadow-sm relative space-y-2.5 ${
+                            isConfigUpdate
+                              ? 'bg-violet-50 dark:bg-violet-950/20 border-violet-300 dark:border-violet-800/50'
+                              : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b]'
+                          }`}>
                             {/* Botão de excluir */}
                             <button
                               type="button"
