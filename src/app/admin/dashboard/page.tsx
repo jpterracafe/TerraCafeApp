@@ -379,14 +379,36 @@ export default function DashboardPage() {
 
       // Configuração e metas da etapa atual
       const configKey = `${nomeProjeto}::${etapaAtual}`;
-      const conf = configEtapas[configKey] || { dataInicio: dataStart, metaDias: 40 };
+      const confSalva = configEtapas[configKey] as (EtapaConfig & { hasStarted?: boolean }) | undefined;
+      const logsEtapaAtual = logsProjeto.filter(l =>
+        l.atividade.toLowerCase().includes(etapaAtual.toLowerCase()) ||
+        etapaAtual.toLowerCase().includes(l.atividade.toLowerCase())
+      );
+      const etapaFoiIniciada = confSalva?.hasStarted === true || logsEtapaAtual.length > 0;
 
-      const inicioEtapa = new Date(`${conf.dataInicio}T00:00:00`);
-      inicioEtapa.setHours(0, 0, 0, 0);
-      const diffEtapa = Math.max(0, Math.floor((hoje.getTime() - inicioEtapa.getTime()) / (1000 * 60 * 60 * 24)));
-      const diasRestantes = conf.metaDias - diffEtapa;
-      const pctEtapa = Math.min(100, Math.max(0, Math.round((diffEtapa / conf.metaDias) * 100)));
-      const isAtrasado = diasRestantes < 0 ? 1 : 0;
+      const conf = etapaFoiIniciada
+        ? (confSalva || {
+            dataInicio: logsEtapaAtual.length > 0
+              ? logsEtapaAtual.map(l => l.data).sort()[0]
+              : dataStart,
+            metaDias: confSalva?.metaDias || 20,
+            hasStarted: true,
+          })
+        : { dataInicio: '', metaDias: confSalva?.metaDias || 20, hasStarted: false };
+
+      let diffEtapa = 0;
+      let diasRestantes = conf.metaDias;
+      let pctEtapa = 0;
+      let isAtrasado = 0;
+
+      if (etapaFoiIniciada && conf.dataInicio) {
+        const inicioEtapa = new Date(`${conf.dataInicio}T00:00:00`);
+        inicioEtapa.setHours(0, 0, 0, 0);
+        diffEtapa = Math.max(0, Math.floor((hoje.getTime() - inicioEtapa.getTime()) / (1000 * 60 * 60 * 24)));
+        diasRestantes = conf.metaDias - diffEtapa;
+        pctEtapa = Math.min(100, Math.max(0, Math.round((diffEtapa / Math.max(1, conf.metaDias)) * 100)));
+        isAtrasado = diasRestantes < 0 ? 1 : 0;
+      }
 
       // Status Recente
       const statusRecente = ultimoLogProjeto?.status || 'Dentro do programado';

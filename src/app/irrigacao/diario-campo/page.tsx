@@ -591,17 +591,33 @@ export default function DiarioCampoTimelinePage() {
       const datas = logsEtapa.map(l => l.data).sort();
       dataInicioDefault = datas[0];
     }
+    const temLogs = logsEtapa.length > 0;
     return {
-      dataInicio: dataInicioDefault || dataStartProjeto || new Date().toISOString().split('T')[0],
+      dataInicio: temLogs ? (dataInicioDefault || new Date().toISOString().split('T')[0]) : '',
       metaDias: 20,
       prazoLimite: '',
-      hasStarted: logsEtapa.length > 0,
+      hasStarted: temLogs,
     };
-  }, [configEtapas, currentConfigKey, registros, selectedProjeto, selectedEtapa, dataStartProjeto]);
+  }, [configEtapas, currentConfigKey, registros, selectedProjeto, selectedEtapa]);
 
   const statsContador = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
+
+    const faseFoiIniciada = currentEtapaConfig.hasStarted === true;
+    if (!faseFoiIniciada) {
+      return {
+        diasDecorridos: 0,
+        diasRestantes: currentEtapaConfig.metaDias || 20,
+        metaDias: currentEtapaConfig.metaDias || 20,
+        prazoLimite: '',
+        prazoLimiteFormatado: 'Fase ainda não iniciada',
+        pct: 0,
+        atrasado: false,
+        dataInicio: '',
+        hasStarted: false,
+      };
+    }
 
     const inicio = new Date(`${currentEtapaConfig.dataInicio}T00:00:00`);
     inicio.setHours(0, 0, 0, 0);
@@ -632,7 +648,7 @@ export default function DiarioCampoTimelinePage() {
       pct,
       atrasado,
       dataInicio: currentEtapaConfig.dataInicio,
-      hasStarted: currentEtapaConfig.hasStarted ?? true,
+      hasStarted: true,
     };
   }, [currentEtapaConfig]);
 
@@ -908,7 +924,7 @@ export default function DiarioCampoTimelinePage() {
         metaDias: novaMetaDias,
         dataInicio: novaDataInicio,
         prazoLimite: novoPrazoLimite,
-        hasStarted: prev.hasStarted ?? true,
+        hasStarted: prev.hasStarted ?? false,
       }
     };
     saveEtapaConfigToStorage(updated);
@@ -1273,9 +1289,35 @@ export default function DiarioCampoTimelinePage() {
   // Informações consolidadas de cada etapa para o resumo da diretoria
   const getEtapaResumoInfo = (etapaKey: EtapaCampo) => {
     const key = `${selectedProjeto}::${etapaKey}`;
-    const cfg = configEtapas[key] || {
-      dataInicio: dataStartProjeto || new Date().toISOString().split('T')[0],
-      metaDias: 40,
+    const cfgSalva = configEtapas[key];
+    const logsEtapa = registros
+      .filter(r => r.projetoCliente === selectedProjeto && (r.atividade === etapaKey || r.atividade.toLowerCase().includes(etapaKey.toLowerCase())))
+      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
+    const ultimoLog = logsEtapa[0];
+    const temLogs = logsEtapa.length > 0;
+
+    const faseFoiIniciada = cfgSalva?.hasStarted === true || temLogs;
+
+    if (!faseFoiIniciada) {
+      const resp = responsaveisPorEtapa[key] || [];
+      return {
+        cfg: { dataInicio: '', metaDias: cfgSalva?.metaDias ?? 20, prazoLimite: '', hasStarted: false },
+        decorridos: 0,
+        restantes: cfgSalva?.metaDias ?? 20,
+        metaDias: cfgSalva?.metaDias ?? 20,
+        atrasado: false,
+        responsaveis: resp,
+        ultimoStatus: 'Fase ainda não iniciada',
+        ultimoRegistro: null,
+        totalRegistros: 0,
+        naoIniciada: true,
+      };
+    }
+
+    const cfg = cfgSalva || {
+      dataInicio: temLogs ? logsEtapa[logsEtapa.length - 1].data : new Date().toISOString().split('T')[0],
+      metaDias: 20,
+      hasStarted: true,
     };
     const inicio = new Date(`${cfg.dataInicio}T00:00:00`);
     inicio.setHours(0, 0, 0, 0);
@@ -1283,25 +1325,21 @@ export default function DiarioCampoTimelinePage() {
     hoje.setHours(0, 0, 0, 0);
     const diffMs = hoje.getTime() - inicio.getTime();
     const decorridos = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-    const restantes = cfg.metaDias - decorridos;
+    const metaDiasFase = cfg.metaDias ?? 20;
+    const restantes = metaDiasFase - decorridos;
     const resp = responsaveisPorEtapa[key] || [];
-
-    // Último status lançado dessa etapa
-    const logsEtapa = registros
-      .filter(r => r.projetoCliente === selectedProjeto && (r.atividade === etapaKey || r.atividade.toLowerCase().includes(etapaKey.toLowerCase())))
-      .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-    const ultimoLog = logsEtapa[0];
 
     return {
       cfg,
       decorridos,
       restantes,
-      metaDias: cfg.metaDias,
+      metaDias: metaDiasFase,
       atrasado: restantes < 0,
       responsaveis: resp,
       ultimoStatus: ultimoLog?.status || 'Dentro do programado',
       ultimoRegistro: ultimoLog?.data || null,
       totalRegistros: logsEtapa.length,
+      naoIniciada: false,
     };
   };
 
@@ -1346,7 +1384,11 @@ export default function DiarioCampoTimelinePage() {
       const statusIcon = statusMap[info.ultimoStatus] ?? '🟢';
 
       texto += `• *${etMeta.label}:* ${statusIcon} ${info.ultimoStatus}\n`;
-      texto += `  Progresso: ${info.decorridos} de ${info.metaDias} dias (${info.restantes >= 0 ? `${info.restantes}d restantes` : `${Math.abs(info.restantes)}d excedidos`})\n`;
+      if ((info as any).naoIniciada) {
+        texto += `  Progresso: Fase ainda não iniciada (aguardando definição de início/prazo)\n`;
+      } else {
+        texto += `  Progresso: ${info.decorridos} de ${info.metaDias} dias (${info.restantes >= 0 ? `${info.restantes}d restantes` : `${Math.abs(info.restantes)}d excedidos`})\n`;
+      }
       texto += `  Responsáveis: ${respStr}\n`;
     });
 
@@ -1763,12 +1805,14 @@ export default function DiarioCampoTimelinePage() {
                       <span className={`text-3xl md:text-4xl font-extrabold tracking-tight ${
                         isFaseConcluida 
                           ? 'text-emerald-600 dark:text-emerald-400' 
-                          : 'text-slate-900 dark:text-white'
+                          : statsContador.hasStarted
+                          ? 'text-slate-900 dark:text-white'
+                          : 'text-slate-400 dark:text-slate-500'
                       }`}>
-                        Dia {statsContador.diasDecorridos}
+                        {statsContador.hasStarted ? `Dia ${statsContador.diasDecorridos}` : 'Fase não iniciada'}
                       </span>
                       <span className="text-sm font-semibold text-slate-400">
-                        / meta de {statsContador.metaDias} dias
+                        {statsContador.hasStarted ? `/ meta de ${statsContador.metaDias} dias` : `(meta: ${statsContador.metaDias} dias após início)`}
                       </span>
                       {isFaseConcluida && (
                         <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-1 rounded-md">
@@ -1777,7 +1821,7 @@ export default function DiarioCampoTimelinePage() {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      <span>Início da etapa: <strong className="text-slate-700 dark:text-slate-200">{new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}</strong></span>
+                      <span>Início da etapa: <strong className="text-slate-700 dark:text-slate-200">{statsContador.dataInicio ? new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR') : 'Aguardando definição'}</strong></span>
                       <span>•</span>
                       <span>Prazo da Fase: <strong className={isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}>{statsContador.prazoLimiteFormatado}</strong></span>
                       {projetosPrazoFinal[selectedProjeto] && (
@@ -3297,13 +3341,17 @@ export default function DiarioCampoTimelinePage() {
                       <div>
                         <span className="text-slate-500 dark:text-slate-400 block">Início:</span>
                         <span className="font-bold text-slate-900 dark:text-white">
-                          {new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')}
+                          {statsContador.dataInicio
+                            ? new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')
+                            : '—'}
                         </span>
                       </div>
                       <div>
                         <span className="text-slate-500 dark:text-slate-400 block">Dias Decorridos:</span>
                         <span className="font-bold text-slate-900 dark:text-white">
-                          {statsContador.diasDecorridos} / {statsContador.metaDias} dias
+                          {statsContador.hasStarted
+                            ? `${statsContador.diasDecorridos} / ${statsContador.metaDias} dias`
+                            : 'Fase não iniciada'}
                         </span>
                       </div>
                     </div>

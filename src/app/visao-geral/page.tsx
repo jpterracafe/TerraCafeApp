@@ -253,11 +253,13 @@ export default function VisaoGeralDiretorPage() {
 
         // Detecção de início e prazos
         const cfgFase = config.configEtapas[chaveEtapa];
-        const hasStarted = !!cfgFase?.dataInicio || logsEtapa.length > 0;
-        const dataInicioFase = cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : '');
+        const hasStarted = cfgFase?.hasStarted === true || logsEtapa.length > 0;
+        const dataInicioFase = hasStarted
+          ? (cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : ''))
+          : '';
         const metaDiasFase = cfgFase?.metaDias || 20;
 
-        let prazoLimiteFase = cfgFase?.prazoLimite || '';
+        let prazoLimiteFase = hasStarted ? (cfgFase?.prazoLimite || '') : '';
         if (!prazoLimiteFase && hasStarted && dataInicioFase) {
           const dIni = new Date(`${dataInicioFase}T00:00:00`);
           dIni.setDate(dIni.getDate() + metaDiasFase);
