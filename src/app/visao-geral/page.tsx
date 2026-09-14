@@ -252,14 +252,15 @@ export default function VisaoGeralDiretorPage() {
         const responsaveis = todosResponsaveis.sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
         // Detecção de início e prazos
+        // REGRA ESTRITA: fase SÓ inicia quando cfgFase.hasStarted === true
+        // (usuário clicou explicitamente em "Definir Início / Prazo da Fase")
+        // Logs no diário NÃO contam como início oficial da fase.
         const cfgFase = config.configEtapas[chaveEtapa];
-        const hasStarted = cfgFase?.hasStarted === true || logsEtapa.length > 0;
-        const dataInicioFase = hasStarted
-          ? (cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : ''))
-          : '';
+        const hasStarted = cfgFase?.hasStarted === true;
+        const dataInicioFase = hasStarted ? cfgFase?.dataInicio || '' : '';
         const metaDiasFase = cfgFase?.metaDias || 20;
 
-        let prazoLimiteFase = hasStarted ? (cfgFase?.prazoLimite || '') : '';
+        let prazoLimiteFase = hasStarted ? cfgFase?.prazoLimite || '' : '';
         if (!prazoLimiteFase && hasStarted && dataInicioFase) {
           const dIni = new Date(`${dataInicioFase}T00:00:00`);
           dIni.setDate(dIni.getDate() + metaDiasFase);

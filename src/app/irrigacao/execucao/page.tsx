@@ -229,9 +229,9 @@ export default function PainelOperacionalObrasPage() {
           todosResp = todosResp.filter(r => r !== 'Administrador');
         }
 
-        const hasStarted = cfgFase?.hasStarted === true || logsEtapa.length > 0;
+        const hasStarted = cfgFase?.hasStarted === true;
         const dataInicioFase = hasStarted
-          ? (cfgFase?.dataInicio || (logsEtapa.length > 0 ? logsEtapa[logsEtapa.length - 1].data : ''))
+          ? cfgFase?.dataInicio || ''
           : '';
         const metaDiasFase = cfgFase?.metaDias || 20;
 

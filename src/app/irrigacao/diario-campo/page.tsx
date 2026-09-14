@@ -579,26 +579,23 @@ export default function DiarioCampoTimelinePage() {
   // ── Cálculo do Contador da Etapa Atual ──────────────────────────────────────
   const currentConfigKey = `${selectedProjeto}::${selectedEtapa}`;
   const currentEtapaConfig: EtapaConfig = useMemo(() => {
-    if (configEtapas[currentConfigKey]) {
-      return configEtapas[currentConfigKey];
+    const cfgSalva = configEtapas[currentConfigKey];
+    // A fase SÓ é considerada iniciada se hasStarted === true (ou seja, o usuário
+    // clicou explicitamente em "Definir Início / Prazo da Fase" e salvou).
+    // Logs antigos / data de criação do projeto NÃO contam como início oficial.
+    const inicioOficial = cfgSalva?.hasStarted === true;
+    if (cfgSalva && inicioOficial) {
+      return cfgSalva;
     }
-    const logsEtapa = registros.filter(r => 
-      r.projetoCliente === selectedProjeto && 
-      (r.atividade === selectedEtapa || r.atividade.toLowerCase().includes(selectedEtapa.toLowerCase()))
-    );
-    let dataInicioDefault = '';
-    if (logsEtapa.length > 0) {
-      const datas = logsEtapa.map(l => l.data).sort();
-      dataInicioDefault = datas[0];
-    }
-    const temLogs = logsEtapa.length > 0;
+    // Fallback: sem start oficial → data vazia, prazo vazio, hasStarted = false
+    const metaPadrao = cfgSalva?.metaDias ?? 20;
     return {
-      dataInicio: temLogs ? (dataInicioDefault || new Date().toISOString().split('T')[0]) : '',
-      metaDias: 20,
+      dataInicio: '',
+      metaDias: metaPadrao,
       prazoLimite: '',
-      hasStarted: temLogs,
+      hasStarted: false,
     };
-  }, [configEtapas, currentConfigKey, registros, selectedProjeto, selectedEtapa]);
+  }, [configEtapas, currentConfigKey]);
 
   const statsContador = useMemo(() => {
     const hoje = new Date();
@@ -1290,44 +1287,41 @@ export default function DiarioCampoTimelinePage() {
   const getEtapaResumoInfo = (etapaKey: EtapaCampo) => {
     const key = `${selectedProjeto}::${etapaKey}`;
     const cfgSalva = configEtapas[key];
+
+    // INÍCIO OFICIAL DA FASE: SÓ VALE se cfgSalva.hasStarted === true
+    // (usuário clicou em "Definir Início / Prazo da Fase")
+    const faseFoiIniciada = cfgSalva?.hasStarted === true;
+
     const logsEtapa = registros
       .filter(r => r.projetoCliente === selectedProjeto && (r.atividade === etapaKey || r.atividade.toLowerCase().includes(etapaKey.toLowerCase())))
       .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
     const ultimoLog = logsEtapa[0];
-    const temLogs = logsEtapa.length > 0;
-
-    const faseFoiIniciada = cfgSalva?.hasStarted === true || temLogs;
+    const resp = responsaveisPorEtapa[key] || [];
+    const metaDiasFase = cfgSalva?.metaDias ?? 20;
 
     if (!faseFoiIniciada) {
-      const resp = responsaveisPorEtapa[key] || [];
       return {
-        cfg: { dataInicio: '', metaDias: cfgSalva?.metaDias ?? 20, prazoLimite: '', hasStarted: false },
+        cfg: { dataInicio: '', metaDias: metaDiasFase, prazoLimite: '', hasStarted: false },
         decorridos: 0,
-        restantes: cfgSalva?.metaDias ?? 20,
-        metaDias: cfgSalva?.metaDias ?? 20,
+        restantes: metaDiasFase,
+        metaDias: metaDiasFase,
         atrasado: false,
         responsaveis: resp,
         ultimoStatus: 'Fase ainda não iniciada',
-        ultimoRegistro: null,
-        totalRegistros: 0,
+        ultimoRegistro: ultimoLog?.data || null,
+        totalRegistros: logsEtapa.length,
         naoIniciada: true,
       };
     }
 
-    const cfg = cfgSalva || {
-      dataInicio: temLogs ? logsEtapa[logsEtapa.length - 1].data : new Date().toISOString().split('T')[0],
-      metaDias: 20,
-      hasStarted: true,
-    };
+    const cfg = cfgSalva;
     const inicio = new Date(`${cfg.dataInicio}T00:00:00`);
     inicio.setHours(0, 0, 0, 0);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const diffMs = hoje.getTime() - inicio.getTime();
     const decorridos = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
-    const metaDiasFase = cfg.metaDias ?? 20;
     const restantes = metaDiasFase - decorridos;
-    const resp = responsaveisPorEtapa[key] || [];
 
     return {
       cfg,
@@ -1796,7 +1790,7 @@ export default function DiarioCampoTimelinePage() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <Clock className={`w-4 h-4 ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-500'}`} />
+                      <Clock className={`w-4 h-4 ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : statsContador.hasStarted ? 'text-blue-500' : 'text-amber-500'}`} />
                       <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         Contador da Etapa: <strong className={`capitalize ${isFaseConcluida ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>{selectedEtapa}</strong>
                       </span>
@@ -1807,13 +1801,20 @@ export default function DiarioCampoTimelinePage() {
                           ? 'text-emerald-600 dark:text-emerald-400' 
                           : statsContador.hasStarted
                           ? 'text-slate-900 dark:text-white'
-                          : 'text-slate-400 dark:text-slate-500'
+                          : 'text-amber-600 dark:text-amber-400'
                       }`}>
-                        {statsContador.hasStarted ? `Dia ${statsContador.diasDecorridos}` : 'Fase não iniciada'}
+                        {statsContador.hasStarted ? `Dia ${statsContador.diasDecorridos}` : '⏳ Fase ainda não iniciada'}
                       </span>
-                      <span className="text-sm font-semibold text-slate-400">
-                        {statsContador.hasStarted ? `/ meta de ${statsContador.metaDias} dias` : `(meta: ${statsContador.metaDias} dias após início)`}
-                      </span>
+                      {statsContador.hasStarted && (
+                        <span className="text-sm font-semibold text-slate-400">
+                          / meta de {statsContador.metaDias} dias
+                        </span>
+                      )}
+                      {!statsContador.hasStarted && !isFaseConcluida && (
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                          Clique em "Definir Início" para começar
+                        </span>
+                      )}
                       {isFaseConcluida && (
                         <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 px-2 py-1 rounded-md">
                           ✓ Finalizada
@@ -1821,9 +1822,11 @@ export default function DiarioCampoTimelinePage() {
                       )}
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
-                      <span>Início da etapa: <strong className="text-slate-700 dark:text-slate-200">{statsContador.dataInicio ? new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR') : 'Aguardando definição'}</strong></span>
-                      <span>•</span>
-                      <span>Prazo da Fase: <strong className={isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}>{statsContador.prazoLimiteFormatado}</strong></span>
+                      <span>Início da etapa: <strong className="text-slate-700 dark:text-slate-200">{statsContador.hasStarted && statsContador.dataInicio ? new Date(`${statsContador.dataInicio}T00:00:00`).toLocaleDateString('pt-BR') : '—'}</strong></span>
+                      {statsContador.hasStarted && <span>•</span>}
+                      {statsContador.hasStarted && (
+                        <span>Prazo da Fase: <strong className={isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}>{statsContador.prazoLimiteFormatado}</strong></span>
+                      )}
                       {projetosPrazoFinal[selectedProjeto] && (
                         <>
                           <span>•</span>
@@ -1836,34 +1839,36 @@ export default function DiarioCampoTimelinePage() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${
-                      statsContador.atrasado
-                        ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 dark:text-rose-400'
-                        : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                    }`}>
-                      {statsContador.atrasado ? (
-                        <>
-                          <AlertCircle className="w-4 h-4 text-rose-500" />
-                          <span>+{Math.abs(statsContador.diasRestantes)} dias além da meta da fase</span>
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                          <span>{statsContador.diasRestantes} dias restantes na fase</span>
-                        </>
-                      )}
-                    </div>
+                    {statsContador.hasStarted && (
+                      <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${
+                        statsContador.atrasado
+                          ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 dark:text-rose-400'
+                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      }`}>
+                        {statsContador.atrasado ? (
+                          <>
+                            <AlertCircle className="w-4 h-4 text-rose-500" />
+                            <span>+{Math.abs(statsContador.diasRestantes)} dias além da meta da fase</span>
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                            <span>{statsContador.diasRestantes} dias restantes na fase</span>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     <button
                       type="button"
                       onClick={handleOpenIniciarEtapaModal}
                       disabled={isFaseConcluida}
-                      className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold border flex items-center gap-1.5 shadow-sm transition-all ${
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 shadow-sm transition-all ${
                         isFaseConcluida
                           ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
                           : statsContador.hasStarted
                           ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
-                          : 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20'
+                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-blue-500/50 text-white shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98]'
                       }`}
                       title={
                         isFaseConcluida
@@ -1878,9 +1883,9 @@ export default function DiarioCampoTimelinePage() {
                           ? 'text-slate-400' 
                           : statsContador.hasStarted 
                           ? 'text-emerald-500' 
-                          : 'text-blue-500'
+                          : 'text-white'
                       }`} />
-                      {statsContador.hasStarted ? '✓ Fase Configurada' : 'Definir Início / Prazo da Fase'}
+                      {statsContador.hasStarted ? '✓ Fase Configurada' : '▶ Definir Início / Prazo da Fase'}
                     </button>
 
                     <button
@@ -1934,31 +1939,45 @@ export default function DiarioCampoTimelinePage() {
 
                 {/* Barra de progresso do contador */}
                 <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10">
-                  <div className="flex justify-between items-center text-xs text-slate-500 mb-1.5">
-                    <span className="flex items-center gap-1">
-                      <span>{isFaseConcluida ? 'Fase concluída' : 'Evolução do tempo na etapa'}</span>
-                      {!isFaseConcluida && (
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 font-semibold">
-                          🔒 Meta Fixa Inalterável ({statsContador.metaDias}d)
+                  {!statsContador.hasStarted && !isFaseConcluida ? (
+                    <div className="py-4 px-4 rounded-xl bg-amber-500/5 border border-amber-500/20 text-center">
+                      <p className="text-sm font-bold text-amber-700 dark:text-amber-400 flex items-center justify-center gap-2">
+                        <PlayCircle className="w-4 h-4" />
+                        Esta fase ainda não foi iniciada oficialmente
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Clique em <strong className="text-blue-600 dark:text-blue-400">"Definir Início / Prazo da Fase"</strong> para começar a contagem de dias.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center text-xs text-slate-500 mb-1.5">
+                        <span className="flex items-center gap-1">
+                          <span>{isFaseConcluida ? 'Fase concluída' : 'Evolução do tempo na etapa'}</span>
+                          {!isFaseConcluida && (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 font-semibold">
+                              🔒 Meta Fixa Inalterável ({statsContador.metaDias}d)
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    <span className={`font-semibold ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
-                      {isFaseConcluida ? '100% Concluída ✓' : `${statsContador.pct}% do prazo previsto`}
-                    </span>
-                  </div>
-                  <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        isFaseConcluida
-                          ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 animate-pulse'
-                          : statsContador.atrasado 
-                          ? 'bg-rose-500' 
-                          : 'bg-gradient-to-r from-blue-500 to-emerald-500'
-                      }`}
-                      style={{ width: isFaseConcluida ? '100%' : `${Math.min(100, statsContador.pct)}%` }}
-                    />
-                  </div>
+                        <span className={`font-semibold ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                          {isFaseConcluida ? '100% Concluída ✓' : `${statsContador.pct}% do prazo previsto`}
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden shadow-inner">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isFaseConcluida
+                              ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500 animate-pulse'
+                              : statsContador.atrasado 
+                              ? 'bg-rose-500' 
+                              : 'bg-gradient-to-r from-blue-500 to-emerald-500'
+                          }`}
+                          style={{ width: isFaseConcluida ? '100%' : `${Math.min(100, statsContador.pct)}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
                   {isFaseConcluida && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-2 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />

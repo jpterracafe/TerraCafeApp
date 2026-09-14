@@ -384,13 +384,11 @@ export default function DashboardPage() {
         l.atividade.toLowerCase().includes(etapaAtual.toLowerCase()) ||
         etapaAtual.toLowerCase().includes(l.atividade.toLowerCase())
       );
-      const etapaFoiIniciada = confSalva?.hasStarted === true || logsEtapaAtual.length > 0;
+      const etapaFoiIniciada = confSalva?.hasStarted === true;
 
       const conf = etapaFoiIniciada
         ? (confSalva || {
-            dataInicio: logsEtapaAtual.length > 0
-              ? logsEtapaAtual.map(l => l.data).sort()[0]
-              : dataStart,
+            dataInicio: '',
             metaDias: confSalva?.metaDias || 20,
             hasStarted: true,
           })
