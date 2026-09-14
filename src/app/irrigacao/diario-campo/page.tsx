@@ -32,6 +32,35 @@ interface EtapaConfig {
   hasStarted?: boolean;
 }
 
+// SANITIZAÇÃO OBRIGATÓRIA: NENHUMA fase pode ser considerada iniciada sem hasStarted === true
+// Limpa datas/configs de etapas que não foram oficialmente iniciadas.
+const sanitizeConfigEtapas = (raw: Record<string, any>): Record<string, EtapaConfig> => {
+  if (!raw || typeof raw !== 'object') return {};
+  const sanitized: Record<string, EtapaConfig> = {};
+  for (const [key, val] of Object.entries(raw)) {
+    if (!val || typeof val !== 'object') continue;
+    const metaPadrao = typeof (val as any).metaDias === 'number' ? (val as any).metaDias : 20;
+    if ((val as any).hasStarted === true) {
+      // Apenas fases EXPLICITAMENTE iniciadas mantêm datas
+      sanitized[key] = {
+        dataInicio: (val as any).dataInicio || '',
+        metaDias: metaPadrao,
+        prazoLimite: (val as any).prazoLimite || '',
+        hasStarted: true,
+      };
+    } else {
+      // Tudo o resto NÃO está iniciado → datas vazias
+      sanitized[key] = {
+        dataInicio: '',
+        metaDias: metaPadrao,
+        prazoLimite: '',
+        hasStarted: false,
+      };
+    }
+  }
+  return sanitized;
+};
+
 // Ordem exata solicitada pelo cliente
 const ETAPAS_CAMPO: { key: EtapaCampo; label: string; icon: string; desc: string }[] = [
   { key: 'Valetas',                     label: 'Valetas',                     icon: '⛏️', desc: 'Abertura, alinhamento e nivelamento de valas' },
@@ -199,7 +228,15 @@ export default function DiarioCampoTimelinePage() {
     // 1. Leitura rápida do cache local
     try {
       const savedConfig = localStorage.getItem('diario_etapas_config_v1');
-      if (savedConfig) setConfigEtapas(JSON.parse(savedConfig));
+      if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        const clean = sanitizeConfigEtapas(parsed);
+        // Se houve mudança na sanitização, grava de volta a versão limpa
+        if (JSON.stringify(parsed) !== JSON.stringify(clean)) {
+          localStorage.setItem('diario_etapas_config_v1', JSON.stringify(clean));
+        }
+        setConfigEtapas(clean);
+      }
 
       const savedStarts = localStorage.getItem('diario_projeto_starts_v1');
       if (savedStarts) setProjetoStartDates(JSON.parse(savedStarts));
@@ -226,7 +263,8 @@ export default function DiarioCampoTimelinePage() {
         if (data) {
           if (data.configEtapas && Object.keys(data.configEtapas).length > 0) {
             setConfigEtapas(prev => {
-              const merged = { ...prev, ...data.configEtapas };
+              const rawMerged = { ...prev, ...data.configEtapas };
+              const merged = sanitizeConfigEtapas(rawMerged);
               try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(merged)); } catch (_) {}
               return merged;
             });
@@ -272,9 +310,10 @@ export default function DiarioCampoTimelinePage() {
   }, []);
 
   const saveEtapaConfigToStorage = (newConfigs: Record<string, EtapaConfig>) => {
-    setConfigEtapas(newConfigs);
+    const clean = sanitizeConfigEtapas(newConfigs);
+    setConfigEtapas(clean);
     try {
-      localStorage.setItem('diario_etapas_config_v1', JSON.stringify(newConfigs));
+      localStorage.setItem('diario_etapas_config_v1', JSON.stringify(clean));
     } catch (e) {
       console.error('[diario] Erro ao salvar config no localStorage:', e);
     }
@@ -282,7 +321,7 @@ export default function DiarioCampoTimelinePage() {
     fetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'etapas', dados: newConfigs }),
+      body: JSON.stringify({ tipo: 'etapas', dados: clean }),
     }).catch(e => console.warn('[diario] Erro ao sincronizar metas com a nuvem:', e));
   };
 
@@ -907,9 +946,16 @@ export default function DiarioCampoTimelinePage() {
 
   const handleSaveConfigModal = async () => {
     const prev = configEtapas[currentConfigKey] ?? {} as EtapaConfig;
-    const novaDataInicio = tempDataInicio || prev.dataInicio || new Date().toISOString().split('T')[0];
+    // 🔒 REGRA RIGOROSA: Este modal SÓ ajusta a META DE DIAS.
+    // - dataInicio / prazoLimite SÃO DEFINIDOS APENAS pelo botão "Definir Início / Prazo da Fase".
+    // - hasStarted SÓ vira true quando o usuário clica em "Definir Início / Prazo da Fase".
+    const faseFoiIniciada = prev.hasStarted === true;
     const novaMetaDias = Math.max(1, tempMetaDias);
+    const novaDataInicio = faseFoiIniciada
+      ? (tempDataInicio || prev.dataInicio || new Date().toISOString().split('T')[0])
+      : ''; // NÃO INICIADA → SEM DATA
     const novoPrazoLimite = (() => {
+      if (!faseFoiIniciada || !novaDataInicio) return ''; // NÃO INICIADA → SEM PRAZO
       const d = new Date(`${novaDataInicio}T00:00:00`);
       d.setDate(d.getDate() + (novaMetaDias - 1));
       return d.toISOString().split('T')[0];
@@ -921,7 +967,7 @@ export default function DiarioCampoTimelinePage() {
         metaDias: novaMetaDias,
         dataInicio: novaDataInicio,
         prazoLimite: novoPrazoLimite,
-        hasStarted: prev.hasStarted ?? false,
+        hasStarted: faseFoiIniciada === true ? true : false,
       }
     };
     saveEtapaConfigToStorage(updated);

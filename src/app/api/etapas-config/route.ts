@@ -9,13 +9,43 @@ import path from "path";
 const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
 
 interface SystemConfig {
-  configEtapas: Record<string, { dataInicio: string; metaDias: number; prazoLimite?: string; status?: string }>;
+  configEtapas: Record<string, { dataInicio: string; metaDias: number; prazoLimite?: string; status?: string; hasStarted?: boolean }>;
   projetoStartDates: Record<string, string>;
   responsaveisPorEtapa: Record<string, string[]>;
   projetosPrazoFinal: Record<string, string>;
   projetoJustificativas: Record<string, Array<{ id: string; data: string; autor: string; motivo: string; observacao: string }>>;
   etapasProgresso: Record<string, number>;
   etapasStatus: Record<string, string>;
+}
+
+// 🔒 SANITIZAÇÃO OBRIGATÓRIA NO SERVIDOR:
+// Nenhuma fase é considerada iniciada a menos que hasStarted === true.
+// Datas são removidas de fases não iniciadas para evitar dados inconsistentes no cliente.
+function sanitizeConfigEtapasServer(
+  raw: Record<string, any>
+): Record<string, { dataInicio: string; metaDias: number; prazoLimite?: string; hasStarted: boolean }> {
+  if (!raw || typeof raw !== "object") return {};
+  const out: any = {};
+  for (const [key, val] of Object.entries(raw)) {
+    if (!val || typeof val !== "object") continue;
+    const metaDias = typeof (val as any).metaDias === "number" ? (val as any).metaDias : 20;
+    if ((val as any).hasStarted === true) {
+      out[key] = {
+        dataInicio: (val as any).dataInicio || "",
+        metaDias,
+        prazoLimite: (val as any).prazoLimite || "",
+        hasStarted: true,
+      };
+    } else {
+      out[key] = {
+        dataInicio: "",
+        metaDias,
+        prazoLimite: "",
+        hasStarted: false,
+      };
+    }
+  }
+  return out;
 }
 
 function getLocalConfig(): SystemConfig {
@@ -100,6 +130,9 @@ export async function GET() {
       // Falha silenciosa de tabela não existente — usa arquivo local
     }
 
+    // 🔒 SANITIZAÇÃO FINAL OBRIGATÓRIA antes de responder ao cliente
+    config.configEtapas = sanitizeConfigEtapasServer(config.configEtapas);
+
     return NextResponse.json(config);
   } catch (e) {
     console.error("[GET /api/etapas-config]", e);
@@ -160,7 +193,6 @@ export async function POST(req: Request) {
       // Formato 2: Objeto parcial direto { configEtapas, projetoStartDates, ... }
       if (body.configEtapas) {
         currentConfig.configEtapas = { ...currentConfig.configEtapas, ...body.configEtapas };
-        dbUpdates.push({ chave: "diario_etapas_config_v1", valor: currentConfig.configEtapas });
       }
       if (body.projetoStartDates) {
         currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...body.projetoStartDates };
@@ -187,9 +219,23 @@ export async function POST(req: Request) {
         dbUpdates.push({ chave: "diario_etapas_status_v1", valor: currentConfig.etapasStatus });
       }
 
-      if (dbUpdates.length === 0) {
+      if (dbUpdates.length === 0 && !body.configEtapas) {
         return NextResponse.json({ error: "Nenhum campo de configuração válido informado." }, { status: 400 });
       }
+    }
+
+    // 🔒 SANITIZAÇÃO OBRIGATÓRIA ANTES DE PERSISTIR:
+    // - Garante que configEtapas esteja sempre limpa antes de gravar no arquivo ou banco
+    // - Fases não iniciadas: sem datas, hasStarted=false
+    currentConfig.configEtapas = sanitizeConfigEtapasServer(currentConfig.configEtapas);
+    // Regenera a entrada de dbUpdates para etapas com a versão sanitizada (apenas se foi tocada)
+    const tocouEtapas = (body.tipo === "etapas") || !!body.configEtapas;
+    if (tocouEtapas) {
+      // Remove entrada antiga de etapas se existir e adiciona a versão limpa
+      const filtered = dbUpdates.filter(u => u.chave !== "diario_etapas_config_v1");
+      filtered.push({ chave: "diario_etapas_config_v1", valor: currentConfig.configEtapas });
+      dbUpdates.length = 0;
+      dbUpdates.push(...filtered);
     }
 
     saveLocalConfig(currentConfig);
