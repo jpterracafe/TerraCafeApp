@@ -22,7 +22,7 @@ interface JustificativaItem {
 }
 
 interface SystemConfigResponse {
-  configEtapas: Record<string, { dataInicio: string; metaDias: number; prazoLimite?: string; status?: string }>;
+  configEtapas: Record<string, { dataInicio: string; metaDias: number; prazoLimite?: string; status?: string; hasStarted?: boolean }>;
   projetoStartDates: Record<string, string>;
   responsaveisPorEtapa: Record<string, string[]>;
   projetosPrazoFinal: Record<string, string>;

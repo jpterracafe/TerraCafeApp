@@ -379,20 +379,28 @@ export default function DashboardPage() {
 
       // Configuração e metas da etapa atual
       const configKey = `${nomeProjeto}::${etapaAtual}`;
-      const confSalva = configEtapas[configKey] as (EtapaConfig & { hasStarted?: boolean }) | undefined;
+      type EtapaConfigFull = { dataInicio: string; metaDias: number; prazoLimite?: string; hasStarted?: boolean };
+      const confSalva = configEtapas[configKey] as EtapaConfigFull | undefined;
       const logsEtapaAtual = logsProjeto.filter(l =>
         l.atividade.toLowerCase().includes(etapaAtual.toLowerCase()) ||
         etapaAtual.toLowerCase().includes(l.atividade.toLowerCase())
       );
       const etapaFoiIniciada = confSalva?.hasStarted === true;
 
-      const conf = etapaFoiIniciada
-        ? (confSalva || {
+      // Se etapaFoiIniciada = true, confSalva GARANTIDAMENTE existe (pois hasStarted === true)
+      const conf: EtapaConfigFull = etapaFoiIniciada && confSalva
+        ? {
+            dataInicio: confSalva.dataInicio || '',
+            metaDias: confSalva.metaDias || 20,
+            prazoLimite: confSalva.prazoLimite,
+            hasStarted: true,
+          }
+        : {
             dataInicio: '',
             metaDias: confSalva?.metaDias || 20,
-            hasStarted: true,
-          })
-        : { dataInicio: '', metaDias: confSalva?.metaDias || 20, hasStarted: false };
+            prazoLimite: confSalva?.prazoLimite,
+            hasStarted: false,
+          };
 
       let diffEtapa = 0;
       let diasRestantes = conf.metaDias;
