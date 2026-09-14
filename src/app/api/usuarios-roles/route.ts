@@ -18,7 +18,7 @@ export async function GET() {
 
     if (error) {
       console.error("[GET /api/usuarios-roles] Erro banco:", error);
-      return NextResponse.json({ users: [] });
+      return NextResponse.json({ users: [], error: "Falha ao consultar usuários no banco." }, { status: 500 });
     }
 
     return NextResponse.json({

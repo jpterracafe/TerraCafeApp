@@ -108,20 +108,21 @@ export default function VisaoGeralDiretorPage() {
         fetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
 
-      setProjetosList(resProj.projetos ?? []);
+      setProjetosList(Array.isArray(resProj.projetos) ? resProj.projetos : []);
       if (resConfig) {
         setConfig(resConfig);
       }
-      setFases(resFases.fases ?? []);
-      setDiarioLogs(resLogs.logs ?? []);
+      setFases(Array.isArray(resFases.fases) ? resFases.fases : []);
+      setDiarioLogs(Array.isArray(resLogs.logs) ? resLogs.logs : []);
       setLastUpdate(new Date());
     } catch (err) {
       console.error('[visao-geral] Erro ao carregar dados:', err);
+      toastError('Falha ao carregar painel executivo. Verifique a conexão e tente novamente.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [toastError]);
 
   useEffect(() => {
     carregarDados();
@@ -431,7 +432,7 @@ export default function VisaoGeralDiretorPage() {
     const totalProjetos = projetosProcessados.length;
     const concluidos = projetosProcessados.filter(p => p.concluidoGeral).length;
     const comAtraso = projetosProcessados.filter(p => p.temAtraso && !p.concluidoGeral).length;
-    const emDia = totalProjetos - concluidos - comAtraso;
+    const emDia = Math.max(0, totalProjetos - concluidos - comAtraso);
     const totalFasesAtrasadas = todasFasesAtrasadas.length;
 
     let somaProgressoTotal = 0;
@@ -559,7 +560,7 @@ export default function VisaoGeralDiretorPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
               {todasFasesAtrasadas.map((item, idx) => (
                 <div
-                  key={`${item.projetoNome}-${item.etapaKey}-${idx}`}
+                  key={`${item.projetoNome}__${item.etapaKey}`}
                   className="bg-white dark:bg-[#0d1527] border border-rose-500/30 rounded-xl p-4 flex flex-col gap-3"
                 >
                   {/* Topo: ícone + info + badge de atraso */}
