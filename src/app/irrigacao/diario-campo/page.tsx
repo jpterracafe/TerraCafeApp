@@ -196,6 +196,10 @@ export default function DiarioCampoTimelinePage() {
   const [newProjectDeadline, setNewProjectDeadline] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
 
+  // Modal Excluir Projeto (Enviar para Lixeira)
+  const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
+  const [excluindoProjeto, setExcluindoProjeto] = useState(false);
+
   // Modal Justificativas de Campo (Substitui Ajuste de Meta)
   const [isJustificativaModalOpen, setIsJustificativaModalOpen] = useState(false);
   const [justificativaMotivo, setJustificativaMotivo] = useState('Chuva no dia');
@@ -1066,6 +1070,54 @@ export default function DiarioCampoTimelinePage() {
     }
   };
 
+  // ── Excluir Projeto (Enviar para Lixeira - Soft Delete) ────────────────────
+  const handleExcluirProjeto = async () => {
+    if (!selectedProjeto) return;
+    const nomeProjeto = selectedProjeto;
+
+    setExcluindoProjeto(true);
+    try {
+      const res = await fetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Erro na API ao excluir.');
+
+      // Limpa cache local do projeto excluído
+      setProjetoStartDates(prev => {
+        const cp = { ...prev }; delete cp[nomeProjeto];
+        try { localStorage.setItem('diario_projeto_starts_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+      setProjetosPrazoFinal(prev => {
+        const cp = { ...prev }; delete cp[nomeProjeto];
+        try { localStorage.setItem('diario_projetos_prazo_final_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+      setConfigEtapas(prev => {
+        const cp = { ...prev };
+        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeProjeto}::`)) delete cp[k]; });
+        try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+      setResponsaveisPorEtapa(prev => {
+        const cp = { ...prev };
+        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeProjeto}::`)) delete cp[k]; });
+        try { localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
+      setIsDeleteProjectModalOpen(false);
+      setSelectedProjeto('');
+      await loadProjetos();
+
+      success(`Projeto "${extractProjectBaseName(nomeProjeto)}" movido para a Lixeira de Projetos. Você pode restaurá-lo depois.`);
+    } catch (err: any) {
+      toastError(err.message || 'Falha ao excluir projeto.');
+    } finally {
+      setExcluindoProjeto(false);
+    }
+  };
+
   // ── Registrar Justificativa Oficial de Campo (Prazo Inalterável) ───────────
   const handleSaveJustificativa = async () => {
     const txt = justificativaTexto.trim();
@@ -1655,6 +1707,17 @@ export default function DiarioCampoTimelinePage() {
                     >
                       <FileText className="w-3.5 h-3.5 text-white" />
                       <span>Resumo p/ Diretoria</span>
+                    </button>
+
+                    {/* Botão Excluir Projeto (enviar para Lixeira) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteProjectModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-1.5 transition-all"
+                      title="Mover este projeto para a Lixeira (pode ser restaurado depois)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Excluir Projeto</span>
                     </button>
                   </div>
                 </div>
@@ -3265,6 +3328,90 @@ export default function DiarioCampoTimelinePage() {
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: CONFIRMAR EXCLUSÃO DE PROJETO (→ LIXEIRA) ──────────── */}
+      {isDeleteProjectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-[#1e293b] bg-rose-50 dark:bg-rose-950/20">
+              <div className="p-2 rounded-xl bg-rose-500/15 shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">Excluir Projeto</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">O projeto será movido para a Lixeira</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteProjectModalOpen(false)}
+                className="ml-auto p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                Tem certeza que deseja excluir o projeto{' '}
+                <strong className="text-slate-900 dark:text-white">
+                  &ldquo;{extractProjectBaseName(selectedProjeto)}&rdquo;
+                </strong>?
+              </p>
+
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3.5 text-xs text-amber-800 dark:text-amber-200 space-y-1 leading-relaxed">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  O que acontece ao excluir:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 ml-1">
+                  <li>O projeto some da lista do Diário de Campo</li>
+                  <li>Todos os registros e histórico são preservados</li>
+                  <li>Pode ser <strong>restaurado a qualquer momento</strong> na Lixeira</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteProjectModalOpen(false);
+                  window.location.href = '/irrigacao/lixeira';
+                }}
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Ver Lixeira de Projetos
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteProjectModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExcluirProjeto}
+                  disabled={excluindoProjeto}
+                  className="px-5 py-2.5 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-2 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {excluindoProjeto ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /><span>Excluindo...</span></>
+                  ) : (
+                    <><Trash2 className="w-4 h-4" /><span>Mover para Lixeira</span></>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

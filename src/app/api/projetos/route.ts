@@ -3,11 +3,11 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 
-// ── GET /api/projetos?responsavel=Nome ────────────────────────────────────────
-// Retorna nomes únicos de projetos ativos.
+// ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
+// Retorna nomes únicos de projetos ATIVOS por padrão.
+// Se ?lixeira=true → retorna projetos EXCLUÍDOS (na lixeira).
 // Se ?responsavel= for informado, filtra só os projetos onde essa pessoa
-// é responsável por pelo menos uma fase — evita que alguém registre no
-// diário de campo de um projeto que não é dela.
+// é responsável por pelo menos uma fase.
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -17,17 +17,18 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const responsavel = searchParams.get("responsavel")?.trim() ?? "";
+    const lixeira = searchParams.get("lixeira") === "true";
+    const detalhado = searchParams.get("detalhado") === "true";
 
     const db = getSupabase();
 
     let query = db
       .from("fases_acao")
-      .select("projeto_cliente")
-      .eq("is_deleted", false)
+      .select(detalhado ? "projeto_cliente, prazo_limite, is_deleted, updated_at" : "projeto_cliente")
+      .eq("is_deleted", lixeira)
       .not("projeto_cliente", "is", null)
       .neq("projeto_cliente", "");
 
-    // Se responsavel foi passado, filtra pelo responsável da fase
     if (responsavel) {
       query = query.eq("responsavel", responsavel);
     }
@@ -35,8 +36,30 @@ export async function GET(req: Request) {
     const { data, error } = await query;
     if (error) throw error;
 
+    if (detalhado) {
+      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null }>();
+      for (const r of (data ?? []) as any[]) {
+        const n = r.projeto_cliente as string;
+        if (!mapa.has(n)) {
+          mapa.set(n, {
+            nome: n,
+            prazoFinal: r.prazo_limite || '',
+            excluidoEm: r.is_deleted ? r.updated_at : null,
+          });
+        } else if (r.is_deleted && r.updated_at) {
+          // Prioriza data de exclusão mais recente
+          const atual = mapa.get(n)!;
+          if (!atual.excluidoEm || r.updated_at > atual.excluidoEm) {
+            atual.excluidoEm = r.updated_at;
+          }
+        }
+      }
+      const lista = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+      return NextResponse.json({ projetos: lista });
+    }
+
     const unicos = Array.from(
-      new Set((data ?? []).map((r) => r.projeto_cliente as string).filter(Boolean))
+      new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
     ).sort();
 
     return NextResponse.json({ projetos: unicos });
@@ -143,5 +166,117 @@ export async function POST(req: Request) {
   } catch (e) {
     console.error("[POST /api/projetos]", e);
     return NextResponse.json({ error: "Erro ao criar projeto." }, { status: 500 });
+  }
+}
+
+// ── DELETE /api/projetos?nome=X&hard=true ─────────────────────────────────────
+// Por padrão é SOFT DELETE (envia para lixeira, marca is_deleted=true em todas
+// as fases do projeto, e também marca os diario_logs do projeto como is_deleted).
+// Hard delete SÓ se ?hard=true for explicitamente informado.
+export async function DELETE(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const nome = searchParams.get("nome")?.trim() ?? "";
+    const hard = searchParams.get("hard") === "true";
+
+    if (!nome) {
+      return NextResponse.json({ error: "Nome do projeto obrigatório (?nome=X)." }, { status: 400 });
+    }
+
+    const db = getSupabase();
+
+    if (hard) {
+      // Hard delete permanente — apaga todas as fases e logs do projeto
+      await db.from("fases_acao").delete().eq("projeto_cliente", nome);
+      await db.from("diario_logs").delete().eq("projeto_cliente", nome);
+      // Remove das configurações salvas também
+      try {
+        const { data: prazosRow } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projetos_prazo_final_v1")
+          .maybeSingle();
+        const prazos = { ...(prazosRow?.valor || {}) };
+        delete prazos[nome];
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projetos_prazo_final_v1", valor: prazos, updated_at: new Date().toISOString(),
+        });
+
+        const { data: startsRow } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projeto_starts_v1")
+          .maybeSingle();
+        const starts = { ...(startsRow?.valor || {}) };
+        delete starts[nome];
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projeto_starts_v1", valor: starts, updated_at: new Date().toISOString(),
+        });
+      } catch (_) { /* ignora falha de limpeza em configuracoes_sistema */ }
+
+      return NextResponse.json({ ok: true, hardDeleted: true });
+    }
+
+    // Soft delete — marca fases e logs como is_deleted=true
+    const agora = new Date().toISOString();
+    await db
+      .from("fases_acao")
+      .update({ is_deleted: true, updated_at: agora })
+      .eq("projeto_cliente", nome);
+
+    try {
+      await db
+        .from("diario_logs")
+        .update({ is_deleted: true, updated_at: agora })
+        .eq("projeto_cliente", nome);
+    } catch (_) { /* ignora se tabela diario_logs não tiver coluna is_deleted */ }
+
+    return NextResponse.json({ ok: true, softDeleted: true, projeto: nome });
+  } catch (e) {
+    console.error("[DELETE /api/projetos]", e);
+    return NextResponse.json({ error: "Erro ao excluir projeto." }, { status: 500 });
+  }
+}
+
+// ── PATCH /api/projetos?nome=X ────────────────────────────────────────────────
+// Restaura um projeto da lixeira (marca is_deleted=false nas fases e logs).
+export async function PATCH(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const nome = searchParams.get("nome")?.trim() ?? "";
+
+    if (!nome) {
+      return NextResponse.json({ error: "Nome do projeto obrigatório (?nome=X)." }, { status: 400 });
+    }
+
+    const db = getSupabase();
+    const agora = new Date().toISOString();
+
+    await db
+      .from("fases_acao")
+      .update({ is_deleted: false, updated_at: agora })
+      .eq("projeto_cliente", nome);
+
+    try {
+      await db
+        .from("diario_logs")
+        .update({ is_deleted: false, updated_at: agora })
+        .eq("projeto_cliente", nome);
+    } catch (_) { /* ignora */ }
+
+    return NextResponse.json({ ok: true, restaurado: true, projeto: nome });
+  } catch (e) {
+    console.error("[PATCH /api/projetos]", e);
+    return NextResponse.json({ error: "Erro ao restaurar projeto." }, { status: 500 });
   }
 }
