@@ -68,7 +68,7 @@ export default function ResponsaveisPage() {
 
   const handleSaveNovo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!novoNome.trim() || !novoCargo.trim()) return;
+    if (!novoNome.trim()) return;
     setSaving(true);
     try {
       // (offline: fica na fila e sincroniza depois)
@@ -263,8 +263,8 @@ export default function ResponsaveisPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Cargo / Função</label>
-                  <input type="text" required placeholder="Ex: Engenheiro Hidráulico" value={novoCargo} onChange={(e) => setNovoCargo(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
+                  <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Cargo / Função <span className="text-xs text-slate-400">(opcional)</span></label>
+                  <input type="text" placeholder="Ex: Engenheiro Hidráulico" value={novoCargo} onChange={(e) => setNovoCargo(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
                 </div>
               </form>
             </div>

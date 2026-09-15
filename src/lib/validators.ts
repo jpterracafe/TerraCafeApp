@@ -33,7 +33,7 @@ export const loginSchema = z.object({
 
 export const responsavelCreateSchema = z.object({
   nome: z.string().trim().min(2, { message: "nome muito curto." }).max(120, { message: "nome muito longo." }),
-  cargo: z.string().trim().min(2, { message: "cargo muito curto." }).max(120, { message: "cargo muito longo." }),
+  cargo: z.string().trim().max(120, { message: "cargo muito longo." }).optional().default(""),
   origem: z.enum(["MANUAL", "BANCO_DADOS"]).default("MANUAL"),
 });
 

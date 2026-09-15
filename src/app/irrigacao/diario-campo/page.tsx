@@ -869,8 +869,8 @@ export default function DiarioCampoTimelinePage() {
   const handleAdicionarResponsavel = async () => {
     const nome = novoResponsavelNome.trim();
     const cargo = novoResponsavelCargo.trim();
-    if (!nome || !cargo) {
-      toastError('Informe o nome e o cargo do responsável.');
+    if (!nome) {
+      toastError('Informe o nome do responsável.');
       return;
     }
     setSavingNovoResponsavel(true);
@@ -1138,10 +1138,6 @@ export default function DiarioCampoTimelinePage() {
   // ── Registrar Justificativa Oficial de Campo (Prazo Inalterável) ───────────
   const handleSaveJustificativa = async () => {
     const txt = justificativaTexto.trim();
-    if (!txt) {
-      toastError('Descreva o que ocorreu (ex: Chuva torrencial impediu o serviço...).');
-      return;
-    }
     if (!selectedProjeto) return;
 
     setSavingJustificativa(true);
@@ -1153,7 +1149,7 @@ export default function DiarioCampoTimelinePage() {
         data: hojeStr,
         autor: responsavelStr,
         motivo: justificativaMotivo,
-        observacao: txt,
+        observacao: txt || justificativaMotivo,
       };
 
       // 1. Salva nas configurações gerais (offline: fica na fila e sincroniza depois)
@@ -1188,7 +1184,7 @@ export default function DiarioCampoTimelinePage() {
           responsavel: responsavelStr,
           atividade: selectedEtapa,
           status: statusLog,
-          observacoes: `[JUSTIFICATIVA OFICIAL - ${justificativaMotivo.toUpperCase()}]: ${txt}`,
+          observacoes: `[JUSTIFICATIVA OFICIAL - ${justificativaMotivo.toUpperCase()}]: ${txt || 'sem detalhamento'}`,
           projetoCliente: selectedProjeto,
         }),
       });
@@ -1722,16 +1718,6 @@ export default function DiarioCampoTimelinePage() {
                       <span>Dia {diaAtualDoProjeto} do Projeto</span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={handleOpenProjectStartModal}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 hover:border-blue-400 flex items-center gap-1.5 transition-all"
-                      title="Alterar data de start da obra"
-                    >
-                      <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                      Ajustar Start
-                    </button>
-
                     {/* Botão de Resumo para a Diretoria */}
                     <button
                       type="button"
@@ -1981,29 +1967,17 @@ export default function DiarioCampoTimelinePage() {
                           </span>
                         </>
                       )}
+                      {statsContador.hasStarted && !isFaseConcluida && (
+                        <>
+                          <span>•</span>
+                          <span className={`font-semibold ${statsContador.atrasado ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {statsContador.atrasado
+                              ? `+${Math.abs(statsContador.diasRestantes)} dias além da meta`
+                              : `${statsContador.diasRestantes} dias restantes na fase`}
+                          </span>
+                        </>
+                      )}
                     </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 shrink-0">
-                    {statsContador.hasStarted && (
-                      <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${
-                        statsContador.atrasado
-                          ? 'bg-rose-500/15 border-rose-500/30 text-rose-500 dark:text-rose-400'
-                          : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                      }`}>
-                        {statsContador.atrasado ? (
-                          <>
-                            <AlertCircle className="w-4 h-4 text-rose-500" />
-                            <span>+{Math.abs(statsContador.diasRestantes)} dias além da meta da fase</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                            <span>{statsContador.diasRestantes} dias restantes na fase</span>
-                          </>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                 {/* ── Barra de Ações da Etapa (Definir Início · Justificativa · Concluir) ── */}
@@ -2827,11 +2801,10 @@ export default function DiarioCampoTimelinePage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Detalhamento da Ocorrência (Obrigatório): *
+                  Detalhamento da Ocorrência <span className="text-slate-400">(opcional)</span>
                 </label>
                 <textarea
                   rows={3}
-                  required
                   placeholder="Ex: Chuva torrencial durante toda a tarde impediu os trabalhos da equipe na abertura de valas..."
                   value={justificativaTexto}
                   onChange={(e) => setJustificativaTexto(e.target.value)}
@@ -2853,7 +2826,7 @@ export default function DiarioCampoTimelinePage() {
               </button>
               <button
                 type="button"
-                disabled={savingJustificativa || !justificativaTexto.trim()}
+                disabled={savingJustificativa}
                 onClick={handleSaveJustificativa}
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white flex items-center gap-2 shadow-md shadow-amber-900/20"
               >
@@ -3503,7 +3476,7 @@ export default function DiarioCampoTimelinePage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Cargo / Função <span className="text-rose-500">*</span>
+                  Cargo / Função <span className="text-slate-400">(opcional)</span>
                 </label>
                 <input
                   type="text"
@@ -3533,7 +3506,7 @@ export default function DiarioCampoTimelinePage() {
               <button
                 type="button"
                 onClick={handleAdicionarResponsavel}
-                disabled={savingNovoResponsavel || !novoResponsavelNome.trim() || !novoResponsavelCargo.trim()}
+                disabled={savingNovoResponsavel || !novoResponsavelNome.trim()}
                 className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {savingNovoResponsavel ? (
