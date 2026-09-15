@@ -1743,6 +1743,17 @@ export default function DiarioCampoTimelinePage() {
                       <span>Resumo p/ Diretoria</span>
                     </button>
 
+                    {/* Botão Novo Responsável */}
+                    <button
+                      type="button"
+                      onClick={() => { setNovoResponsavelNome(''); setNovoResponsavelCargo(''); setIsAddResponsavelModalOpen(true); }}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      title="Cadastrar novo responsável da equipe de campo"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Novo Responsável</span>
+                    </button>
+
                     {/* Botão Excluir Projeto (enviar para Lixeira) */}
                     <button
                       type="button"
@@ -1784,15 +1795,7 @@ export default function DiarioCampoTimelinePage() {
                       >
                         Limpar
                       </button>
-                      <span className="text-slate-300 dark:text-slate-600">•</span>
-                      <button
-                        type="button"
-                        onClick={() => { setNovoResponsavelNome(''); setNovoResponsavelCargo(''); setIsAddResponsavelModalOpen(true); }}
-                        className="text-emerald-600 dark:text-emerald-400 hover:underline font-bold flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" /> Novo Responsável
-                      </button>
-                    </div>
+                      </div>
                   </div>
 
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
@@ -1981,7 +1984,7 @@ export default function DiarioCampoTimelinePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3 shrink-0">
                     {statsContador.hasStarted && (
                       <div className={`px-4 py-2 rounded-xl border text-sm font-bold flex items-center gap-2 ${
                         statsContador.atrasado
@@ -2001,83 +2004,86 @@ export default function DiarioCampoTimelinePage() {
                         )}
                       </div>
                     )}
+                  </div>
 
-                    <button
-                      type="button"
-                      onClick={handleOpenIniciarEtapaModal}
-                      disabled={isFaseConcluida}
-                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 shadow-sm transition-all ${
-                        isFaseConcluida
-                          ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-                          : statsContador.hasStarted
-                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
-                          : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-blue-500/50 text-white shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98]'
-                      }`}
-                      title={
-                        isFaseConcluida
-                          ? 'Fase concluída - configuração bloqueada'
-                          : statsContador.hasStarted
-                          ? `Fase iniciada em ${statsContador.dataInicio} com meta de ${statsContador.metaDias} dias. Clique para ajustar.`
-                          : 'Definir início e prazo desta fase específica'
+                {/* ── Barra de Ações da Etapa (Definir Início · Justificativa · Concluir) ── */}
+                <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10 flex flex-col sm:flex-row flex-wrap gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleOpenIniciarEtapaModal}
+                    disabled={isFaseConcluida}
+                    className={`flex-1 min-w-[180px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all ${
+                      isFaseConcluida
+                        ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                        : statsContador.hasStarted
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20'
+                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-blue-500/50 text-white shadow-lg shadow-blue-500/25 hover:scale-[1.02] active:scale-[0.98]'
+                    }`}
+                    title={
+                      isFaseConcluida
+                        ? 'Fase concluída - configuração bloqueada'
+                        : statsContador.hasStarted
+                        ? `Fase iniciada em ${statsContador.dataInicio} com meta de ${statsContador.metaDias} dias. Clique para ajustar.`
+                        : 'Definir início e prazo desta fase específica'
+                    }
+                  >
+                    <Calendar className={`w-3.5 h-3.5 ${
+                      isFaseConcluida 
+                        ? 'text-slate-400' 
+                        : statsContador.hasStarted 
+                        ? 'text-emerald-500' 
+                        : 'text-white'
+                    }`} />
+                    {statsContador.hasStarted ? '✓ Fase Configurada' : '▶ Definir Início / Prazo da Fase'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isFaseConcluida) {
+                        setJustificativaMotivo('Chuva no dia');
+                        setJustificativaTexto('');
+                        setIsJustificativaModalOpen(true);
                       }
-                    >
-                      <Calendar className={`w-3.5 h-3.5 ${
-                        isFaseConcluida 
-                          ? 'text-slate-400' 
-                          : statsContador.hasStarted 
-                          ? 'text-emerald-500' 
-                          : 'text-white'
-                      }`} />
-                      {statsContador.hasStarted ? '✓ Fase Configurada' : '▶ Definir Início / Prazo da Fase'}
-                    </button>
+                    }}
+                    disabled={isFaseConcluida}
+                    className={`flex-1 min-w-[180px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all ${
+                      isFaseConcluida
+                        ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
+                        : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
+                    }`}
+                    title={
+                      isFaseConcluida
+                        ? 'Fase concluída - justificativas bloqueadas'
+                        : 'Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor Paulo'
+                    }
+                  >
+                    <CloudRain className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-amber-500'}`} />
+                    Registrar Justificativa / Ocorrência
+                  </button>
 
+                  {/* Botão Concluir Fase (primário) */}
+                  {!isFaseConcluida ? (
                     <button
                       type="button"
                       onClick={() => {
-                        if (!isFaseConcluida) {
-                          setJustificativaMotivo('Chuva no dia');
-                          setJustificativaTexto('');
-                          setIsJustificativaModalOpen(true);
-                        }
+                        setObservacaoConclusao('');
+                        setIsConcluirFaseModalOpen(true);
                       }}
-                      disabled={isFaseConcluida}
-                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 shadow-sm transition-all ${
-                        isFaseConcluida
-                          ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-                          : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
-                      }`}
-                      title={
-                        isFaseConcluida
-                          ? 'Fase concluída - justificativas bloqueadas'
-                          : 'Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor Paulo'
-                      }
+                      className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 border-2 border-emerald-400/50"
+                      title="Marcar esta fase como 100% concluída"
                     >
-                      <CloudRain className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-amber-500'}`} />
-                      Registrar Justificativa / Ocorrência
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Concluir Fase</span>
+                      <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">100%</span>
                     </button>
-
-                    {/* Botão Concluir Fase */}
-                    {!isFaseConcluida ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setObservacaoConclusao('');
-                          setIsConcluirFaseModalOpen(true);
-                        }}
-                        className="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 border-2 border-emerald-400/50"
-                        title="Marcar esta fase como 100% concluída"
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Concluir Fase</span>
-                        <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">100%</span>
-                      </button>
-                    ) : (
-                      <div className="px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>✅ Fase Concluída</span>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>✅ Fase Concluída</span>
+                    </div>
+                  )}
+                </div>
                 </div>
 
                 {/* Barra de progresso do contador */}
