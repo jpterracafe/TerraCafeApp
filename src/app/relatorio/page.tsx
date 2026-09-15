@@ -195,10 +195,10 @@ function RelatorioContent() {
           </div>
         </div>
 
-        {/* RADAR DAS 5 ETAPAS DE CAMPO DA IRRIGAÇÃO */}
+        {/* RADAR DAS 6 ETAPAS DE CAMPO DA IRRIGAÇÃO */}
         <div style={{ marginBottom: 20 }}>
-          <h2>Ciclo Técnico de Campo (5 Etapas da Irrigação)</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8 }}>
+          <h2>Ciclo Técnico de Campo (6 Fases da Irrigação)</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
             {ETAPAS_CAMPO.map((etp) => {
               const logsEtp = logs.filter(l => (l.atividade || '').toLowerCase().includes(etp.key.toLowerCase()));
               const count = logsEtp.length;

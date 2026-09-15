@@ -112,7 +112,7 @@ function ToastItem({ item, onRemove }: { item: ToastItem; onRemove: (id: string)
 
   return (
     <div
-      className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl shadow-black/30 min-w-[260px] max-w-[360px] transition-all duration-300 ${cfg.bg} ${cfg.ring} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+      className={`pointer-events-auto relative flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl shadow-black/30 min-w-[260px] max-w-[360px] transition-all duration-300 ${cfg.bg} ${cfg.ring} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
     >
       {cfg.icon}
       <p className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100">{item.message}</p>

@@ -547,7 +547,7 @@ export default function DashboardPage() {
 
   // ── Dados para os Gráficos de Campo ─────────────────────────────────────────
 
-  // 1. Distribuição das Obras pelas 5 Etapas de Campo (Pipeline de Obras)
+  // 1. Distribuição das Obras pelas 6 Etapas de Campo (Pipeline de Obras)
   const dadosPipelineEtapas = useMemo(() => {
     return ETAPAS_CAMPO_ORDEM.map(etapa => {
       const obrasNestaEtapa = obrasCampo.filter(o => o.etapaAtual === etapa.key);
@@ -983,7 +983,7 @@ export default function DashboardPage() {
               <div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                   <Wrench className="w-4 h-4 text-blue-500" />
-                  Radar das 5 Etapas de Campo da Irrigação
+                  Radar das 6 Etapas de Campo da Irrigação
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Distribuição atual das frentes de trabalho das fazendas pelo ciclo técnico de implantação
@@ -994,8 +994,8 @@ export default function DashboardPage() {
               </span>
             </div>
 
-            {/* Pipeline Visual das 5 Etapas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {/* Pipeline Visual das 6 Etapas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
               {dadosPipelineEtapas.map((etp, idx) => {
                 const isActiveFilter = selectedProjetoFilter !== '__todos__' && obraSelecionada?.etapaAtual === etp.etapaKey;
                 return (
