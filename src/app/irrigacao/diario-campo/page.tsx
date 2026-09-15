@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
+import { offlineFetch, isOnline } from '@/lib/offline';
 
 interface DiarioUser { 
   id: string; 
@@ -261,7 +262,7 @@ export default function DiarioCampoTimelinePage() {
     }
 
     // 2. Sincronização com o servidor/nuvem (MERGE — nunca substitui dados locais não sincronizados)
-    fetch('/api/etapas-config')
+    offlineFetch('/api/etapas-config')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
@@ -321,8 +322,8 @@ export default function DiarioCampoTimelinePage() {
     } catch (e) {
       console.error('[diario] Erro ao salvar config no localStorage:', e);
     }
-    // Sincroniza em nuvem
-    fetch('/api/etapas-config', {
+    // Sincroniza em nuvem (offline: fica na fila e sincroniza depois)
+    offlineFetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tipo: 'etapas', dados: clean }),
@@ -336,8 +337,8 @@ export default function DiarioCampoTimelinePage() {
     } catch (e) {
       console.error('[diario] Erro ao salvar starts no localStorage:', e);
     }
-    // Sincroniza em nuvem
-    fetch('/api/etapas-config', {
+    // Sincroniza em nuvem (offline: fica na fila e sincroniza depois)
+    offlineFetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tipo: 'starts', dados: newStarts }),
@@ -351,19 +352,19 @@ export default function DiarioCampoTimelinePage() {
     } catch (e) {
       console.error('[diario] Erro ao salvar responsáveis por etapa:', e);
     }
-    // Sincroniza em nuvem
-    fetch('/api/etapas-config', {
+    // Sincroniza em nuvem (offline: fica na fila e sincroniza depois)
+    offlineFetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tipo: 'responsaveis', dados: newResp }),
     }).catch(e => console.warn('[diario] Erro ao sincronizar equipes com a nuvem:', e));
   };
 
-  // Carrega lista de responsáveis
+  // Carrega lista de responsáveis (offline: usa cache da última carga)
   const loadUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch('/api/responsaveis');
+      const res = await offlineFetch('/api/responsaveis');
       if (res.ok) {
         const { responsaveis } = await res.json();
         const mapped: DiarioUser[] = (responsaveis ?? []).map((r: any) => ({
@@ -381,11 +382,11 @@ export default function DiarioCampoTimelinePage() {
     }
   }, []);
 
-  // Carrega logs do diário
+  // Carrega logs do diário (offline: usa cache da última carga)
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
-      const res = await fetch('/api/diario-logs');
+      const res = await offlineFetch('/api/diario-logs');
       if (res.ok) {
         const { logs } = await res.json();
         setRegistros(logs ?? []);
@@ -397,13 +398,13 @@ export default function DiarioCampoTimelinePage() {
     }
   }, []);
 
-  // Carrega lista de projetos ativos e deletados
+  // Carrega lista de projetos ativos e deletados (offline: usa cache da última carga)
   const loadProjetos = useCallback(async () => {
     setLoadingProjetos(true);
     try {
       const [resProjetos, resFases] = await Promise.all([
-        fetch('/api/projetos'),
-        fetch('/api/fases'),
+        offlineFetch('/api/projetos'),
+        offlineFetch('/api/fases'),
       ]);
 
       let deletados = new Set<string>();
@@ -749,7 +750,7 @@ export default function DiarioCampoTimelinePage() {
         if (mudouPrazo)  partes.push(`Prazo alterado de ${new Date(`${antigo.prazoLimite!}T00:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${iniciarEtapaPrazoLimite}T00:00:00`).toLocaleDateString('pt-BR')}`);
       }
       const resp = currentEtapaResponsaveis.length > 0 ? currentEtapaResponsaveis.join(', ') : 'Equipe';
-      fetch('/api/diario-logs', {
+      offlineFetch('/api/diario-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -787,8 +788,8 @@ export default function DiarioCampoTimelinePage() {
       const hojeStr = new Date().toISOString().split('T')[0];
       const responsaveisStr = currentEtapaResponsaveis.join(', ');
 
-      // 1. Salvar progresso 100% via API
-      const resProgresso = await fetch('/api/etapas-config', {
+      // 1. Salvar progresso 100% via API (offline: fica na fila e sincroniza depois)
+      const resProgresso = await offlineFetch('/api/etapas-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -797,8 +798,8 @@ export default function DiarioCampoTimelinePage() {
         })
       });
 
-      // 2. Salvar status "Concluída" via API
-      const resStatus = await fetch('/api/etapas-config', {
+      // 2. Salvar status "Concluída" via API (offline: fica na fila e sincroniza depois)
+      const resStatus = await offlineFetch('/api/etapas-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -821,15 +822,19 @@ export default function DiarioCampoTimelinePage() {
         projetoCliente: selectedProjeto,
       };
 
-      const resLog = await fetch('/api/diario-logs', {
+      const resLog = await offlineFetch('/api/diario-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(logConclusao)
       });
 
       if (resLog.ok) {
-        const novoLog = await resLog.json();
-        setRegistros(prev => [novoLog, ...prev]);
+        // CORREÇÃO: a API devolve { log }, não o log direto —
+        // antes o wrapper era inserido na lista e quebrava a renderização
+        const logData = await resLog.json().catch(() => null);
+        if (logData?.log) {
+          setRegistros(prev => [logData.log, ...prev]);
+        }
       }
 
       // 4. Atualizar localStorage e estado local
@@ -846,9 +851,10 @@ export default function DiarioCampoTimelinePage() {
       setObservacaoConclusao('');
       success(`🎉 Fase "${selectedEtapa}" marcada como CONCLUÍDA! Progresso atualizado para 100%.`);
       
-      // Recarregar dados para refletir mudanças
+      // Recarregar dados para refletir mudanças (somente online — offline o app já
+      // atualiza o estado local e a sincronização acontece depois)
       setTimeout(() => {
-        window.location.reload();
+        if (isOnline()) window.location.reload();
       }, 1500);
 
     } catch (err) {
@@ -870,25 +876,30 @@ export default function DiarioCampoTimelinePage() {
     setSavingNovoResponsavel(true);
     try {
       // Mesmo método da página de Responsáveis: cadastro manual via /api/responsaveis
-      const res = await fetch('/api/responsaveis', {
+      // (offline: fica na fila e sincroniza depois)
+      const res = await offlineFetch('/api/responsaveis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome, cargo, origem: 'MANUAL' }),
       });
 
       if (res.ok) {
-        const { responsavel } = await res.json();
+        const data = await res.json().catch(() => null);
+        const responsavel = data?.responsavel;
+        const isQueued = !!data?.offlineQueued;
         // Atualiza lista local imediatamente (mesmo padrão da página de responsáveis)
         const novoDiarioUser: DiarioUser = {
-          id: responsavel.id,
-          name: responsavel.nome,
-          role: responsavel.cargo,
-          avatar: getInitials(responsavel.nome),
+          id: responsavel?.id ?? `temp-${Date.now()}`,
+          name: responsavel?.nome ?? nome,
+          role: responsavel?.cargo ?? cargo,
+          avatar: getInitials(responsavel?.nome ?? nome),
         };
         setUsers(prev => [novoDiarioUser, ...prev]);
 
         // Garante sincronia completa com o banco (mesma origem da página de Responsáveis)
-        await loadUsers();
+        if (!isQueued) {
+          await loadUsers();
+        }
 
         // Atribui automaticamente à etapa atual se projeto selecionado
         if (selectedProjeto) {
@@ -903,7 +914,11 @@ export default function DiarioCampoTimelinePage() {
         setIsAddResponsavelModalOpen(false);
         setNovoResponsavelNome('');
         setNovoResponsavelCargo('');
-        success(`✅ Responsável "${nome}" (${cargo}) adicionado com sucesso!`);
+        success(
+          isQueued
+            ? `Sem conexão: responsável "${nome}" salvo no dispositivo e será sincronizado automaticamente.`
+            : `✅ Responsável "${nome}" (${cargo}) adicionado com sucesso!`
+        );
       } else {
         const err = await res.json().catch(() => ({}));
         toastError(err.error || 'Erro ao criar responsável.');
@@ -929,7 +944,7 @@ export default function DiarioCampoTimelinePage() {
 
     setSavingProgresso(true);
     try {
-      await fetch('/api/etapas-config', {
+      await offlineFetch('/api/etapas-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo: 'progresso', dados: { [chaveEtapa]: clampado } }),
@@ -987,7 +1002,7 @@ export default function DiarioCampoTimelinePage() {
         const respEtapaStr = currentEtapaResponsaveis.join(', ') || 'Equipe Técnica';
         const obsAjuste = `⏱️ Ajuste de Meta para ${tempMetaDias} dias (início: ${new Date(`${tempDataInicio}T00:00:00`).toLocaleDateString('pt-BR')}).${motivo ? ` Motivo: ${motivo}` : ''}`;
 
-        const res = await fetch('/api/diario-logs', {
+        const res = await offlineFetch('/api/diario-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1002,7 +1017,7 @@ export default function DiarioCampoTimelinePage() {
 
         if (res.ok) {
           const { log } = await res.json();
-          setRegistros(prev => [log, ...prev]);
+          if (log) setRegistros(prev => [log, ...prev]);
         }
       } catch (err) {
         console.error('[diario] Erro ao registrar ajuste no histórico:', err);
@@ -1029,7 +1044,8 @@ export default function DiarioCampoTimelinePage() {
     setCreatingProject(true);
     try {
       const hoje = new Date().toISOString().split('T')[0];
-      const res = await fetch('/api/projetos', {
+      // (offline: fica na fila e sincroniza depois)
+      const res = await offlineFetch('/api/projetos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1044,10 +1060,10 @@ export default function DiarioCampoTimelinePage() {
         throw new Error(dErr.error || 'Erro ao criar projeto');
       }
 
-      // Sincroniza prazo final imutável
+      // Sincroniza prazo final imutável (offline: fica na fila e sincroniza depois)
       const novoPrazoObj = { ...projetosPrazoFinal, [nomeLimpo]: newProjectDeadline };
       setProjetosPrazoFinal(novoPrazoObj);
-      fetch('/api/etapas-config', {
+      offlineFetch('/api/etapas-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tipo: 'prazos_finais', dados: novoPrazoObj }),
@@ -1077,7 +1093,8 @@ export default function DiarioCampoTimelinePage() {
 
     setExcluindoProjeto(true);
     try {
-      const res = await fetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, {
+      // (offline: fica na fila e sincroniza depois)
+      const res = await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, {
         method: 'DELETE',
       });
       if (!res.ok) throw new Error('Erro na API ao excluir.');
@@ -1139,8 +1156,8 @@ export default function DiarioCampoTimelinePage() {
         observacao: txt,
       };
 
-      // 1. Salva nas configurações gerais
-      await fetch('/api/etapas-config', {
+      // 1. Salva nas configurações gerais (offline: fica na fila e sincroniza depois)
+      await offlineFetch('/api/etapas-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1163,7 +1180,7 @@ export default function DiarioCampoTimelinePage() {
 
       // 2. Cria log no diário de campo para ficar visível na timeline da obra
       const statusLog = justificativaMotivo.toLowerCase().includes('chuva') ? 'Chuva' : 'Abaixo';
-      const resLog = await fetch('/api/diario-logs', {
+      const resLog = await offlineFetch('/api/diario-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1178,7 +1195,7 @@ export default function DiarioCampoTimelinePage() {
 
       if (resLog.ok) {
         const { log } = await resLog.json();
-        setRegistros(prev => [log, ...prev]);
+        if (log) setRegistros(prev => [log, ...prev]);
       }
 
       setIsJustificativaModalOpen(false);
@@ -1233,27 +1250,44 @@ export default function DiarioCampoTimelinePage() {
       const responsaveisStr = currentEtapaResponsaveis.join(', ');
       const hojeStr = new Date().toISOString().split('T')[0];
 
-      const res = await fetch('/api/diario-logs', {
+      const payloadDiario = {
+        data: hojeStr,
+        responsavel: responsaveisStr,
+        atividade: selectedEtapa,
+        status: statusRapido,
+        observacoes: observacoes.trim(),
+        projetoCliente: selectedProjeto,
+        midiaUrl,
+        midiaTipo: midiaFinalTipo,
+      };
+
+      const res = await offlineFetch('/api/diario-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: hojeStr,
-          responsavel: responsaveisStr,
-          atividade: selectedEtapa,
-          status: statusRapido,
-          observacoes: observacoes.trim(),
-          projetoCliente: selectedProjeto,
-          midiaUrl,
-          midiaTipo: midiaFinalTipo,
-        }),
+        body: JSON.stringify(payloadDiario),
       });
 
       if (res.ok) {
-        const { log } = await res.json();
-        setRegistros(prev => [log, ...prev]);
-        setObservacoes('');
-        clearMidia();
-        success(`Registro em "${selectedEtapa}" salvo no diário!`);
+        const resData = await res.json().catch(() => null);
+        if (resData?.offlineQueued) {
+          // Sem conexão: registro salvo no dispositivo + otimista na tela,
+          // sincroniza automaticamente quando a conexão voltar
+          const tempLog: RegistroDiarioCampo = {
+            id: `temp-${Date.now()}`,
+            ...payloadDiario,
+          };
+          setRegistros(prev => [tempLog, ...prev]);
+          setObservacoes('');
+          clearMidia();
+          success('Sem conexão: registro salvo no dispositivo e será sincronizado automaticamente.');
+        } else if (resData?.log) {
+          setRegistros(prev => [resData.log, ...prev]);
+          setObservacoes('');
+          clearMidia();
+          success(`Registro em "${selectedEtapa}" salvo no diário!`);
+        } else {
+          toastError('Erro ao registrar no diário.');
+        }
       } else {
         toastError('Erro ao registrar no diário.');
       }
@@ -1266,11 +1300,11 @@ export default function DiarioCampoTimelinePage() {
     }
   };
 
-  // Excluir log
+  // Excluir log (offline: fica na fila e sincroniza depois)
   const handleDeleteLog = async (id: string) => {
     if (!confirm('Deseja excluir este registro do diário?')) return;
     try {
-      const res = await fetch(`/api/diario-logs?id=${id}`, { method: 'DELETE' });
+      const res = await offlineFetch(`/api/diario-logs?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setRegistros(prev => prev.filter(r => r.id !== id));
         success('Registro excluído com sucesso.');

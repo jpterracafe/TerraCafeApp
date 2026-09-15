@@ -7,6 +7,7 @@ import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { AlertTriangle, ChevronRight, RefreshCcw, Trash2, Inbox, Briefcase, ChevronDown, ChevronUp } from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
+import { offlineFetch } from '@/lib/offline';
 
 export default function LixeiraPage() {
   const { success, error: toastError } = useToast();
@@ -18,7 +19,8 @@ export default function LixeiraPage() {
   const loadDeleted = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/fases');
+      // (offline: usa cache da última carga)
+      const res = await offlineFetch('/api/fases');
       if (res.ok) {
         const { fases } = await res.json();
         setDeletedFases((fases as FaseAcao[]).filter(f => f.isDeleted));
@@ -104,7 +106,7 @@ export default function LixeiraPage() {
     try {
       const resultados = await Promise.all(
         fasesDoProjeto.map(f =>
-          fetch('/api/fases', {
+          offlineFetch('/api/fases', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: f.id, isDeleted: false }),
@@ -138,7 +140,7 @@ export default function LixeiraPage() {
     try {
       await Promise.all(
         fasesDoProjeto.map(f =>
-          fetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })
+          offlineFetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })
         )
       );
       setDeletedFases(prev => prev.filter(f => !ids.includes(f.id)));
@@ -156,7 +158,7 @@ export default function LixeiraPage() {
     if (deletedFases.length === 0) return;
     if (!confirm(`Deseja esvaziar a lixeira inteira? Isso apagará permanentemente todos os ${projetosAgrupados.length} projeto${projetosAgrupados.length !== 1 ? 's' : ''} e ${deletedFases.length} ação${deletedFases.length !== 1 ? 'ões' : ''}. Esta ação não poderá ser desfeita.`)) return;
     try {
-      await Promise.all(deletedFases.map(f => fetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })));
+      await Promise.all(deletedFases.map(f => offlineFetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })));
       setDeletedFases([]);
       success('Lixeira esvaziada.');
     } catch (e) {

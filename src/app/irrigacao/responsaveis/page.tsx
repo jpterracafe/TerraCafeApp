@@ -10,6 +10,7 @@ import {
   Edit2, Trash2, AlertTriangle, X, Info
 } from 'lucide-react';
 import { Responsavel } from './mockResponsaveis';
+import { offlineFetch } from '@/lib/offline';
 
 export default function ResponsaveisPage() {
   const { data: session } = useSession();
@@ -22,7 +23,7 @@ export default function ResponsaveisPage() {
   const loadResponsaveis = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/responsaveis');
+      const res = await offlineFetch('/api/responsaveis');
       if (res.ok) {
         const d = await res.json();
         setResponsaveis(d.responsaveis ?? []);
@@ -70,14 +71,32 @@ export default function ResponsaveisPage() {
     if (!novoNome.trim() || !novoCargo.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/responsaveis', {
+      // (offline: fica na fila e sincroniza depois)
+      const res = await offlineFetch('/api/responsaveis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome: novoNome.trim(), cargo: novoCargo.trim(), origem: 'MANUAL' }),
       });
       if (res.ok) {
-        const { responsavel } = await res.json();
-        setResponsaveis(prev => [responsavel, ...prev]);
+        const data = await res.json().catch(() => null);
+        if (data?.responsavel) {
+          setResponsaveis(prev => [data.responsavel, ...prev]);
+        } else if (data?.offlineQueued) {
+          // Sem conexão: mostra otimisticamente até a sincronização
+          const nome = novoNome.trim();
+          setResponsaveis(prev => [
+            {
+              id: `temp-${Date.now()}`,
+              nome,
+              cargo: novoCargo.trim(),
+              origem: 'MANUAL',
+              avatar: nome.trim().split(' ').length >= 2
+                ? (nome.trim()[0] + nome.trim().split(' ').at(-1)![0]).toUpperCase()
+                : nome.substring(0, 2).toUpperCase(),
+            },
+            ...prev,
+          ]);
+        }
         setNovoNome('');
         setNovoCargo('');
         setIsAddModalOpen(false);
@@ -99,13 +118,13 @@ export default function ResponsaveisPage() {
   const confirmDelete = async (trashProjects: boolean) => {
     if (!selectedToDelete) return;
     try {
-      // Atualiza fases que têm esse responsável
-      const fasesRes = await fetch('/api/fases');
+      // Atualiza fases que têm esse responsável (offline: usa cache + fila)
+      const fasesRes = await offlineFetch('/api/fases');
       if (fasesRes.ok) {
         const { fases } = await fasesRes.json();
         const afetadas = fases.filter((f: any) => f.responsavel === selectedToDelete.nome && !f.isDeleted);
         await Promise.all(afetadas.map((f: any) =>
-          fetch('/api/fases', {
+          offlineFetch('/api/fases', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -115,8 +134,8 @@ export default function ResponsaveisPage() {
           })
         ));
       }
-      // Deleta o responsável
-      await fetch(`/api/responsaveis?id=${selectedToDelete.id}`, { method: 'DELETE' });
+      // Deleta o responsável (offline: fica na fila e sincroniza depois)
+      await offlineFetch(`/api/responsaveis?id=${selectedToDelete.id}`, { method: 'DELETE' });
       setResponsaveis(prev => prev.filter(r => r.id !== selectedToDelete.id));
     } catch (e) {
       console.error('[responsaveis] Erro ao deletar:', e);
