@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
+import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
 // Retorna nomes únicos de projetos ATIVOS por padrão.
@@ -21,6 +22,22 @@ export async function GET(req: Request) {
     const detalhado = searchParams.get("detalhado") === "true";
 
     const db = getSupabase();
+    const userRole = (session.user as any)?.role || "Colaborador";
+    const userName = (session.user as any)?.name || "";
+    const userEmail = (session.user as any)?.email || "";
+
+    // Busca projetos do usuário se for agricultor
+    let userProjects: string[] = [];
+    if (isFarmerRole(userRole)) {
+      const { data: userProjs } = await db
+        .from("user_projetos")
+        .select("projeto_id, projetos_irrigacao(nome)")
+        .eq("user_id", session.user.id);
+      
+      userProjects = (userProjs ?? [])
+        .map((up: any) => up.projetos_irrigacao?.nome)
+        .filter(Boolean);
+    }
 
     let query = db
       .from("fases_acao")
@@ -31,6 +48,14 @@ export async function GET(req: Request) {
 
     if (responsavel) {
       query = query.eq("responsavel", responsavel);
+    }
+
+    // Se não é admin/diretor, filtra pelos projetos do usuário
+    if (!canSeeAllProjects(userRole) && userProjects.length > 0) {
+      query = query.in("projeto_cliente", userProjects);
+    } else if (!canSeeAllProjects(userRole) && userProjects.length === 0) {
+      // Agricultor sem projetos associados - retorna vazio
+      return NextResponse.json({ projetos: detalhado ? [] : [] });
     }
 
     const { data, error } = await query;
@@ -47,7 +72,6 @@ export async function GET(req: Request) {
             excluidoEm: r.is_deleted ? r.updated_at : null,
           });
         } else if (r.is_deleted && r.updated_at) {
-          // Prioriza data de exclusão mais recente
           const atual = mapa.get(n)!;
           if (!atual.excluidoEm || r.updated_at > atual.excluidoEm) {
             atual.excluidoEm = r.updated_at;

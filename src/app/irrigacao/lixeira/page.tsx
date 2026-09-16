@@ -8,13 +8,30 @@ import { useToast } from '@/components/Toast';
 import { AlertTriangle, ChevronRight, RefreshCcw, Trash2, Inbox, Briefcase, ChevronDown, ChevronUp } from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
 import { offlineFetch } from '@/lib/offline';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 export default function LixeiraPage() {
   const { success, error: toastError } = useToast();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const [deletedFases, setDeletedFases] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+
+  // Guard: só Diretor e Admin podem ver a lixeira
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (status !== 'authenticated') {
+      router.push('/login');
+      return;
+    }
+    const role = (session?.user as any)?.role;
+    if (role && role !== 'Diretor' && role !== 'Desenvolvedor' && role !== 'Admin') {
+      router.replace('/irrigacao/diario-campo');
+    }
+  }, [status, session, router]);
 
   const loadDeleted = useCallback(async () => {
     setLoading(true);

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession, getQueryParam } from "@/lib/api";
+import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 import {
   diarioLogCreateSchema,
   diarioLogDeleteSchema,
@@ -31,12 +32,36 @@ export async function GET() {
     if (err) return err;
 
     const db = getSupabase();
-    const { data, error } = await db
+    const userRole = (session.user as any)?.role || "Colaborador";
+
+    // Busca projetos do usuário se for agricultor
+    let userProjects: string[] = [];
+    if (isFarmerRole(userRole)) {
+      const { data: userProjs } = await db
+        .from("user_projetos")
+        .select("projeto_id, projetos_irrigacao(nome)")
+        .eq("user_id", session.user.id);
+      
+      userProjects = (userProjs ?? [])
+        .map((up: any) => up.projetos_irrigacao?.nome)
+        .filter(Boolean);
+    }
+
+    let query = db
       .from("diario_logs")
       .select("*")
       .order("data", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200);
+
+    // Se não é admin/diretor, filtra pelos projetos do usuário
+    if (!canSeeAllProjects(userRole) && userProjects.length > 0) {
+      query = query.in("projeto_cliente", userProjects);
+    } else if (!canSeeAllProjects(userRole) && userProjects.length === 0) {
+      return NextResponse.json({ logs: [] });
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

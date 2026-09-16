@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
+import { isAdminRole, isDirectorRole, canManageUsers } from '@/lib/roles';
 
 export default function NavigationDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -18,17 +19,24 @@ export default function NavigationDrawer() {
 
   const toggleDrawer = () => setIsOpen(!isOpen);
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  const isMasterDev = role === 'Desenvolvedor' || session?.user?.email === 'joao2005souza@gmail.com';
+  const role = (session?.user as { role?: string } | undefined)?.role || 'Colaborador';
 
   const navLinks = [
-    { href: '/visao-geral', label: 'Resumo Geral Executivo (Paulo)', icon: LayoutDashboard, color: 'text-blue-500' },
-    { href: '/admin/dashboard', label: 'Visão do Diretor (Dashboards)', icon: BarChart2, color: 'text-cyan-500' },
+    // Visão geral - só Diretor e Admin
+    ...(isDirectorRole(role) || isAdminRole(role) ? [
+      { href: '/visao-geral', label: 'Resumo Geral Executivo', icon: LayoutDashboard, color: 'text-blue-500' },
+      { href: '/admin/dashboard', label: 'Visão do Diretor (Dashboards)', icon: BarChart2, color: 'text-cyan-500' },
+    ] : []),
+    // Páginas comuns a todos
     { href: '/irrigacao/diario-campo', label: 'Diário de Campo', icon: Calendar, color: 'text-amber-500' },
     { href: '/irrigacao/execucao', label: 'Cronograma & Execução', icon: Layers, color: 'text-indigo-500' },
-    { href: '/irrigacao/responsaveis', label: 'Equipe & Responsáveis', icon: Users, color: 'text-emerald-500' },
-    { href: '/irrigacao/lixeira', label: 'Lixeira de Projetos', icon: Trash2, color: 'text-rose-500' },
-    ...(isMasterDev ? [
+    // Equipe - só Diretor e Admin
+    ...(isDirectorRole(role) || isAdminRole(role) ? [
+      { href: '/irrigacao/responsaveis', label: 'Equipe & Responsáveis', icon: Users, color: 'text-emerald-500' },
+      { href: '/irrigacao/lixeira', label: 'Lixeira de Projetos', icon: Trash2, color: 'text-rose-500' },
+    ] : []),
+    // Usuários - só Admin/Desenvolvedor
+    ...(canManageUsers(role) ? [
       { href: '/admin/usuarios', label: 'Usuários do Sistema', icon: ShieldCheck, color: 'text-purple-500' }
     ] : []),
   ];

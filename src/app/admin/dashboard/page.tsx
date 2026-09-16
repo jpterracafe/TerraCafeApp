@@ -154,8 +154,15 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (status === 'loading') return;
-    if (status !== 'authenticated') router.push('/login');
-  }, [status, router]);
+    if (status !== 'authenticated') {
+      router.push('/login');
+      return;
+    }
+    const role = (session?.user as any)?.role;
+    if (role && role !== 'Diretor' && role !== 'Desenvolvedor' && role !== 'Admin') {
+      router.replace('/irrigacao/diario-campo');
+    }
+  }, [status, session, router]);
 
   // Carrega dados das APIs e localStorage
   const loadData = useCallback(async () => {

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
+import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 import fs from "fs";
 import path from "path";
 
@@ -92,11 +93,26 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
+    const db = getSupabase();
+    const userRole = (session.user as any)?.role || "Colaborador";
+
+    // Busca projetos do usuário se for agricultor
+    let userProjects: string[] = [];
+    if (isFarmerRole(userRole)) {
+      const { data: userProjs } = await db
+        .from("user_projetos")
+        .select("projeto_id, projetos_irrigacao(nome)")
+        .eq("user_id", session.user.id);
+      
+      userProjects = (userProjs ?? [])
+        .map((up: any) => up.projetos_irrigacao?.nome)
+        .filter(Boolean);
+    }
+
     let config = getLocalConfig();
 
     // Tenta ler do Supabase se a tabela existir
     try {
-      const db = getSupabase();
       const { data, error } = await db
         .from("configuracoes_sistema")
         .select("chave, valor");
@@ -128,6 +144,38 @@ export async function GET() {
       }
     } catch (dbErr) {
       // Falha silenciosa de tabela não existente — usa arquivo local
+    }
+
+    // Filtrar configurações por projetos do usuário se for agricultor
+    if (!canSeeAllProjects(userRole) && userProjects.length > 0) {
+      const filterByProjects = (obj: Record<string, any>) => {
+        const filtered: Record<string, any> = {};
+        for (const [key, value] of Object.entries(obj)) {
+          // Extrai o nome do projeto da chave (formato: "Projeto::Fase")
+          const projectName = key.split("::")[0];
+          if (userProjects.includes(projectName)) {
+            filtered[key] = value;
+          }
+        }
+        return filtered;
+      };
+
+      config.configEtapas = filterByProjects(config.configEtapas);
+      config.projetoStartDates = filterByProjects(config.projetoStartDates);
+      config.responsaveisPorEtapa = filterByProjects(config.responsaveisPorEtapa);
+      config.projetosPrazoFinal = filterByProjects(config.projetosPrazoFinal);
+      config.projetoJustificativas = filterByProjects(config.projetoJustificativas);
+      config.etapasProgresso = filterByProjects(config.etapasProgresso);
+      config.etapasStatus = filterByProjects(config.etapasStatus);
+    } else if (!canSeeAllProjects(userRole) && userProjects.length === 0) {
+      // Agricultor sem projetos - retorna config vazia
+      config.configEtapas = {};
+      config.projetoStartDates = {};
+      config.responsaveisPorEtapa = {};
+      config.projetosPrazoFinal = {};
+      config.projetoJustificativas = {};
+      config.etapasProgresso = {};
+      config.etapasStatus = {};
     }
 
     // 🔒 SANITIZAÇÃO FINAL OBRIGATÓRIA antes de responder ao cliente

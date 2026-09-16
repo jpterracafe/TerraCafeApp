@@ -21,7 +21,24 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")
 
+  projetos  UserProjeto[]
+
   @@map("users")
+}
+
+// =====================================================================
+// TABELA: associação usuário-projeto (muitos-para-muitos)
+// =====================================================================
+model UserProjeto {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  projetoId String   @map("projeto_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projeto   ProjetoIrrigacao @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([userId, projetoId])
+  @@map("user_projetos")
 }
 
 // =====================================================================
@@ -36,6 +53,8 @@ model ProjetoIrrigacao {
   dataInicio           DateTime? @map("data_inicio")
   areaTotal            Float?    @map("area_total")
   ultimaSincronizacao  DateTime  @default(now()) @map("ultima_sincronizacao")
+
+  usuarios  UserProjeto[]
 
   @@map("projetos_irrigacao")
 }

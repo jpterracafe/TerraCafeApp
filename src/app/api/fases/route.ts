@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession, getQueryParam } from "@/lib/api";
+import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 import {
   faseCreateSchema,
   faseUpdateSchema,
@@ -11,17 +12,43 @@ import {
 } from "@/lib/validators";
 
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;
 
     const db = getSupabase();
-    const { data, error } = await db
+    const userRole = (session.user as any)?.role || "Colaborador";
+    const userName = (session.user as any)?.name || "";
+    const userEmail = (session.user as any)?.email || "";
+
+    // Busca projetos do usuário se for agricultor
+    let userProjects: string[] = [];
+    if (isFarmerRole(userRole)) {
+      const { data: userProjs } = await db
+        .from("user_projetos")
+        .select("projeto_id, projetos_irrigacao(nome)")
+        .eq("user_id", session.user.id);
+      
+      userProjects = (userProjs ?? [])
+        .map((up: any) => up.projetos_irrigacao?.nome)
+        .filter(Boolean);
+    }
+
+    let query = db
       .from("fases_acao")
       .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
       .order("created_at", { ascending: true });
+
+    // Se não é admin/diretor, filtra pelos projetos do usuário
+    if (!canSeeAllProjects(userRole) && userProjects.length > 0) {
+      query = query.in("projeto_cliente", userProjects);
+    } else if (!canSeeAllProjects(userRole) && userProjects.length === 0) {
+      return NextResponse.json({ fases: [] });
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 

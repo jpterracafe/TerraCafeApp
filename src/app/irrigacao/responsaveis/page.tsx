@@ -5,6 +5,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { 
   ChevronRight, Search, Plus, RefreshCw, Users, User, Database,
   Edit2, Trash2, AlertTriangle, X, Info
@@ -13,8 +14,21 @@ import { Responsavel } from './mockResponsaveis';
 import { offlineFetch } from '@/lib/offline';
 
 export default function ResponsaveisPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const userRole = (session?.user as { role?: string } | undefined)?.role ?? '';
+
+  // Guard: só Diretor e Admin podem ver responsáveis
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (status !== 'authenticated') {
+      router.push('/login');
+      return;
+    }
+    if (userRole && userRole !== 'Diretor' && userRole !== 'Desenvolvedor' && userRole !== 'Admin') {
+      router.replace('/irrigacao/diario-campo');
+    }
+  }, [status, session, router, userRole]);
 
   const [responsaveis, setResponsaveis] = useState<Responsavel[]>([]);
   const [loading, setLoading] = useState(true);
