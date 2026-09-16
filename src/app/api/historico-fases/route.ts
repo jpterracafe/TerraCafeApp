@@ -2,10 +2,31 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
+import { requireSession } from "@/lib/api";
+import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 
-function requireSession(session: any) {
-  if (!session?.user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  return null;
+// Helper: verifica se o usuário tem acesso ao projeto
+async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
+  if (!projetoCliente || !userId) return false;
+  const db = getSupabase();
+  const { data } = await db
+    .from("user_projetos")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("projeto_id", projetoCliente)
+    .maybeSingle();
+  return !!data;
+}
+
+// Helper: busca projeto de uma fase
+async function getProjetoFromFase(faseId: string): Promise<string> {
+  const db = getSupabase();
+  const { data } = await db
+    .from("fases_acao")
+    .select("projeto_cliente")
+    .eq("id", faseId)
+    .maybeSingle();
+  return data?.projeto_cliente ?? "";
 }
 
 // ── GET /api/historico-fases?faseId=xxx ────────────────────────────────────────
@@ -19,6 +40,25 @@ export async function GET(req: Request) {
     const faseId = searchParams.get("faseId");
 
     const db = getSupabase();
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+
+    // Se for agricultor e não tem faseId específica, retorna vazio
+    if (isFarmerRole(userRole) && !faseId) {
+      return NextResponse.json({ historico: [] });
+    }
+
+    // Se for agricultor com faseId, verifica acesso
+    if (isFarmerRole(userRole) && faseId) {
+      const projeto = await getProjetoFromFase(faseId);
+      if (projeto) {
+        const access = await hasAccessToProject(userId, projeto);
+        if (!access) {
+          return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+        }
+      }
+    }
+
     let query = db
       .from("historico_fases")
       .select("*")
@@ -57,6 +97,12 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;
+
+    // 🔒 Só admin e diretor podem inserir histórico diretamente
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    if (!canSeeAllProjects(userRole)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+    }
 
     const body = await req.json().catch(() => null);
     if (!body?.faseId || !body?.campo) {

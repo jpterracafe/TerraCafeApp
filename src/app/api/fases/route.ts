@@ -11,6 +11,19 @@ import {
   formatZodErrors,
 } from "@/lib/validators";
 
+// Helper: verifica se o usuário tem acesso ao projeto
+async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
+  if (!projetoCliente || !userId) return false;
+  const db = getSupabase();
+  const { data } = await db
+    .from("user_projetos")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("projeto_id", projetoCliente)
+    .maybeSingle();
+  return !!data;
+}
+
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
   try {
@@ -84,6 +97,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
     }
     const dataIn = parsed.data;
+
+    // 🔒 Se for agricultor, verifica se tem acesso ao projeto
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+    if (isFarmerRole(userRole) && dataIn.projetoCliente) {
+      const access = await hasAccessToProject(userId, dataIn.projetoCliente);
+      if (!access) {
+        return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
+      }
+    }
 
     const db = getSupabase();
 
@@ -175,6 +198,16 @@ export async function PUT(req: Request) {
       .eq("id", dataIn.id)
       .limit(1)
       .maybeSingle();
+
+    // 🔒 Se for agricultor, verifica se tem acesso ao projeto da fase
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+    if (isFarmerRole(userRole) && faseAntiga?.projeto_cliente) {
+      const access = await hasAccessToProject(userId, faseAntiga.projeto_cliente);
+      if (!access) {
+        return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
+      }
+    }
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (dataIn.gabarito       !== undefined) updates.gabarito       = dataIn.gabarito;
@@ -313,6 +346,16 @@ export async function DELETE(req: Request) {
       .single();
 
     const projetoCliente = faseData?.projeto_cliente ?? "";
+
+    // 🔒 Se for agricultor, verifica se tem acesso ao projeto da fase
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+    if (isFarmerRole(userRole) && projetoCliente) {
+      const access = await hasAccessToProject(userId, projetoCliente);
+      if (!access) {
+        return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
+      }
+    }
 
     if (hard) {
       // Hard delete — apaga linha permanentemente (requer explicitamente ?hard=true)

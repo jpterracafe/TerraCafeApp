@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession, getQueryParam } from "@/lib/api";
+import { isAdminRole, isDirectorRole } from "@/lib/roles";
 import {
   responsavelCreateSchema,
   responsavelDeleteSchema,
@@ -54,6 +55,12 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    // 🔒 Só admin e diretor podem criar responsáveis
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem criar responsáveis." }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => null);
     const parsed = responsavelCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -91,6 +98,12 @@ export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;
+
+    // 🔒 Só admin e diretor podem deletar responsáveis
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem deletar responsáveis." }, { status: 403 });
+    }
 
     const { searchParams } = new URL(req.url);
     const parsed = responsavelDeleteSchema.safeParse({

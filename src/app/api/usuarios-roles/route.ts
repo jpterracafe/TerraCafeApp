@@ -3,12 +3,19 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
+import { canManageUsers } from "@/lib/roles";
 
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;
+
+    // 🔒 Só admin pode listar todos os usuários
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    if (!canManageUsers(userRole)) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+    }
 
     const db = getSupabase();
     const { data: users, error } = await db

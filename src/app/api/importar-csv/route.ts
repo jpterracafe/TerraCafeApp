@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Papa from 'papaparse';
 import { getSupabase } from '@/lib/supabase';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { requireSession } from '@/lib/api';
+import { isAdminRole } from '@/lib/roles';
 import env from '@/lib/env';
 
 export async function POST(req: NextRequest) {
   try {
+    // 🔒 AUTENTICAÇÃO OBRIGATÓRIA — estava completamente ausente
+    const session = await getServerSession(authOptions);
+    const err = requireSession(session);
+    if (err) return err;
+
+    // 🔒 Só admin pode importar CSV
+    const userRole = (session?.user as any)?.role || 'Colaborador';
+    if (!isAdminRole(userRole)) {
+      return NextResponse.json({ error: 'Não autorizado. Apenas administradores podem importar CSV.' }, { status: 403 });
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const rawContent = formData.get('csvContent') as string | null;

@@ -195,6 +195,12 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    // 🔒 Só admin e diretor podem modificar configurações do sistema
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem modificar configurações." }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => null);
     if (!body) {
       return NextResponse.json({ error: "Corpo da requisição inválido." }, { status: 400 });

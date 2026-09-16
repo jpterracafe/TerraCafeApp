@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
+import { canSeeAllProjects, isFarmerRole, isAdminRole, isDirectorRole } from "@/lib/roles";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
 // Retorna nomes únicos de projetos ATIVOS por padrão.
@@ -100,6 +100,12 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
+    // 🔒 Só admin e diretor podem criar projetos
+    const userRole = (session.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem criar projetos." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
@@ -204,6 +210,12 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
+    // 🔒 Só admin e diretor podem excluir projetos
+    const userRole = (session.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem excluir projetos." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const nome = searchParams.get("nome")?.trim() ?? "";
     const hard = searchParams.get("hard") === "true";
@@ -274,6 +286,12 @@ export async function PATCH(req: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
+    // 🔒 Só admin e diretor podem restaurar projetos
+    const userRole = (session.user as any)?.role || "Colaborador";
+    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem restaurar projetos." }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

@@ -10,6 +10,19 @@ import {
   formatZodErrors,
 } from "@/lib/validators";
 
+// Helper: verifica se o usuário tem acesso ao projeto
+async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
+  if (!projetoCliente || !userId) return false;
+  const db = getSupabase();
+  const { data } = await db
+    .from("user_projetos")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("projeto_id", projetoCliente)
+    .maybeSingle();
+  return !!data;
+}
+
 function mapLog(l: any) {
   return {
     id: l.id,
@@ -87,6 +100,16 @@ export async function POST(req: Request) {
     const dataIn = parsed.data;
     const { data, responsavel, atividade, status, observacoes, projetoCliente, midiaUrl, midiaTipo } = dataIn;
 
+    // 🔒 Se for agricultor, verifica se tem acesso ao projeto
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+    if (isFarmerRole(userRole) && projetoCliente) {
+      const access = await hasAccessToProject(userId, projetoCliente);
+      if (!access) {
+        return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
+      }
+    }
+
     const db = getSupabase();
 
     const insertBase = { data, responsavel, atividade, status, observacoes };
@@ -152,6 +175,25 @@ export async function DELETE(req: Request) {
     const { id } = parsed.data;
 
     const db = getSupabase();
+
+    // 🔒 Busca o log para verificar se o usuário tem acesso ao projeto
+    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userId = (session?.user as any)?.id;
+    if (isFarmerRole(userRole)) {
+      const { data: logData } = await db
+        .from("diario_logs")
+        .select("projeto_cliente")
+        .eq("id", id)
+        .maybeSingle();
+      
+      if (logData?.projeto_cliente) {
+        const access = await hasAccessToProject(userId, logData.projeto_cliente);
+        if (!access) {
+          return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
+        }
+      }
+    }
+
     const { error } = await db.from("diario_logs").delete().eq("id", id);
     if (error) throw error;
 
