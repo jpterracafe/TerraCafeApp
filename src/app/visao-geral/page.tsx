@@ -8,7 +8,7 @@ import {
   Search, CheckCircle2, AlertCircle, Clock,
   Calendar, Users, RefreshCw, FileText, Loader2, Tv,
   AlertTriangle, ShieldAlert, Activity,
-  Layers, ArrowUpRight, TrendingUp, ChevronDown, LayoutGrid, List
+  Layers, ArrowUpRight, TrendingUp, ChevronDown, LayoutGrid, List, Check
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '../irrigacao/execucao/page';
@@ -688,13 +688,13 @@ export default function VisaoGeralDiretorPage() {
           </div>
         ) : modoView === 'resumido' ? (
           /* ── MODO RESUMIDO: grid de cards compactos ──────────────────── */
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
             {projetosFiltrados.map((proj) => {
               const expandido = projetosExpandidos.has(proj.nome);
               return (
                 <div
                   key={proj.nome}
-                  className={`bg-white dark:bg-[#0d1527] rounded-2xl border shadow-sm transition-all overflow-hidden ${
+                  className={`bg-white dark:bg-[#0d1527] rounded-2xl border shadow-sm transition-all overflow-hidden self-start ${
                     proj.temAtraso ? 'border-rose-500/40' :
                     proj.concluidoGeral ? 'border-emerald-500/40' :
                     'border-slate-200 dark:border-[#1e293b]'
@@ -841,9 +841,14 @@ export default function VisaoGeralDiretorPage() {
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="py-2 px-3 text-right">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${isConcluida ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : isAtrasada ? 'bg-rose-600 text-white' : fase.hasStarted ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                                      {isConcluida ? '✓ OK' : isAtrasada ? `+${fase.diasAtraso}d` : fase.hasStarted ? `${fase.diasRestantesFase}d` : '—'}
+                                  <td className="py-2 px-3 text-right whitespace-nowrap">
+                                    <span className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-black uppercase whitespace-nowrap ${isConcluida ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : isAtrasada ? 'bg-rose-600 text-white' : fase.hasStarted ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                      {isConcluida ? (
+                                        <>
+                                          <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                          <span>OK</span>
+                                        </>
+                                      ) : isAtrasada ? `+${fase.diasAtraso}d` : fase.hasStarted ? `${fase.diasRestantesFase}d` : '—'}
                                     </span>
                                   </td>
                                 </tr>
