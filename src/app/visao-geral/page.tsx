@@ -470,7 +470,7 @@ export default function VisaoGeralDiretorPage() {
     <div
       ref={scrollContainerRef}
       className={`min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 font-sans transition-colors ${
-        modoTV ? 'p-4 md:p-6 overflow-y-auto' : 'p-4 md:p-8'
+        modoTV ? 'overflow-y-auto' : 'p-4 md:p-8'
       }`}
     >
       {/* Guard de sessão — não renderiza enquanto verifica */}
@@ -479,72 +479,91 @@ export default function VisaoGeralDiretorPage() {
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
         </div>
       )}
-      {/* ── Topbar Executiva & Controles ────────────────────────────────── */}
-      <header className="max-w-7xl mx-auto mb-6 bg-white/90 dark:bg-[#0d1527]/90 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-slate-200 dark:border-[#1e293b] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-              Painel Executivo
-            </span>
-            <span className="text-xs text-slate-400">• {lastUpdate.toLocaleTimeString('pt-BR')}</span>
-          </div>
-          <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
-            📊 Visão Geral das Obras
-          </h1>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-            Fases, responsáveis e progresso. O % de cada fase é atualizado pela equipe no Diário de Campo.
-          </p>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {horaAtual && (
-            <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
-              🕒 {horaAtual}
-            </div>
-          )}
-
+      {/* Botão Sair do Modo TV (só aparece no modo TV) */}
+      {modoTV && (
+        <div className="fixed top-4 right-4 z-50">
           <button
             onClick={toggleModoTV}
-            className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${
-              modoTV
-                ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
-                : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-200 border-slate-200 dark:border-[#1e293b]'
-            }`}
-            title="Alternar Modo TV"
+            className="px-4 py-2 rounded-xl text-sm font-bold bg-rose-600 text-white border border-rose-400 shadow-lg hover:bg-rose-500 flex items-center gap-2 transition-all"
+            title="Sair do Modo TV"
           >
-            <Tv className="w-3.5 h-3.5" />
-            <span>{modoTV ? 'Sair TV' : 'Modo TV'}</span>
-          </button>
-
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
-            title="Atualizar dados"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>Atualizar</span>
-          </button>
-
-          <button
-            onClick={() => router.push('/irrigacao/execucao')}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
-          >
-            <Layers className="w-3.5 h-3.5 text-blue-500" />
-            <span>Painel Operacional</span>
-          </button>
-
-          <button
-            onClick={() => router.push('/irrigacao/diario-campo')}
-            className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1.5 transition-all"
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Diário de Campo</span>
+            <Tv className="w-4 h-4" />
+            <span>Sair do Modo TV</span>
           </button>
         </div>
-      </header>
+      )}
 
-      <main className="max-w-7xl mx-auto space-y-4">
+      {!modoTV && (
+        <>
+        {/* Topbar Executiva & Controles (escondido no modo TV) */}
+        <header className="max-w-7xl mx-auto mb-6 bg-white/90 dark:bg-[#0d1527]/90 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-slate-200 dark:border-[#1e293b] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                Painel Executivo
+              </span>
+              <span className="text-xs text-slate-400">• {lastUpdate.toLocaleTimeString('pt-BR')}</span>
+            </div>
+            <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+              📊 Visão Geral das Obras
+            </h1>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              Fases, responsáveis e progresso. O % de cada fase é atualizado pela equipe no Diário de Campo.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {horaAtual && (
+              <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] text-xs font-mono font-bold text-slate-700 dark:text-slate-200">
+                🕒 {horaAtual}
+              </div>
+            )}
+
+            <button
+              onClick={toggleModoTV}
+              className={`px-3 py-2 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all ${
+                modoTV
+                  ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
+                  : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-200 border-slate-200 dark:border-[#1e293b]'
+              }`}
+              title="Alternar Modo TV"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>{modoTV ? 'Sair TV' : 'Modo TV'}</span>
+            </button>
+
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
+              title="Atualizar dados"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Atualizar</span>
+            </button>
+
+            <button
+              onClick={() => router.push('/irrigacao/execucao')}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-500" />
+              <span>Painel Operacional</span>
+            </button>
+
+            <button
+              onClick={() => router.push('/irrigacao/diario-campo')}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1.5 transition-all"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Diário de Campo</span>
+            </button>
+          </div>
+        </header>
+        </>
+      )}
+
+      <main className={`max-w-7xl mx-auto space-y-4 ${modoTV ? 'p-4 md:p-6' : ''}`}>
 
         {/* ── Alertas de Fases em Atraso (se houver) ────────────────────── */}
         {todasFasesAtrasadas.length > 0 && (
