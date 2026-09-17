@@ -45,7 +45,8 @@ export async function GET() {
     if (err) return err;
 
     const db = getSupabase();
-    const userRole = (session.user as any)?.role || "Colaborador";
+    const user = session!.user;
+    const userRole = user?.role || "Colaborador";
 
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
@@ -53,7 +54,7 @@ export async function GET() {
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
-        .eq("user_id", session.user.id);
+        .eq("user_id", user.id);
       
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
@@ -92,6 +93,7 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const body = await req.json().catch(() => null);
     const parsed = diarioLogCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -101,10 +103,10 @@ export async function POST(req: Request) {
     const { data, responsavel, atividade, status, observacoes, projetoCliente, midiaUrl, midiaTipo } = dataIn;
 
     // 🔒 Se for agricultor, verifica se tem acesso ao projeto
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    const userId = (session?.user as any)?.id;
+    const userRole = user?.role || "Colaborador";
+    const userId = user?.id;
     if (isFarmerRole(userRole) && projetoCliente) {
-      const access = await hasAccessToProject(userId, projetoCliente);
+      const access = await hasAccessToProject(userId!, projetoCliente);
       if (!access) {
         return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
       }
@@ -165,6 +167,7 @@ export async function DELETE(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const { searchParams } = new URL(req.url);
     const parsed = diarioLogDeleteSchema.safeParse({
       id: searchParams.get("id"),
@@ -177,8 +180,8 @@ export async function DELETE(req: Request) {
     const db = getSupabase();
 
     // 🔒 Busca o log para verificar se o usuário tem acesso ao projeto
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    const userId = (session?.user as any)?.id;
+    const userRole = user?.role || "Colaborador";
+    const userId = user?.id;
     if (isFarmerRole(userRole)) {
       const { data: logData } = await db
         .from("diario_logs")
@@ -187,7 +190,7 @@ export async function DELETE(req: Request) {
         .maybeSingle();
       
       if (logData?.projeto_cliente) {
-        const access = await hasAccessToProject(userId, logData.projeto_cliente);
+        const access = await hasAccessToProject(userId!, logData.projeto_cliente);
         if (!access) {
           return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
         }

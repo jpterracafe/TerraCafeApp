@@ -31,10 +31,11 @@ export async function GET(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const db = getSupabase();
-    const userRole = (session.user as any)?.role || "Colaborador";
-    const userName = (session.user as any)?.name || "";
-    const userEmail = (session.user as any)?.email || "";
+    const userRole = user?.role || "Colaborador";
+    const userName = user?.name || "";
+    const userEmail = user?.email || "";
 
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
-        .eq("user_id", session.user.id);
+        .eq("user_id", user.id);
       
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const body = await req.json().catch(() => null);
     const parsed = faseCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -99,10 +101,10 @@ export async function POST(req: Request) {
     const dataIn = parsed.data;
 
     // 🔒 Se for agricultor, verifica se tem acesso ao projeto
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    const userId = (session?.user as any)?.id;
+    const userRole = user?.role || "Colaborador";
+    const userId = user?.id;
     if (isFarmerRole(userRole) && dataIn.projetoCliente) {
-      const access = await hasAccessToProject(userId, dataIn.projetoCliente);
+      const access = await hasAccessToProject(userId!, dataIn.projetoCliente);
       if (!access) {
         return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
       }
@@ -182,6 +184,7 @@ export async function PUT(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const body = await req.json().catch(() => null);
     const parsed = faseUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -200,10 +203,10 @@ export async function PUT(req: Request) {
       .maybeSingle();
 
     // 🔒 Se for agricultor, verifica se tem acesso ao projeto da fase
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    const userId = (session?.user as any)?.id;
+    const userRole = user?.role || "Colaborador";
+    const userId = user?.id;
     if (isFarmerRole(userRole) && faseAntiga?.projeto_cliente) {
-      const access = await hasAccessToProject(userId, faseAntiga.projeto_cliente);
+      const access = await hasAccessToProject(userId!, faseAntiga.projeto_cliente);
       if (!access) {
         return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
       }
@@ -325,6 +328,7 @@ export async function DELETE(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const { searchParams } = new URL(req.url);
     const parsed = faseDeleteSchema.safeParse({
       id: searchParams.get("id"),
@@ -348,10 +352,10 @@ export async function DELETE(req: Request) {
     const projetoCliente = faseData?.projeto_cliente ?? "";
 
     // 🔒 Se for agricultor, verifica se tem acesso ao projeto da fase
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    const userId = (session?.user as any)?.id;
+    const userRole = user?.role || "Colaborador";
+    const userId = user?.id;
     if (isFarmerRole(userRole) && projetoCliente) {
-      const access = await hasAccessToProject(userId, projetoCliente);
+      const access = await hasAccessToProject(userId!, projetoCliente);
       if (!access) {
         return NextResponse.json({ error: "Não autorizado. Você não tem acesso a este projeto." }, { status: 403 });
       }

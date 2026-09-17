@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
-import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
+import { canSeeAllProjects, isFarmerRole, isAdminRole, isDirectorRole } from "@/lib/roles";
 import fs from "fs";
 import path from "path";
 
@@ -93,8 +93,9 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const db = getSupabase();
-    const userRole = (session.user as any)?.role || "Colaborador";
+    const userRole = user?.role || "Colaborador";
 
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
@@ -102,7 +103,7 @@ export async function GET() {
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
-        .eq("user_id", session.user.id);
+        .eq("user_id", user.id);
       
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
@@ -195,8 +196,9 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     // 🔒 Só admin e diretor podem modificar configurações do sistema
-    const userRole = (session?.user as any)?.role || "Colaborador";
+    const userRole = user?.role || "Colaborador";
     if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
       return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem modificar configurações." }, { status: 403 });
     }

@@ -12,12 +12,13 @@ export async function GET(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     const { searchParams } = new URL(req.url);
-    const targetUserId = searchParams.get("userId") || (session.user as any)?.id;
+    const targetUserId = searchParams.get("userId") || user.id;
 
     // Verifica permissão: admin pode ver de qualquer usuário, usuário comum só vê o seu
-    const userRole = (session.user as any)?.role || "Colaborador";
-    if (!canManageUsers(userRole) && targetUserId !== (session.user as any)?.id) {
+    const userRole = user?.role || "Colaborador";
+    if (!canManageUsers(userRole) && targetUserId !== user.id) {
       return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
     }
 
@@ -58,8 +59,9 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const authUser = session!.user;
     // Só admin pode gerenciar associações
-    const userRole = (session.user as any)?.role || "Colaborador";
+    const userRole = authUser?.role || "Colaborador";
     if (!canManageUsers(userRole)) {
       return NextResponse.json({ error: "Não autorizado. Apenas administradores." }, { status: 403 });
     }
@@ -75,13 +77,13 @@ export async function POST(req: Request) {
     const db = getSupabase();
 
     // Verifica se usuário existe
-    const { data: user, error: userError } = await db
+    const { data: dbUser, error: userError } = await db
       .from("users")
       .select("id")
       .eq("id", userId)
       .maybeSingle();
 
-    if (userError || !user) {
+    if (userError || !dbUser) {
       return NextResponse.json({ error: "Usuário não encontrado." }, { status: 404 });
     }
 
@@ -134,8 +136,9 @@ export async function DELETE(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const user = session!.user;
     // Só admin pode gerenciar associações
-    const userRole = (session.user as any)?.role || "Colaborador";
+    const userRole = user?.role || "Colaborador";
     if (!canManageUsers(userRole)) {
       return NextResponse.json({ error: "Não autorizado. Apenas administradores." }, { status: 403 });
     }

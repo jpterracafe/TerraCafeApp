@@ -16,15 +16,16 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
+    const user = session.user;
     const { searchParams } = new URL(req.url);
     const responsavel = searchParams.get("responsavel")?.trim() ?? "";
     const lixeira = searchParams.get("lixeira") === "true";
     const detalhado = searchParams.get("detalhado") === "true";
 
     const db = getSupabase();
-    const userRole = (session.user as any)?.role || "Colaborador";
-    const userName = (session.user as any)?.name || "";
-    const userEmail = (session.user as any)?.email || "";
+    const userRole = user?.role || "Colaborador";
+    const userName = user?.name || "";
+    const userEmail = user?.email || "";
 
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
@@ -32,7 +33,7 @@ export async function GET(req: Request) {
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
-        .eq("user_id", session.user.id);
+        .eq("user_id", user.id);
       
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
