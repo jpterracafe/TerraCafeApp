@@ -17,7 +17,23 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
+    const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
+    const sessionName = session?.user?.name?.trim() ?? "";
+    const sessionRole = (session?.user as any)?.role || "Colaborador";
+
     const db = getSupabase();
+
+    // Carrega mapa de criadores
+    let mapCriadores: Record<string, { email: string }> = {};
+    try {
+      const { data: criadoresRow } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_criadores_v1")
+        .maybeSingle();
+      if (criadoresRow?.valor) mapCriadores = criadoresRow.valor;
+    } catch (_) {}
+
     const { data, error } = await db
       .from("fases_acao")
       .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
@@ -25,17 +41,35 @@ export async function GET() {
 
     if (error) throw error;
 
-    const fases = (data ?? []).map((f) => ({
-      id: f.id,
-      gabarito: f.gabarito,
-      responsavel: f.responsavel,
-      acao: f.acao,
-      prazoLimite: f.prazo_limite,
-      status: f.status,
-      observacoes: f.observacoes ?? "",
-      projetoCliente: f.projeto_cliente ?? "",
-      isDeleted: f.is_deleted ?? false,
-    }));
+    const fases = (data ?? [])
+      .filter((f) => {
+        const pNome = (f.projeto_cliente || "").trim();
+        if (!pNome) return false;
+
+        const criador = mapCriadores[pNome];
+        const criadorEmail = criador?.email?.trim().toLowerCase();
+
+        // Se tem criador e NÃO é o usuário logado:
+        if (criadorEmail && criadorEmail !== sessionEmail) {
+          const resp = (f.responsavel || "").trim().toLowerCase();
+          const ehResponsavel = resp && (resp === sessionName.toLowerCase() || resp.includes(sessionName.toLowerCase()));
+          if (!ehResponsavel) {
+            return false; // Oculta fase deste projeto para outro usuário
+          }
+        }
+        return true;
+      })
+      .map((f) => ({
+        id: f.id,
+        gabarito: f.gabarito,
+        responsavel: f.responsavel,
+        acao: f.acao,
+        prazoLimite: f.prazo_limite,
+        status: f.status,
+        observacoes: f.observacoes ?? "",
+        projetoCliente: f.projeto_cliente ?? "",
+        isDeleted: f.is_deleted ?? false,
+      }));
 
     return NextResponse.json({ fases });
   } catch (e) {

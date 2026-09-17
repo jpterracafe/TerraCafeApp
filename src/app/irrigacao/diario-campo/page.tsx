@@ -410,12 +410,15 @@ export default function DiarioCampoTimelinePage() {
       let deletados = new Set<string>();
       let listaProjetos: string[] = [];
 
+      if (resProjetos.ok) {
+        const dataProj = await resProjetos.json();
+        const pSupabase = dataProj?.projetos;
+        listaProjetos = Array.isArray(pSupabase) ? pSupabase : [];
+      }
+
       if (resFases.ok) {
         const { fases } = await resFases.json();
-        const ativas = (fases ?? [])
-          .filter((f: any) => !f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
-          .map((f: any) => f.projetoCliente as string);
-        const ativasSet = new Set(ativas);
+        const ativasSet = new Set(listaProjetos);
 
         deletados = new Set<string>(
           (fases ?? [])
@@ -424,12 +427,6 @@ export default function DiarioCampoTimelinePage() {
             .filter((p: string) => !ativasSet.has(p))
         );
         setProjetosDeletados(deletados);
-        listaProjetos.push(...ativas);
-      }
-
-      if (resProjetos.ok) {
-        const { projetos } = await resProjetos.json();
-        listaProjetos.push(...(projetos ?? []));
       }
 
       const unicos = Array.from(new Set(listaProjetos.filter(p => !deletados.has(p)))).sort();
@@ -437,6 +434,8 @@ export default function DiarioCampoTimelinePage() {
 
       if (unicos.length > 0) {
         setSelectedProjeto(prev => prev && unicos.includes(prev) ? prev : unicos[0]);
+      } else {
+        setSelectedProjeto('');
       }
     } catch (e) {
       console.error('[diario] Erro ao carregar projetos:', e);

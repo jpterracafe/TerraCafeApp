@@ -19,15 +19,16 @@ export async function GET(req: Request) {
     const responsavel = searchParams.get("responsavel")?.trim() ?? "";
     const lixeira = searchParams.get("lixeira") === "true";
     const detalhado = searchParams.get("detalhado") === "true";
+    const todos = searchParams.get("todos") === "true";
     const emailFiltro = searchParams.get("email")?.trim().toLowerCase() ?? "";
-    const apenasMeus = searchParams.get("meus") === "true";
 
     const sessionEmail = session.user?.email?.trim().toLowerCase() ?? "";
-    const filtroCriadorEmail = emailFiltro || (apenasMeus ? sessionEmail : "");
+    const sessionName = session.user?.name?.trim() ?? "";
+    const sessionRole = (session.user as any)?.role || "Colaborador";
 
     const db = getSupabase();
 
-    // Carrega mapa de criadores para enriquecer e filtrar
+    // 1. Carrega mapa de criadores de configuracoes_sistema
     let mapCriadores: Record<string, { email: string; nome?: string; id?: string; criadoEm?: string }> = {};
     try {
       const { data: criadoresRow } = await db
@@ -36,13 +37,34 @@ export async function GET(req: Request) {
         .eq("chave", "diario_projetos_criadores_v1")
         .maybeSingle();
       if (criadoresRow?.valor) {
-        mapCriadores = criadoresRow.valor;
+        mapCriadores = { ...criadoresRow.valor };
       }
     } catch (_) {}
 
+    // 2. Complementa com user_projetos se a tabela existir
+    const userProjetosPermitidos = new Set<string>();
+    try {
+      const { data: upRows } = await db.from("user_projetos").select("projeto_nome, user_email");
+      if (upRows) {
+        for (const up of upRows) {
+          const pNome = up.projeto_nome;
+          const uEmail = up.user_email?.trim().toLowerCase();
+          if (pNome && uEmail) {
+            if (!mapCriadores[pNome]) {
+              mapCriadores[pNome] = { email: uEmail };
+            }
+            if (uEmail === sessionEmail) {
+              userProjetosPermitidos.add(pNome);
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Consulta fases_acao
     let query = db
       .from("fases_acao")
-      .select(detalhado ? "projeto_cliente, prazo_limite, is_deleted, updated_at" : "projeto_cliente")
+      .select("projeto_cliente, prazo_limite, is_deleted, updated_at, responsavel")
       .eq("is_deleted", lixeira)
       .not("projeto_cliente", "is", null)
       .neq("projeto_cliente", "");
@@ -54,26 +76,61 @@ export async function GET(req: Request) {
     const { data, error } = await query;
     if (error) throw error;
 
+    // Agrupa fases por projeto para checar responsáveis
+    const fasesPorProjeto = new Map<string, any[]>();
+    for (const r of (data ?? []) as any[]) {
+      const n = r.projeto_cliente as string;
+      if (!fasesPorProjeto.has(n)) fasesPorProjeto.set(n, []);
+      fasesPorProjeto.get(n)!.push(r);
+    }
+
+    // Regra de autorização / isolamento por usuário:
+    const emailAlvo = emailFiltro || sessionEmail;
+    const podeVerTodos = todos && ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+
+    const temAcessoAoProjeto = (nome: string): boolean => {
+      if (podeVerTodos) return true;
+
+      const criador = mapCriadores[nome];
+      const criadorEmail = criador?.email?.trim().toLowerCase();
+
+      // Se o projeto tem criador cadastrado
+      if (criadorEmail) {
+        if (criadorEmail === emailAlvo) return true;
+        if (userProjetosPermitidos.has(nome)) return true;
+
+        // Se for responsável direto por alguma fase do projeto
+        const fasesDoProj = fasesPorProjeto.get(nome) || [];
+        const ehResponsavel = fasesDoProj.some(f => {
+          const r = (f.responsavel || "").trim().toLowerCase();
+          return r && (r === sessionName.toLowerCase() || r.includes(sessionName.toLowerCase()));
+        });
+        if (ehResponsavel) return true;
+
+        // Pertence a outro usuário -> oculta
+        return false;
+      }
+
+      // Projeto legado (anterior ao recurso, sem criador definido):
+      // Permite para Diretores/Admins ou se não há criador atribuído
+      return true;
+    };
+
     if (detalhado) {
       const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; criador: any }>();
       for (const r of (data ?? []) as any[]) {
         const n = r.projeto_cliente as string;
+        if (!temAcessoAoProjeto(n)) continue;
+
         const criador = mapCriadores[n] || null;
-
-        // Se houver filtro de criador por email, só inclui se for do criador
-        if (filtroCriadorEmail && criador?.email && criador.email.toLowerCase() !== filtroCriadorEmail) {
-          continue;
-        }
-
         if (!mapa.has(n)) {
           mapa.set(n, {
             nome: n,
-            prazoFinal: r.prazo_limite || '',
+            prazoFinal: r.prazo_limite || "",
             excluidoEm: r.is_deleted ? r.updated_at : null,
             criador,
           });
         } else if (r.is_deleted && r.updated_at) {
-          // Prioriza data de exclusão mais recente
           const atual = mapa.get(n)!;
           if (!atual.excluidoEm || r.updated_at > atual.excluidoEm) {
             atual.excluidoEm = r.updated_at;
@@ -86,14 +143,7 @@ export async function GET(req: Request) {
 
     let unicos = Array.from(
       new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
-    );
-
-    if (filtroCriadorEmail) {
-      unicos = unicos.filter(n => {
-        const c = mapCriadores[n];
-        return c?.email && c.email.toLowerCase() === filtroCriadorEmail;
-      });
-    }
+    ).filter(n => temAcessoAoProjeto(n));
 
     unicos.sort();
     return NextResponse.json({ projetos: unicos, criadores: mapCriadores });
@@ -136,6 +186,10 @@ export async function POST(req: Request) {
       { gabarito: "entrega técnica",            acao: "Checklist final, treinamento e entrega ao cliente" },
     ];
 
+    const userEmail = session.user?.email?.toLowerCase().trim() || "";
+    const userName = session.user?.name || "Usuário";
+    const userId = (session.user as any)?.id || null;
+
     const inserts = fasesIniciais.map((f) => ({
       gabarito: f.gabarito,
       acao: f.acao,
@@ -145,16 +199,25 @@ export async function POST(req: Request) {
       observacoes: `Início do projeto: ${dataInicio}`,
       projeto_cliente: nome,
       is_deleted: false,
+      criado_por_email: userEmail,
+      criado_por_nome: userName,
     }));
 
-    const { error: insertError } = await db.from("fases_acao").insert(inserts);
+    let { error: insertError } = await db.from("fases_acao").insert(inserts);
     if (insertError) {
-      console.warn("[POST /api/projetos] Aviso ao inserir no Supabase fases_acao:", insertError.message);
+      // Fallback sem colunas extras se ainda não foi rodada a migração no Supabase
+      const insertsBasico = fasesIniciais.map((f) => ({
+        gabarito: f.gabarito,
+        acao: f.acao,
+        responsavel: session.user?.name || "Equipe Técnica",
+        prazo_limite: prazoFinal,
+        status: "Dentro do programado",
+        observacoes: `Início do projeto: ${dataInicio}`,
+        projeto_cliente: nome,
+        is_deleted: false,
+      }));
+      await db.from("fases_acao").insert(insertsBasico);
     }
-
-    const userEmail = session.user?.email?.toLowerCase().trim() || "";
-    const userName = session.user?.name || "Usuário";
-    const userId = (session.user as any)?.id || null;
 
     // Salva criador, dataInicio e prazoFinal nas configurações do sistema (Supabase)
     try {
