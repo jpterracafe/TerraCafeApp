@@ -19,8 +19,26 @@ export async function GET(req: Request) {
     const responsavel = searchParams.get("responsavel")?.trim() ?? "";
     const lixeira = searchParams.get("lixeira") === "true";
     const detalhado = searchParams.get("detalhado") === "true";
+    const emailFiltro = searchParams.get("email")?.trim().toLowerCase() ?? "";
+    const apenasMeus = searchParams.get("meus") === "true";
+
+    const sessionEmail = session.user?.email?.trim().toLowerCase() ?? "";
+    const filtroCriadorEmail = emailFiltro || (apenasMeus ? sessionEmail : "");
 
     const db = getSupabase();
+
+    // Carrega mapa de criadores para enriquecer e filtrar
+    let mapCriadores: Record<string, { email: string; nome?: string; id?: string; criadoEm?: string }> = {};
+    try {
+      const { data: criadoresRow } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_criadores_v1")
+        .maybeSingle();
+      if (criadoresRow?.valor) {
+        mapCriadores = criadoresRow.valor;
+      }
+    } catch (_) {}
 
     let query = db
       .from("fases_acao")
@@ -37,14 +55,22 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     if (detalhado) {
-      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null }>();
+      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; criador: any }>();
       for (const r of (data ?? []) as any[]) {
         const n = r.projeto_cliente as string;
+        const criador = mapCriadores[n] || null;
+
+        // Se houver filtro de criador por email, só inclui se for do criador
+        if (filtroCriadorEmail && criador?.email && criador.email.toLowerCase() !== filtroCriadorEmail) {
+          continue;
+        }
+
         if (!mapa.has(n)) {
           mapa.set(n, {
             nome: n,
             prazoFinal: r.prazo_limite || '',
             excluidoEm: r.is_deleted ? r.updated_at : null,
+            criador,
           });
         } else if (r.is_deleted && r.updated_at) {
           // Prioriza data de exclusão mais recente
@@ -55,14 +81,22 @@ export async function GET(req: Request) {
         }
       }
       const lista = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-      return NextResponse.json({ projetos: lista });
+      return NextResponse.json({ projetos: lista, criadores: mapCriadores });
     }
 
-    const unicos = Array.from(
+    let unicos = Array.from(
       new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
-    ).sort();
+    );
 
-    return NextResponse.json({ projetos: unicos });
+    if (filtroCriadorEmail) {
+      unicos = unicos.filter(n => {
+        const c = mapCriadores[n];
+        return c?.email && c.email.toLowerCase() === filtroCriadorEmail;
+      });
+    }
+
+    unicos.sort();
+    return NextResponse.json({ projetos: unicos, criadores: mapCriadores });
   } catch (e) {
     console.error("[GET /api/projetos]", e);
     return NextResponse.json({ error: "Erro ao buscar projetos." }, { status: 500 });
@@ -118,8 +152,47 @@ export async function POST(req: Request) {
       console.warn("[POST /api/projetos] Aviso ao inserir no Supabase fases_acao:", insertError.message);
     }
 
-    // Salva dataInicio e prazoFinal nas configurações do sistema (Supabase)
+    const userEmail = session.user?.email?.toLowerCase().trim() || "";
+    const userName = session.user?.name || "Usuário";
+    const userId = (session.user as any)?.id || null;
+
+    // Salva criador, dataInicio e prazoFinal nas configurações do sistema (Supabase)
     try {
+      if (userEmail) {
+        const { data: currentCriadores } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projetos_criadores_v1")
+          .maybeSingle();
+
+        const mapCriadores = currentCriadores?.valor || {};
+        mapCriadores[nome] = {
+          email: userEmail,
+          nome: userName,
+          id: userId,
+          criadoEm: new Date().toISOString(),
+        };
+
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projetos_criadores_v1",
+          valor: mapCriadores,
+          updated_at: new Date().toISOString(),
+        });
+
+        // Vínculo relacional se a tabela user_projetos existir
+        try {
+          await db.from("user_projetos").upsert({
+            user_email: userEmail,
+            user_id: userId,
+            projeto_nome: nome,
+            role: "owner",
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "user_email,projeto_nome" });
+        } catch (_) {
+          // Tabela opcional até ser criada no Supabase
+        }
+      }
+
       if (prazoFinal) {
         const { data: currentPrazos } = await db
           .from("configuracoes_sistema")
@@ -154,7 +227,7 @@ export async function POST(req: Request) {
         });
       }
     } catch (cfgErr) {
-      console.warn("[POST /api/projetos] Erro ao sincronizar datas no configuracoes_sistema:", cfgErr);
+      console.warn("[POST /api/projetos] Erro ao sincronizar metadados no configuracoes_sistema:", cfgErr);
     }
 
     return NextResponse.json({
@@ -162,6 +235,11 @@ export async function POST(req: Request) {
       projeto: nome,
       prazoFinal,
       dataInicio,
+      criador: {
+        email: userEmail,
+        nome: userName,
+        id: userId,
+      },
     });
   } catch (e) {
     console.error("[POST /api/projetos]", e);
@@ -217,6 +295,19 @@ export async function DELETE(req: Request) {
         await db.from("configuracoes_sistema").upsert({
           chave: "diario_projeto_starts_v1", valor: starts, updated_at: new Date().toISOString(),
         });
+
+        const { data: criadoresRow } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projetos_criadores_v1")
+          .maybeSingle();
+        const criadores = { ...(criadoresRow?.valor || {}) };
+        delete criadores[nome];
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projetos_criadores_v1", valor: criadores, updated_at: new Date().toISOString(),
+        });
+
+        await db.from("user_projetos").delete().eq("projeto_nome", nome);
       } catch (_) { /* ignora falha de limpeza em configuracoes_sistema */ }
 
       return NextResponse.json({ ok: true, hardDeleted: true });
