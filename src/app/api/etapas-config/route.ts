@@ -251,6 +251,21 @@ export async function POST(req: Request) {
             updated_at: new Date().toISOString(),
           });
         }
+
+        // Sincroniza diretamente na tabela fases_acao para que ambas as fontes fiquem alinhadas
+        if (body.tipo === "responsaveis" && body.dados) {
+          for (const [chave, respList] of Object.entries(body.dados as Record<string, string[]>)) {
+            const [projNome, etapaKey] = chave.split("::");
+            if (projNome && etapaKey) {
+              const respStr = Array.isArray(respList) && respList.length > 0 ? respList.join(", ") : "Não atribuído";
+              await db
+                .from("fases_acao")
+                .update({ responsavel: respStr, updated_at: new Date().toISOString() })
+                .eq("projeto_cliente", projNome)
+                .ilike("gabarito", `%${etapaKey}%`);
+            }
+          }
+        }
       } catch (dbErr) {
         // Tabela ainda não criada no banco — segue com arquivo local
       }

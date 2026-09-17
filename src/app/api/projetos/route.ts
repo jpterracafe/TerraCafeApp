@@ -198,7 +198,7 @@ export async function POST(req: Request) {
     const inserts = fasesIniciais.map((f) => ({
       gabarito: f.gabarito,
       acao: f.acao,
-      responsavel: session.user?.name || "Equipe Técnica",
+      responsavel: "Não atribuído",
       prazo_limite: prazoFinal,
       status: "Dentro do programado",
       observacoes: `Início do projeto: ${dataInicio}`,
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
       const insertsBasico = fasesIniciais.map((f) => ({
         gabarito: f.gabarito,
         acao: f.acao,
-        responsavel: session.user?.name || "Equipe Técnica",
+        responsavel: "Não atribuído",
         prazo_limite: prazoFinal,
         status: "Dentro do programado",
         observacoes: `Início do projeto: ${dataInicio}`,
