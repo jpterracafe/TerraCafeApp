@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession, getQueryParam } from "@/lib/api";
-import { isAdminRole, isDirectorRole } from "@/lib/roles";
+import { canCreateResponsaveis, canDeleteResponsaveis } from "@/lib/roles";
 import {
   responsavelCreateSchema,
   responsavelDeleteSchema,
@@ -55,10 +55,11 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
-    // 🔒 Só admin e diretor podem criar responsáveis
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
-      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem criar responsáveis." }, { status: 403 });
+    const user = session!.user;
+    // 🔒 Admin, Diretor e Agricultor podem criar responsáveis
+    const userRole = user?.role || "Colaborador";
+    if (!canCreateResponsaveis(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores, diretores e agricultores podem criar responsáveis." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
@@ -99,10 +100,11 @@ export async function DELETE(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
-    // 🔒 Só admin e diretor podem deletar responsáveis
-    const userRole = (session?.user as any)?.role || "Colaborador";
-    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
-      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem deletar responsáveis." }, { status: 403 });
+    const user = session!.user;
+    // 🔒 Admin, Diretor e Agricultor podem deletar responsáveis
+    const userRole = user?.role || "Colaborador";
+    if (!canDeleteResponsaveis(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores, diretores e agricultores podem deletar responsáveis." }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);

@@ -43,6 +43,26 @@ export const canManageUsers = (role: string): boolean => {
   return isAdminRole(role);
 };
 
+export const canCreateProjects = (role: string): boolean => {
+  return isAdminRole(role) || isDirectorRole(role) || isFarmerRole(role);
+};
+
+export const canCreateResponsaveis = (role: string): boolean => {
+  return isAdminRole(role) || isDirectorRole(role) || isFarmerRole(role);
+};
+
+export const canDeleteResponsaveis = (role: string): boolean => {
+  return isAdminRole(role) || isDirectorRole(role) || isFarmerRole(role);
+};
+
+export const canDeleteProjects = (role: string): boolean => {
+  return isAdminRole(role) || isDirectorRole(role);
+};
+
+export const canRestoreProjects = (role: string): boolean => {
+  return isAdminRole(role) || isDirectorRole(role);
+};
+
 export const getAllowedPages = (role: string): string[] => {
   const basePages = [
     '/irrigacao/diario-campo',

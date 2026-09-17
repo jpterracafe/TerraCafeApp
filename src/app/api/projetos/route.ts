@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-import { canSeeAllProjects, isFarmerRole, isAdminRole, isDirectorRole } from "@/lib/roles";
+import { canSeeAllProjects, isFarmerRole, canCreateProjects, canDeleteProjects, canRestoreProjects } from "@/lib/roles";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
 // Retorna nomes únicos de projetos ATIVOS por padrão.
@@ -103,10 +103,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
-    // 🔒 Só admin e diretor podem criar projetos
-    const userRole = (session.user as any)?.role || "Colaborador";
-    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
-      return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem criar projetos." }, { status: 403 });
+    const user = session.user;
+    // 🔒 Admin, Diretor e Agricultor podem criar projetos
+    const userRole = user?.role || "Colaborador";
+    if (!canCreateProjects(userRole)) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores, diretores e agricultores podem criar projetos." }, { status: 403 });
     }
 
     const body = await req.json().catch(() => null);
@@ -212,8 +213,9 @@ export async function DELETE(req: Request) {
     }
 
     // 🔒 Só admin e diretor podem excluir projetos
-    const userRole = (session.user as any)?.role || "Colaborador";
-    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+    const user = session.user;
+    const userRole = user?.role || "Colaborador";
+    if (!canDeleteProjects(userRole)) {
       return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem excluir projetos." }, { status: 403 });
     }
 
@@ -290,8 +292,9 @@ export async function PATCH(req: Request) {
     }
 
     // 🔒 Só admin e diretor podem restaurar projetos
-    const userRole = (session.user as any)?.role || "Colaborador";
-    if (!isAdminRole(userRole) && !isDirectorRole(userRole)) {
+    const user = session.user;
+    const userRole = user?.role || "Colaborador";
+    if (!canRestoreProjects(userRole)) {
       return NextResponse.json({ error: "Não autorizado. Apenas administradores e diretores podem restaurar projetos." }, { status: 403 });
     }
 
