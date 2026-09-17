@@ -447,12 +447,29 @@ export default function DashboardPage() {
         .filter(([k]) => k.startsWith(`${nomeProjeto}::`))
         .flatMap(([, v]) => v || []);
 
-      const respTodos = Array.from(
+      const TERMOS_GENERICOS_RESP = new Set([
+        'equipe',
+        'equipe técnica',
+        'equipe tecnica',
+        'equipe de campo',
+        'equipe geral',
+        'administrador',
+        'admin',
+        'não atribuído',
+        'nao atribuido',
+        'sem responsável',
+        'sem responsavel',
+        'sistema',
+      ]);
+
+      const respTodosBruto = Array.from(
         new Set([...respFasesAcao, ...(responsaveisPorEtapa[configKey] || []), ...respOutrasEtapasDoProjeto])
       )
         .filter(Boolean)
-        .map(r => String(r).trim())
-        .filter(r => r !== '' && r !== 'Não atribuído')
+        .map(r => String(r).trim());
+
+      const respReais = respTodosBruto.filter(r => !TERMOS_GENERICOS_RESP.has(r.toLowerCase()));
+      const respTodos = (respReais.length > 0 ? respReais : [])
         .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
       return {

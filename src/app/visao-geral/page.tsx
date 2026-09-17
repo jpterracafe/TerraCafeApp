@@ -41,6 +41,23 @@ const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: str
   { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
 
+// Termos genéricos que não representam pessoas reais e não devem poluir a lista de responsáveis
+const TERMOS_GENERICOS_RESPONSAVEL = new Set([
+  'equipe',
+  'equipe técnica',
+  'equipe tecnica',
+  'equipe de campo',
+  'equipe geral',
+  'administrador',
+  'admin',
+  'não atribuído',
+  'nao atribuido',
+  'sem responsável',
+  'sem responsavel',
+  'sistema',
+]);
+
+
 export default function VisaoGeralDiretorPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -244,12 +261,13 @@ export default function VisaoGeralDiretorPage() {
           ])
         ).filter(Boolean);
 
-        // Se houver responsáveis reais, remove a tag "Administrador" genérica
-        if (todosResponsaveis.length > 1 && todosResponsaveis.includes('Administrador')) {
-          todosResponsaveis = todosResponsaveis.filter(r => r !== 'Administrador');
-        }
+        // Se houver responsáveis reais, remove termos genéricos como "Equipe", "Administrador", etc.
+        const nomesReais = todosResponsaveis.filter(
+          r => !TERMOS_GENERICOS_RESPONSAVEL.has(r.trim().toLowerCase())
+        );
 
-        const responsaveis = todosResponsaveis.sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        const responsaveis = (nomesReais.length > 0 ? nomesReais : [])
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
         // Detecção de início e prazos
         // REGRA ESTRITA: fase SÓ inicia quando cfgFase.hasStarted === true
@@ -404,7 +422,7 @@ export default function VisaoGeralDiretorPage() {
             etapaLabel: f.label,
             etapaIcon: f.icon,
             etapaOrder: f.order,
-            responsaveis: f.responsaveis.length > 0 ? f.responsaveis : ['Equipe Técnica'],
+            responsaveis: f.responsaveis,
             diasAtraso: f.diasAtraso,
             prazoFormatado: f.prazoFaseFormatado,
             progresso: f.progresso,
@@ -594,7 +612,7 @@ export default function VisaoGeralDiretorPage() {
                         <span className="text-xs text-slate-500 dark:text-slate-400 block">
                           {item.etapaOrder}. {item.etapaLabel}
                         </span>
-                        {item.responsaveis.length > 0 && (
+                        {item.responsaveis.length > 0 ? (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {item.responsaveis.map((r, i) => (
                               <span key={i} className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
@@ -602,6 +620,10 @@ export default function VisaoGeralDiretorPage() {
                               </span>
                             ))}
                           </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic block mt-1">
+                            Sem responsável atribuído
+                          </span>
                         )}
                       </div>
                     </div>

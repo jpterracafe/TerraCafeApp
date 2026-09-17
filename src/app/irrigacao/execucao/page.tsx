@@ -65,6 +65,22 @@ export const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; de
   { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
 
+const TERMOS_GENERICOS_RESPONSAVEL = new Set([
+  'equipe',
+  'equipe técnica',
+  'equipe tecnica',
+  'equipe de campo',
+  'equipe geral',
+  'administrador',
+  'admin',
+  'não atribuído',
+  'nao atribuido',
+  'sem responsável',
+  'sem responsavel',
+  'sistema',
+]);
+
+
 interface EtapaConfigItem {
   dataInicio: string;
   metaDias: number;
@@ -226,9 +242,8 @@ export default function PainelOperacionalObrasPage() {
           .filter(Boolean);
 
         let todosResp = Array.from(new Set([...respConfig, ...respLogs])).filter(Boolean);
-        if (todosResp.length > 1 && todosResp.includes('Administrador')) {
-          todosResp = todosResp.filter(r => r !== 'Administrador');
-        }
+        const respReais = todosResp.filter(r => !TERMOS_GENERICOS_RESPONSAVEL.has(r.trim().toLowerCase()));
+        todosResp = respReais.length > 0 ? respReais : [];
 
         const hasStarted = cfgFase?.hasStarted === true;
         const dataInicioFase = hasStarted

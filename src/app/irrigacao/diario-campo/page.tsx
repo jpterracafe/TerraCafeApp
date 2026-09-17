@@ -749,21 +749,23 @@ export default function DiarioCampoTimelinePage() {
         if (mudouInicio) partes.push(`Início alterado de ${new Date(`${antigo.dataInicio}T00:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${iniciarEtapaDataInicio}T00:00:00`).toLocaleDateString('pt-BR')}`);
         if (mudouPrazo)  partes.push(`Prazo alterado de ${new Date(`${antigo.prazoLimite!}T00:00:00`).toLocaleDateString('pt-BR')} → ${new Date(`${iniciarEtapaPrazoLimite}T00:00:00`).toLocaleDateString('pt-BR')}`);
       }
-      const resp = currentEtapaResponsaveis.length > 0 ? currentEtapaResponsaveis.join(', ') : 'Equipe';
-      offlineFetch('/api/diario-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: hojeStr,
-          responsavel: resp,
-          atividade: selectedEtapa,
-          status: 'Configuração Atualizada',
-          observacoes: `📅 ${partes.join(' | ')}`,
-          projetoCliente: selectedProjeto,
-        }),
-      }).then(r => r.ok ? r.json() : null)
-        .then(res => { if (res?.log) setRegistros(prev => [res.log, ...prev]); })
-        .catch(() => {});
+      const resp = currentEtapaResponsaveis.length > 0 ? currentEtapaResponsaveis.join(', ') : (session?.user?.name || '');
+      if (resp) {
+        offlineFetch('/api/diario-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: hojeStr,
+            responsavel: resp,
+            atividade: selectedEtapa,
+            status: 'Configuração Atualizada',
+            observacoes: `📅 ${partes.join(' | ')}`,
+            projetoCliente: selectedProjeto,
+          }),
+        }).then(r => r.ok ? r.json() : null)
+          .then(res => { if (res?.log) setRegistros(prev => [res.log, ...prev]); })
+          .catch(() => {});
+      }
     }
 
     setIsIniciarEtapaModalOpen(false);
@@ -999,7 +1001,7 @@ export default function DiarioCampoTimelinePage() {
     if (motivo || alterouDias || alterouData) {
       try {
         const hojeStr = new Date().toISOString().split('T')[0];
-        const respEtapaStr = currentEtapaResponsaveis.join(', ') || 'Equipe Técnica';
+        const respEtapaStr = currentEtapaResponsaveis.join(', ') || (session?.user?.name || '');
         const obsAjuste = `⏱️ Ajuste de Meta para ${tempMetaDias} dias (início: ${new Date(`${tempDataInicio}T00:00:00`).toLocaleDateString('pt-BR')}).${motivo ? ` Motivo: ${motivo}` : ''}`;
 
         const res = await offlineFetch('/api/diario-logs', {
@@ -1143,7 +1145,7 @@ export default function DiarioCampoTimelinePage() {
     setSavingJustificativa(true);
     try {
       const hojeStr = new Date().toISOString().split('T')[0];
-      const responsavelStr = currentEtapaResponsaveis.join(', ') || 'Equipe de Campo';
+      const responsavelStr = currentEtapaResponsaveis.join(', ') || (session?.user?.name || '');
       const novaJust = {
         id: `just_${Date.now()}`,
         data: hojeStr,
