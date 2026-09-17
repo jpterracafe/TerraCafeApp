@@ -63,7 +63,31 @@ export async function GET(req: Request) {
     if (error) throw error;
 
     if (detalhado) {
-      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null }>();
+      // Busca info dos projetos incluindo criador
+      const nomesProjetos = Array.from(
+        new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
+      );
+      
+      let creatorMap = new Map<string, { id: string; name: string | null; email: string | null }>();
+      if (nomesProjetos.length > 0) {
+        const { data: projetosInfo } = await db
+          .from("projetos_irrigacao")
+          .select("nome, criado_por, users!criado_por(id, name, email)")
+          .in("nome", nomesProjetos);
+        
+        if (projetosInfo) {
+          for (const p of projetosInfo) {
+            const creator = Array.isArray(p.users) ? p.users[0] : p.users;
+            creatorMap.set(p.nome, {
+              id: creator?.id || '',
+              name: creator?.name || null,
+              email: creator?.email || null,
+            });
+          }
+        }
+      }
+
+      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; criador: { id: string; name: string | null; email: string | null } | null }>();
       for (const r of (data ?? []) as any[]) {
         const n = r.projeto_cliente as string;
         if (!mapa.has(n)) {
@@ -71,6 +95,7 @@ export async function GET(req: Request) {
             nome: n,
             prazoFinal: r.prazo_limite || '',
             excluidoEm: r.is_deleted ? r.updated_at : null,
+            criador: creatorMap.get(n) || null,
           });
         } else if (r.is_deleted && r.updated_at) {
           const atual = mapa.get(n)!;
@@ -148,6 +173,40 @@ export async function POST(req: Request) {
     const { error: insertError } = await db.from("fases_acao").insert(inserts);
     if (insertError) {
       console.warn("[POST /api/projetos] Aviso ao inserir no Supabase fases_acao:", insertError.message);
+    }
+
+    // Cria/atualiza projeto na tabela projetos_irrigacao e associa criador
+    const userId = user.id;
+    try {
+      // Upsert projeto e pega o ID
+      const { data: projetoData, error: projetoError } = await db
+        .from("projetos_irrigacao")
+        .upsert({
+          nome,
+          criado_por: userId,
+          status: "Ativo",
+          data_inicio: dataInicio,
+          ultima_sincronizacao: new Date().toISOString(),
+        }, { onConflict: "nome" })
+        .select("id")
+        .single();
+
+      if (projetoError) throw projetoError;
+
+      const projetoId = projetoData?.id;
+      if (projetoId) {
+        // Associa criador como 'creator' em user_projetos
+        await db.from("user_projetos").upsert({
+          user_id: userId,
+          projeto_id: projetoId,
+          role: "creator",
+          created_at: new Date().toISOString(),
+        }, { onConflict: "user_id,projeto_id" });
+
+        console.log("[POST /api/projetos] Projeto criado e criador associado:", nome, "criador:", userId, "projetoId:", projetoId);
+      }
+    } catch (projErr) {
+      console.warn("[POST /api/projetos] Erro ao criar/associar projeto:", projErr);
     }
 
     // Salva dataInicio e prazoFinal nas configurações do sistema (Supabase)

@@ -27,8 +27,24 @@ CREATE TABLE IF NOT EXISTS projetos_irrigacao (
   responsavel           TEXT,
   data_inicio           TIMESTAMPTZ,
   area_total            FLOAT,
-  ultima_sincronizacao  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  ultima_sincronizacao  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  criado_por            TEXT
 );
+ALTER TABLE projetos_irrigacao ADD COLUMN IF NOT EXISTS criado_por TEXT;
+
+-- Foreign key for criado_por
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'fk_projetos_irrigacao_criado_por'
+  ) THEN
+    ALTER TABLE projetos_irrigacao 
+      ADD CONSTRAINT fk_projetos_irrigacao_criado_por 
+      FOREIGN KEY (criado_por) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_projetos_irrigacao_criado_por ON projetos_irrigacao(criado_por);
 
 -- ============================================================
 -- TABELA: responsáveis (equipe de campo)

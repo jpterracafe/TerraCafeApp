@@ -29,6 +29,7 @@ export async function GET(req: Request) {
         id,
         user_id,
         projeto_id,
+        role,
         created_at,
         projetos_irrigacao (id, nome, status)
       `)
@@ -41,6 +42,7 @@ export async function GET(req: Request) {
         id: up.id,
         userId: up.user_id,
         projetoId: up.projeto_id,
+        role: up.role,
         projeto: up.projetos_irrigacao,
         createdAt: up.created_at,
       }))
@@ -52,7 +54,7 @@ export async function GET(req: Request) {
 }
 
 // ── POST /api/user-projetos ─────────────────────────────────────────────────────
-// Body: { userId, projetoId }
+// Body: { userId, projetoId, role? }  role default: 'member'
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -69,6 +71,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const userId = body?.userId?.trim();
     const projetoId = body?.projetoId?.trim();
+    const role = body?.role === 'creator' ? 'creator' : 'member'; // default 'member'
 
     if (!userId || !projetoId) {
       return NextResponse.json({ error: "userId e projetoId são obrigatórios." }, { status: 400 });
@@ -98,10 +101,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });
     }
 
+    // Se tentando definir como creator, verifica se já existe creator para este projeto
+    if (role === 'creator') {
+      const { data: existingCreator } = await db
+        .from("user_projetos")
+        .select("user_id")
+        .eq("projeto_id", projetoId)
+        .eq("role", "creator")
+        .maybeSingle();
+
+      if (existingCreator && existingCreator.user_id !== userId) {
+        return NextResponse.json({ 
+          error: "Já existe um criador para este projeto. Remova o criador atual antes de definir outro." 
+        }, { status: 409 });
+      }
+    }
+
     // Cria associação (upsert para evitar duplicatas)
     const { data, error } = await db
       .from("user_projetos")
-      .upsert({ user_id: userId, projeto_id: projetoId }, { onConflict: "user_id,projeto_id" })
+      .upsert({ user_id: userId, projeto_id: projetoId, role }, { onConflict: "user_id,projeto_id" })
       .select(`
         id,
         user_id,
