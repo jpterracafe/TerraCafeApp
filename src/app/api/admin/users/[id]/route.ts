@@ -5,6 +5,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession } from "@/lib/auth";
 import env from "@/lib/env";
 import { ALLOWED_ROLES } from "../route";
+import { audit } from "@/lib/audit";
 
 export async function DELETE(
   _req: Request,
@@ -25,7 +26,7 @@ export async function DELETE(
 
     const { data: user, error: findError } = await db
       .from("users")
-      .select("id, email")
+      .select("id, email, name")
       .eq("id", id)
       .single();
 
@@ -58,6 +59,12 @@ export async function DELETE(
     if (deleteError) {
       console.error("[DELETE /api/admin/users/[id]]", JSON.stringify(deleteError));
       throw deleteError;
+    }
+
+    // Auditoria: deleção de usuário
+    const adminUser = session?.user;
+    if (adminUser) {
+      await audit.usuario.delete(adminUser, id, user?.name || '', user?.email || '');
     }
 
     return NextResponse.json({ ok: true });
@@ -93,6 +100,16 @@ export async function PATCH(
         return NextResponse.json({ error: "Nível de acesso inválido." }, { status: 400 });
       }
 
+      // Busca cargo anterior para auditoria
+      const { data: userAtual } = await db
+        .from("users")
+        .select("role, name")
+        .eq("id", id)
+        .single();
+
+      const cargoAnterior = (userAtual as any)?.role || '';
+      const userName = (userAtual as any)?.name || '';
+
       const { error: roleError } = await db
         .from("users")
         .update({ role: novoCargo })
@@ -101,6 +118,12 @@ export async function PATCH(
       if (roleError) {
         console.error("[PATCH role /api/admin/users/[id]]", roleError);
         throw roleError;
+      }
+
+      // Auditoria: mudança de role
+      const adminUser = session?.user;
+      if (adminUser && userAtual) {
+        await audit.usuario.updateRole(adminUser, id, userName, cargoAnterior, novoCargo);
       }
 
       return NextResponse.json({ ok: true, role: novoCargo, cargo: novoCargo });
@@ -123,6 +146,19 @@ export async function PATCH(
     if (error) {
       console.error("[PATCH /api/admin/users/[id]]", JSON.stringify(error));
       throw error;
+    }
+
+    // Auditoria: reset de senha
+    const adminUser = session?.user;
+    if (adminUser) {
+      const { data: userInfo } = await db
+        .from("users")
+        .select("name")
+        .eq("id", id)
+        .single();
+      if (userInfo) {
+        await audit.usuario.resetPassword(adminUser, id, userInfo.name || '');
+      }
     }
 
     return NextResponse.json({ novaSenha });

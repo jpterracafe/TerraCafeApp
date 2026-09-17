@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import bcrypt from "bcrypt";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession, extractUsernameFromEmail } from "@/lib/auth";
+import { audit } from "@/lib/audit";
 
 export const ALLOWED_ROLES = [
   "Agricultor",
@@ -157,6 +158,12 @@ export async function POST(req: Request) {
       },
       senhaGerada,
     });
+
+    // Auditoria: criação de usuário
+    const adminUser = (await getServerSession(authOptions))?.user;
+    if (adminUser) {
+      await audit.usuario.create(adminUser, { id: userId, name: userName, email, role: userRole }, senhaGerada);
+    }
   } catch (error: any) {
     console.error("[POST /api/admin/users]", error);
     return NextResponse.json(

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { canSeeAllProjects, isFarmerRole, canCreateProjects, canDeleteProjects, canRestoreProjects } from "@/lib/roles";
+import { audit } from "@/lib/audit";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
 // Retorna nomes únicos de projetos ATIVOS por padrão.
@@ -219,6 +220,9 @@ export async function POST(req: Request) {
         }, { onConflict: "user_id,projeto_id" });
 
         console.log("[POST /api/projetos] Projeto criado e criador associado:", nome, "criador:", userId, "projetoId:", projetoId);
+
+        // Auditoria: log criação do projeto
+        await audit.projeto.create(user, { id: projetoId, nome, prazoFinal, dataInicio, status: "Ativo", criado_por: userId });
       }
     } catch (projErr) {
       console.warn("[POST /api/projetos] Erro ao criar/associar projeto:", projErr);
@@ -332,6 +336,9 @@ export async function DELETE(req: Request) {
         });
       } catch (_) { /* ignora falha de limpeza em configuracoes_sistema */ }
 
+      // Auditoria: hard delete
+      await audit.projeto.delete(user, nome, nome, { nome }, true);
+
       return NextResponse.json({ ok: true, hardDeleted: true });
     }
 
@@ -348,6 +355,9 @@ export async function DELETE(req: Request) {
         .update({ is_deleted: true, updated_at: agora })
         .eq("projeto_cliente", nome);
     } catch (_) { /* ignora se tabela diario_logs não tiver coluna is_deleted */ }
+
+    // Auditoria: soft delete
+    await audit.projeto.delete(user, nome, nome, { nome }, false);
 
     return NextResponse.json({ ok: true, softDeleted: true, projeto: nome });
   } catch (e) {
@@ -393,6 +403,9 @@ export async function PATCH(req: Request) {
         .update({ is_deleted: false, updated_at: agora })
         .eq("projeto_cliente", nome);
     } catch (_) { /* ignora */ }
+
+    // Auditoria: restore
+    await audit.projeto.restore(user, nome, nome);
 
     return NextResponse.json({ ok: true, restaurado: true, projeto: nome });
   } catch (e) {

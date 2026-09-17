@@ -9,6 +9,7 @@ import {
   responsavelDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
+import { audit } from "@/lib/audit";
 
 // ── GET /api/responsaveis ──────────────────────────────────────────────────────
 export async function GET() {
@@ -78,6 +79,9 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    // Auditoria: criação de responsável
+    await audit.responsavel.create(user, data);
+
     const parts = nome.trim().split(" ");
     const avatar =
       parts.length >= 2
@@ -117,8 +121,21 @@ export async function DELETE(req: Request) {
     const { id } = parsed.data;
 
     const db = getSupabase();
+
+    // Busca o responsável ANTES de deletar para auditoria
+    const { data: responsavelData } = await db
+      .from("responsaveis")
+      .select("nome")
+      .eq("id", id)
+      .single();
+
+    const responsavelNome = responsavelData?.nome ?? "";
+
     const { error } = await db.from("responsaveis").delete().eq("id", id);
     if (error) throw error;
+
+    // Auditoria: deleção de responsável
+    await audit.responsavel.delete(user, id, responsavelNome);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

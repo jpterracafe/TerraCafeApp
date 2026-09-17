@@ -10,6 +10,7 @@ import {
   faseDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
+import { audit } from "@/lib/audit";
 
 // Helper: verifica se o usuário tem acesso ao projeto
 async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
@@ -196,6 +197,9 @@ export async function POST(req: Request) {
         isDeleted: data.is_deleted ?? false,
       },
     });
+
+    // Auditoria: criação de fase
+    await audit.fase.create(user, data, dataIn.projetoCliente ?? "");
   } catch (e) {
     console.error("[POST /api/fases]", e);
     return NextResponse.json({ error: "Erro ao criar fase." }, { status: 500 });
@@ -339,6 +343,9 @@ export async function PUT(req: Request) {
         isDeleted: data.is_deleted ?? false,
       },
     });
+
+    // Auditoria: atualização de fase
+    await audit.fase.update(user, dataIn.id, faseAntiga?.gabarito ?? "", faseAntiga?.projeto_cliente ?? "", faseAntiga, data);
   } catch (e) {
     console.error("[PUT /api/fases]", e);
     return NextResponse.json({ error: "Erro ao atualizar fase." }, { status: 500 });
@@ -371,11 +378,12 @@ export async function DELETE(req: Request) {
     // Busca a fase ANTES para decidir o que fazer
     const { data: faseData } = await db
       .from("fases_acao")
-      .select("projeto_cliente")
+      .select("id, gabarito, projeto_cliente")
       .eq("id", id)
       .single();
 
     const projetoCliente = faseData?.projeto_cliente ?? "";
+    const faseGabarito = faseData?.gabarito ?? "";
 
     // 🔒 Se for agricultor, verifica se tem acesso ao projeto da fase
     const userRole = user?.role || "Colaborador";
@@ -391,6 +399,9 @@ export async function DELETE(req: Request) {
       // Hard delete — apaga linha permanentemente (requer explicitamente ?hard=true)
       const { error } = await db.from("fases_acao").delete().eq("id", id);
       if (error) throw error;
+
+      // Auditoria: hard delete
+      await audit.fase.delete(user, id, faseGabarito, projetoCliente, true);
     } else {
       // Soft delete — marca is_deleted=true (comportamento DEFAULT e seguro)
       const { error } = await db
@@ -398,6 +409,9 @@ export async function DELETE(req: Request) {
         .update({ is_deleted: true, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
+
+      // Auditoria: soft delete
+      await audit.fase.delete(user, id, faseGabarito, projetoCliente, false);
     }
 
     // Se for HARD DELETE (exclusão permanente da lixeira) e não restar mais nenhuma fase do projeto,

@@ -4,6 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
 import { canManageUsers } from "@/lib/roles";
+import { audit } from "@/lib/audit";
 
 // ── GET /api/user-projetos?userId=xxx ───────────────────────────────────────────
 export async function GET(req: Request) {
@@ -151,6 +152,18 @@ export async function POST(req: Request) {
 
     if (error) throw error;
 
+    const projetoData = data as any;
+    // Auditoria: adição de membro/creator ao projeto
+    const projetoNome = Array.isArray(projetoData.projetos_irrigacao) ? projetoData.projetos_irrigacao[0]?.nome : projetoData.projetos_irrigacao?.nome;
+    await audit.userProjeto.add(
+      authUser,
+      userId,
+      dbUser?.id || userId, // nome do usuário alvo
+      projetoId,
+      projetoNome || projetoId,
+      role
+    );
+
     return NextResponse.json({ 
       ok: true, 
       userProjeto: {
@@ -220,6 +233,18 @@ export async function DELETE(req: Request) {
       }
     }
 
+    // Busca info antes de deletar para auditoria
+    const { data: assocData } = await db
+      .from("user_projetos")
+      .select("role, projetos_irrigacao(nome)")
+      .eq("user_id", userId)
+      .eq("projeto_id", projetoId)
+      .single();
+
+    const assoc = assocData as any;
+    const role = assoc?.role || 'member';
+    const projetoNome = Array.isArray(assoc?.projetos_irrigacao) ? assoc?.projetos_irrigacao[0]?.nome : assoc?.projetos_irrigacao?.nome || projetoId;
+
     const { error } = await db
       .from("user_projetos")
       .delete()
@@ -227,6 +252,16 @@ export async function DELETE(req: Request) {
       .eq("projeto_id", projetoId);
 
     if (error) throw error;
+
+    // Auditoria: remoção de membro/creator do projeto
+    await audit.userProjeto.remove(
+      user,
+      userId,
+      userId, // target user id
+      projetoId,
+      projetoNome,
+      role
+    );
 
     return NextResponse.json({ ok: true });
   } catch (e) {
