@@ -41,20 +41,25 @@ export async function GET() {
 
     if (error) throw error;
 
+    const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+
     const fases = (data ?? [])
       .filter((f) => {
         const pNome = (f.projeto_cliente || "").trim();
         if (!pNome) return false;
 
+        // 👑 Diretor, Admin e Desenvolvedor vêem todas as fases
+        if (isDiretorOuAdmin) return true;
+
         const criador = mapCriadores[pNome];
         const criadorEmail = criador?.email?.trim().toLowerCase();
 
-        // Se tem criador e NÃO é o usuário logado:
+        // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
         if (criadorEmail && criadorEmail !== sessionEmail) {
           const resp = (f.responsavel || "").trim().toLowerCase();
           const ehResponsavel = resp && (resp === sessionName.toLowerCase() || resp.includes(sessionName.toLowerCase()));
           if (!ehResponsavel) {
-            return false; // Oculta fase deste projeto para outro usuário
+            return false; // Oculta fase deste projeto para outro agricultor
           }
         }
         return true;

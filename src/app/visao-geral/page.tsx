@@ -63,18 +63,13 @@ export default function VisaoGeralDiretorPage() {
   const { data: session, status: sessionStatus } = useSession();
   const { success, error: toastError } = useToast();
 
-  // Guard: só Diretor e Desenvolvedor podem ver esta página
+  // Guard: requer autenticação
   useEffect(() => {
     if (sessionStatus === 'loading') return;
     if (sessionStatus === 'unauthenticated') {
       router.replace('/login');
-      return;
     }
-    const role = (session?.user as any)?.role;
-    if (role && role !== 'Diretor' && role !== 'Desenvolvedor' && role !== 'Admin') {
-      router.replace('/irrigacao/diario-campo');
-    }
-  }, [sessionStatus, session, router]);
+  }, [sessionStatus, router]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -492,7 +487,7 @@ export default function VisaoGeralDiretorPage() {
       }`}
     >
       {/* Guard de sessão — não renderiza enquanto verifica */}
-      {(sessionStatus === 'loading' || (sessionStatus === 'authenticated' && (session?.user as any)?.role && !['Diretor','Desenvolvedor','Admin'].includes((session?.user as any)?.role))) && (
+      {sessionStatus === 'loading' && (
         <div className="flex items-center justify-center min-h-screen">
           <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
         </div>
@@ -519,7 +514,7 @@ export default function VisaoGeralDiretorPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                Painel Executivo
+                {['Diretor', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role) ? '👑 Painel Executivo Geral' : '🌱 Meus Projetos & Obras'}
               </span>
               <span className="text-xs text-slate-400">• {lastUpdate.toLocaleTimeString('pt-BR')}</span>
             </div>
@@ -527,7 +522,9 @@ export default function VisaoGeralDiretorPage() {
               📊 Visão Geral das Obras
             </h1>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              Fases, responsáveis e progresso. O % de cada fase é atualizado pela equipe no Diário de Campo.
+              {['Diretor', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role)
+                ? 'Painel geral consolidado de todas as obras, equipes e prazos da empresa.'
+                : 'Acompanhamento exclusivo das suas obras, responsáveis e progresso das fases.'}
             </p>
           </div>
 

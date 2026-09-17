@@ -21,6 +21,7 @@ export async function GET(req: Request) {
     const detalhado = searchParams.get("detalhado") === "true";
     const todos = searchParams.get("todos") === "true";
     const emailFiltro = searchParams.get("email")?.trim().toLowerCase() ?? "";
+    const apenasMeus = searchParams.get("meus") === "true";
 
     const sessionEmail = session.user?.email?.trim().toLowerCase() ?? "";
     const sessionName = session.user?.name?.trim() ?? "";
@@ -84,19 +85,23 @@ export async function GET(req: Request) {
       fasesPorProjeto.get(n)!.push(r);
     }
 
-    // Regra de autorização / isolamento por usuário:
-    const emailAlvo = emailFiltro || sessionEmail;
-    const podeVerTodos = todos && ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+    // Regra de autorização / isolamento por perfil:
+    const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+    const emailAlvo = emailFiltro || (apenasMeus ? sessionEmail : "");
 
     const temAcessoAoProjeto = (nome: string): boolean => {
-      if (podeVerTodos) return true;
+      // 👑 Diretor, Admin e Desenvolvedor vêem todos os projetos de todos os logins por padrão
+      if (isDiretorOuAdmin && !emailAlvo) {
+        return true;
+      }
 
       const criador = mapCriadores[nome];
       const criadorEmail = criador?.email?.trim().toLowerCase();
+      const emailComparar = emailAlvo || sessionEmail;
 
-      // Se o projeto tem criador cadastrado
+      // Se o projeto tem criador cadastrado:
       if (criadorEmail) {
-        if (criadorEmail === emailAlvo) return true;
+        if (criadorEmail === emailComparar) return true;
         if (userProjetosPermitidos.has(nome)) return true;
 
         // Se for responsável direto por alguma fase do projeto
@@ -107,14 +112,14 @@ export async function GET(req: Request) {
         });
         if (ehResponsavel) return true;
 
-        // Pertence a outro usuário -> oculta
+        // Pertence a outro usuário -> oculta do agricultor
         return false;
       }
 
-      // Projeto legado (anterior ao recurso, sem criador definido):
-      // Permite para Diretores/Admins ou se não há criador atribuído
+      // Projeto legado (sem criador definido): acessível
       return true;
     };
+
 
     if (detalhado) {
       const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; criador: any }>();
