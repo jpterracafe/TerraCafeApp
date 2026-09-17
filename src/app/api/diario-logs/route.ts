@@ -14,13 +14,25 @@ import {
 async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
   if (!projetoCliente || !userId) return false;
   const db = getSupabase();
-  const { data } = await db
+  
+  // 1. Verifica associação explícita via user_projetos
+  const { data: assoc } = await db
     .from("user_projetos")
     .select("id")
     .eq("user_id", userId)
     .eq("projeto_id", projetoCliente)
     .maybeSingle();
-  return !!data;
+  
+  if (assoc) return true;
+  
+  // 2. Fallback: verifica se é o criador do projeto
+  const { data: projeto } = await db
+    .from("projetos_irrigacao")
+    .select("criado_por")
+    .eq("nome", projetoCliente)
+    .maybeSingle();
+  
+  return projeto?.criado_por === userId;
 }
 
 function mapLog(l: any) {
@@ -51,6 +63,7 @@ export async function GET() {
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
     if (isFarmerRole(userRole)) {
+      // 1. Busca via user_projetos (membros e creators explícitos)
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
@@ -59,6 +72,19 @@ export async function GET() {
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
         .filter(Boolean);
+
+      // 2. Fallback: busca projetos onde o usuário é o criador (criado_por)
+      const { data: createdProjs } = await db
+        .from("projetos_irrigacao")
+        .select("nome")
+        .eq("criado_por", user.id);
+      
+      const createdNames = (createdProjs ?? [])
+        .map((p: any) => p.nome)
+        .filter(Boolean);
+      
+      // Merge sem duplicatas
+      userProjects = [...new Set([...userProjects, ...createdNames])];
     }
 
     let query = db

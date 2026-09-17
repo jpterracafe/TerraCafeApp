@@ -55,6 +55,7 @@ export async function GET(req: Request) {
 
 // ── POST /api/user-projetos ─────────────────────────────────────────────────────
 // Body: { userId, projetoId, role? }  role default: 'member'
+// Permissão: admin OU creator do projeto
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -62,24 +63,40 @@ export async function POST(req: Request) {
     if (err) return err;
 
     const authUser = session!.user;
-    // Só admin pode gerenciar associações
     const userRole = authUser?.role || "Colaborador";
-    if (!canManageUsers(userRole)) {
-      return NextResponse.json({ error: "Não autorizado. Apenas administradores." }, { status: 403 });
-    }
-
+    
     const body = await req.json().catch(() => null);
     const userId = body?.userId?.trim();
     const projetoId = body?.projetoId?.trim();
-    const role = body?.role === 'creator' ? 'creator' : 'member'; // default 'member'
-
+    
     if (!userId || !projetoId) {
       return NextResponse.json({ error: "userId e projetoId são obrigatórios." }, { status: 400 });
     }
 
     const db = getSupabase();
 
-    // Verifica se usuário existe
+    // Verifica se o usuário autenticado tem permissão:
+    // - Admin: pode gerenciar qualquer associação
+    // - Creator do projeto: pode adicionar membros ao seu projeto
+    const isAdmin = canManageUsers(userRole);
+    let isCreator = false;
+    
+    if (!isAdmin) {
+      const { data: creatorCheck } = await db
+        .from("user_projetos")
+        .select("user_id")
+        .eq("projeto_id", projetoId)
+        .eq("user_id", authUser.id)
+        .eq("role", "creator")
+        .maybeSingle();
+      isCreator = !!creatorCheck;
+    }
+
+    if (!isAdmin && !isCreator) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores ou o criador do projeto podem gerenciar associações." }, { status: 403 });
+    }
+
+    // Valida se usuário existe
     const { data: dbUser, error: userError } = await db
       .from("users")
       .select("id")
@@ -100,6 +117,8 @@ export async function POST(req: Request) {
     if (projetoError || !projeto) {
       return NextResponse.json({ error: "Projeto não encontrado." }, { status: 404 });
     }
+
+    const role = body?.role === 'creator' ? 'creator' : 'member'; // default 'member'
 
     // Se tentando definir como creator, verifica se já existe creator para este projeto
     if (role === 'creator') {
@@ -156,12 +175,8 @@ export async function DELETE(req: Request) {
     if (err) return err;
 
     const user = session!.user;
-    // Só admin pode gerenciar associações
     const userRole = user?.role || "Colaborador";
-    if (!canManageUsers(userRole)) {
-      return NextResponse.json({ error: "Não autorizado. Apenas administradores." }, { status: 403 });
-    }
-
+    
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId")?.trim();
     const projetoId = searchParams.get("projetoId")?.trim();
@@ -171,6 +186,39 @@ export async function DELETE(req: Request) {
     }
 
     const db = getSupabase();
+
+    // Permissão: admin OU creator do projeto
+    const isAdmin = canManageUsers(userRole);
+    let isCreator = false;
+    
+    if (!isAdmin) {
+      const { data: creatorCheck } = await db
+        .from("user_projetos")
+        .select("user_id")
+        .eq("projeto_id", projetoId)
+        .eq("user_id", user.id)
+        .eq("role", "creator")
+        .maybeSingle();
+      isCreator = !!creatorCheck;
+    }
+
+    if (!isAdmin && !isCreator) {
+      return NextResponse.json({ error: "Não autorizado. Apenas administradores ou o criador do projeto podem remover associações." }, { status: 403 });
+    }
+
+    // Não permitir remover o próprio creator (a menos que seja admin)
+    if (!isAdmin && userId === user.id) {
+      const { data: isCreatorCheck } = await db
+        .from("user_projetos")
+        .select("role")
+        .eq("projeto_id", projetoId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      
+      if (isCreatorCheck?.role === 'creator') {
+        return NextResponse.json({ error: "Não é possível remover o criador do projeto." }, { status: 403 });
+      }
+    }
 
     const { error } = await db
       .from("user_projetos")

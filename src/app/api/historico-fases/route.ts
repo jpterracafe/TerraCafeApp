@@ -9,13 +9,25 @@ import { canSeeAllProjects, isFarmerRole } from "@/lib/roles";
 async function hasAccessToProject(userId: string, projetoCliente: string): Promise<boolean> {
   if (!projetoCliente || !userId) return false;
   const db = getSupabase();
-  const { data } = await db
+  
+  // 1. Verifica associação explícita via user_projetos
+  const { data: assoc } = await db
     .from("user_projetos")
     .select("id")
     .eq("user_id", userId)
     .eq("projeto_id", projetoCliente)
     .maybeSingle();
-  return !!data;
+  
+  if (assoc) return true;
+  
+  // 2. Fallback: verifica se é o criador do projeto
+  const { data: projeto } = await db
+    .from("projetos_irrigacao")
+    .select("criado_por")
+    .eq("nome", projetoCliente)
+    .maybeSingle();
+  
+  return projeto?.criado_por === userId;
 }
 
 // Helper: busca projeto de uma fase

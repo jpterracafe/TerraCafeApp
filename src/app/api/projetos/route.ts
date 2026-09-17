@@ -30,6 +30,7 @@ export async function GET(req: Request) {
     // Busca projetos do usuário se for agricultor
     let userProjects: string[] = [];
     if (isFarmerRole(userRole)) {
+      // 1. Busca via user_projetos (membros e creators explícitos)
       const { data: userProjs } = await db
         .from("user_projetos")
         .select("projeto_id, projetos_irrigacao(nome)")
@@ -38,6 +39,20 @@ export async function GET(req: Request) {
       userProjects = (userProjs ?? [])
         .map((up: any) => up.projetos_irrigacao?.nome)
         .filter(Boolean);
+
+      // 2. Fallback: busca projetos onde o usuário é o criador (criado_por)
+      // Isso cobre projetos legados criados antes da migração user_projetos
+      const { data: createdProjs } = await db
+        .from("projetos_irrigacao")
+        .select("nome")
+        .eq("criado_por", user.id);
+      
+      const createdNames = (createdProjs ?? [])
+        .map((p: any) => p.nome)
+        .filter(Boolean);
+      
+      // Merge sem duplicatas
+      userProjects = [...new Set([...userProjects, ...createdNames])];
     }
 
     let query = db
@@ -162,7 +177,7 @@ export async function POST(req: Request) {
     const inserts = fasesIniciais.map((f) => ({
       gabarito: f.gabarito,
       acao: f.acao,
-      responsavel: session.user?.name || "Equipe Técnica",
+      responsavel: user?.name || "Equipe Técnica",
       prazo_limite: prazoFinal,
       status: "Dentro do programado",
       observacoes: `Início do projeto: ${dataInicio}`,
