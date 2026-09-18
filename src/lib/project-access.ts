@@ -30,33 +30,9 @@ interface FaseRow {
   responsavel: string | null;
 }
 
-function parseResponsavelEmails(responsavel?: string): { email: string; nome: string }[] {
+function parseResponsavelEmails(responsavel?: string): string[] {
   if (!responsavel) return [];
-  
-  // Formato esperado: "email|nome,email|nome" ou apenas "nome" (compatibilidade)
-  const pairs = responsavel.split(',').map(part => part.trim()).filter(Boolean);
-  
-  const result: { email: string; nome: string }[] = [];
-  
-  for (const pair of pairs) {
-    // Tenta parser como "email|nome"
-    const pipeIndex = pair.indexOf('|');
-    if (pipeIndex > 0 && pipeIndex < pair.length - 1) {
-      const email = pair.substring(0, pipeIndex).trim().toLowerCase();
-      const nome = pair.substring(pipeIndex + 1).trim();
-      if (email.includes('@')) {
-        result.push({ email, nome });
-        continue;
-      }
-    }
-    // Fallback: trata como nome antigo
-    const nome = pair.trim();
-    if (nome) {
-      result.push({ email: "", nome });
-    }
-  }
-  
-  return result;
+  return responsavel.split(',').map(part => part.trim()).filter(Boolean);
 }
 
 interface CriadoresRow {

@@ -51,8 +51,8 @@ export async function GET() {
 
     const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
 
-    const userEmail = sessionEmail.toLowerCase();
-    const userName = sessionName.toLowerCase();
+    const sessionEmailLc = sessionEmail.toLowerCase();
+    const sessionNameLc = sessionName.toLowerCase();
 
     const fases = (data ?? [])
       .filter((f) => {
@@ -66,11 +66,11 @@ export async function GET() {
         const criadorEmail = criador?.email?.trim().toLowerCase();
 
         // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
-        if (criadorEmail && criadorEmail !== sessionEmail) {
+        if (criadorEmail && criadorEmail !== sessionEmailLc) {
           // Verifica se o usuário é responsável pela fase (pelo email)
           const resp = (f.responsavel || "").trim();
           const responsaveis = parseResponsavelEmails(resp);
-          const ehResponsavel = responsaveis.includes(userEmail);
+          const ehResponsavel = responsaveis.includes(sessionEmailLc);
           
           // Se não for responsável por email, esconde a fase
           if (!ehResponsavel) {
@@ -105,6 +105,7 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
     const body = await req.json().catch(() => null);
     const parsed = faseCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -113,6 +114,8 @@ export async function POST(req: Request) {
     const dataIn = parsed.data;
 
     const db = getSupabase();
+
+    const userEmail = sessionEmail;
 
     const responsavelAtual = dataIn.responsavel || "Não atribuído";
 
@@ -200,6 +203,7 @@ export async function PUT(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
+    const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
     const body = await req.json().catch(() => null);
     const parsed = faseUpdateSchema.safeParse(body);
     if (!parsed.success) {
@@ -227,13 +231,13 @@ export async function PUT(req: Request) {
       
       // Se o valor digitado for "Não atribuído", define como o email do usuário logado
       if (responsavelDigitado === "Não atribuído") {
-        novoResponsavel = userEmail;
+        novoResponsavel = sessionEmail;
       } else {
         // Verifica se o email do usuário já está na lista, se não, adiciona
-        const jaTem = parseResponsavelEmails(responsavelDigitado).includes(userEmail);
+        const jaTem = parseResponsavelEmails(responsavelDigitado).includes(sessionEmail);
         if (!jaTem) {
           // Adiciona o email do usuário logado à lista existente
-          novoResponsavel = `${responsavelDigitado},${userEmail}`;
+          novoResponsavel = `${responsavelDigitado},${sessionEmail}`;
         }
       }
       
