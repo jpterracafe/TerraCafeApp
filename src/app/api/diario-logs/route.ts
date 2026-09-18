@@ -8,6 +8,7 @@ import {
   diarioLogDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
+import { getUserProjectAccess, filterLogsByAccess } from "@/lib/project-access";
 
 function mapLog(l: any) {
   return {
@@ -30,6 +31,27 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
+    // Obtém informações de acesso do usuário aos projetos
+    const access = await getUserProjectAccess();
+
+    // Busca fases para verificar responsabilidades
+    let fasesPorProjeto = new Map<string, any[]>();
+    try {
+      const db = getSupabase();
+      const { data: fasesData } = await db
+        .from("fases_acao")
+        .select("projeto_cliente, responsavel")
+        .eq("is_deleted", false);
+      
+      if (fasesData) {
+        for (const f of fasesData) {
+          const pNome = f.projeto_cliente;
+          if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
+          fasesPorProjeto.get(pNome)!.push(f);
+        }
+      }
+    } catch (_) {}
+
     const db = getSupabase();
     const { data, error } = await db
       .from("diario_logs")
@@ -40,7 +62,10 @@ export async function GET() {
 
     if (error) throw error;
 
-    return NextResponse.json({ logs: (data ?? []).map(mapLog) });
+    // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas logs dos projetos permitidos
+    const logsFiltrados = filterLogsByAccess(data ?? [], access, fasesPorProjeto);
+
+    return NextResponse.json({ logs: logsFiltrados.map(mapLog) });
   } catch (e) {
     console.error("[GET /api/diario-logs]", e);
     return NextResponse.json({ error: "Erro ao buscar logs." }, { status: 500 });

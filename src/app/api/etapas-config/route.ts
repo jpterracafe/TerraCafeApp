@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
 import fs from "fs";
 import path from "path";
+import { getUserProjectAccess, filterConfigByAccess, hasProjectAccess } from "@/lib/project-access";
 
 const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
 
@@ -92,6 +93,27 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
+    // Obtém informações de acesso do usuário aos projetos
+    const access = await getUserProjectAccess();
+
+    // Busca fases para verificar responsabilidades
+    let fasesPorProjeto = new Map<string, any[]>();
+    try {
+      const db = getSupabase();
+      const { data: fasesData } = await db
+        .from("fases_acao")
+        .select("projeto_cliente, responsavel")
+        .eq("is_deleted", false);
+      
+      if (fasesData) {
+        for (const f of fasesData) {
+          const pNome = f.projeto_cliente;
+          if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
+          fasesPorProjeto.get(pNome)!.push(f);
+        }
+      }
+    } catch (_) {}
+
     let config = getLocalConfig();
 
     // Tenta ler do Supabase se a tabela existir
@@ -129,6 +151,15 @@ export async function GET() {
     } catch (dbErr) {
       // Falha silenciosa de tabela não existente — usa arquivo local
     }
+
+    // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas dados dos projetos permitidos
+    config.configEtapas = filterConfigByAccess(config.configEtapas, access, fasesPorProjeto);
+    config.projetoStartDates = filterConfigByAccess(config.projetoStartDates, access, fasesPorProjeto);
+    config.responsaveisPorEtapa = filterConfigByAccess(config.responsaveisPorEtapa, access, fasesPorProjeto);
+    config.projetosPrazoFinal = filterConfigByAccess(config.projetosPrazoFinal, access, fasesPorProjeto);
+    config.projetoJustificativas = filterConfigByAccess(config.projetoJustificativas, access, fasesPorProjeto);
+    config.etapasProgresso = filterConfigByAccess(config.etapasProgresso, access, fasesPorProjeto);
+    config.etapasStatus = filterConfigByAccess(config.etapasStatus, access, fasesPorProjeto);
 
     // 🔒 SANITIZAÇÃO FINAL OBRIGATÓRIA antes de responder ao cliente
     config.configEtapas = sanitizeConfigEtapasServer(config.configEtapas);
