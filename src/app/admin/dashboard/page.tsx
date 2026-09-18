@@ -143,6 +143,7 @@ export default function DashboardPage() {
   const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
   const [projetosPrazoFinal, setProjetosPrazoFinal] = useState<Record<string, string>>({});
   const [usuariosRoles, setUsuariosRoles] = useState<Record<string, string>>({});
+  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
 
   // Controles de Visualização
   const [activeTab, setActiveTab] = useState<'campo' | 'cronograma'>('campo');
@@ -201,6 +202,11 @@ export default function DashboardPage() {
         if (configJson.projetoStartDates) setProjetoStartDates(configJson.projetoStartDates);
         if (configJson.responsaveisPorEtapa) setResponsaveisPorEtapa(configJson.responsaveisPorEtapa);
         if (configJson.projetosPrazoFinal) setProjetosPrazoFinal(configJson.projetosPrazoFinal);
+      }
+
+      // Captura criadores dos projetos (do /api/projetos)
+      if (projJson.criadores) {
+        setProjetosCriadores(projJson.criadores);
       }
 
       setHistoricoAcoes(histJson.historico ?? []);
@@ -601,19 +607,16 @@ export default function DashboardPage() {
     return resultado;
   }, [logsVisiveis]);
 
-  // 4. Ranking de Atividade e Engajamento dos Usuários (@terracafe.com) - APENAS AGRICULTORES
-  const dadosAtividadeUsuarios = useMemo(() => {
+  // ── Projetos por Agricultor (Criador + Responsável) ───────────────────────────
+  const projetosPorAgricultor = useMemo(() => {
     const mapa: Record<string, {
       nome: string;
       email: string;
-      total: number;
-      relatos: number;
-      alteracoes: number;
-      hoje: number;
-      ultimo: string;
+      projetos: string[];
+      totalProjetos: number;
+      comoCriador: number;
+      comoResponsavel: number;
     }> = {};
-
-    const hojeStr = new Date().toISOString().split('T')[0];
 
     const normalizarPessoa = (raw: string) => {
       const trimmed = (raw || '').trim();
@@ -641,50 +644,73 @@ export default function DashboardPage() {
       return 'Agricultor';
     };
 
-    // 1. Apontamentos no Diário de Campo
-    logsVisiveis.forEach(l => {
-      const partes = (l.responsavel || '').split(',').map(p => p.trim()).filter(Boolean);
-      partes.forEach(parte => {
-        const p = normalizarPessoa(parte);
-        if (!p) return;
-        const cargo = getRole(p);
-        // Exclusivo: apenas perfil Agricultor é contabilizado na atividade
-        if (cargo !== 'Agricultor') return;
-
-        const key = p.nome.toLowerCase();
-        if (!mapa[key]) {
-          mapa[key] = { nome: p.nome, email: p.email, total: 0, relatos: 0, alteracoes: 0, hoje: 0, ultimo: '' };
-        }
-        mapa[key].relatos++;
-        mapa[key].total++;
-        if (l.data === hojeStr) mapa[key].hoje++;
-        if (!mapa[key].ultimo || l.data > mapa[key].ultimo) mapa[key].ultimo = l.data;
-      });
-    });
-
-    // 2. Alterações de Cronograma & Fases no Sistema
-    historicoAcoes.forEach(h => {
-      const p = normalizarPessoa(h.usuario);
+    // 1. Projetos onde é CRIADOR (via diario_projetos_criadores_v1)
+    Object.entries(projetosCriadores).forEach(([projNome, criador]) => {
+      if (!criador?.email) return;
+      const p = normalizarPessoa(criador.email);
       if (!p) return;
       const cargo = getRole(p);
-      // Exclusivo: apenas perfil Agricultor é contabilizado na atividade
       if (cargo !== 'Agricultor') return;
 
       const key = p.nome.toLowerCase();
       if (!mapa[key]) {
-        mapa[key] = { nome: p.nome, email: p.email, total: 0, relatos: 0, alteracoes: 0, hoje: 0, ultimo: '' };
+        mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
       }
-      mapa[key].alteracoes++;
-      mapa[key].total++;
-      const dataHist = (h.criadoEm || '').split('T')[0];
-      if (dataHist === hojeStr) mapa[key].hoje++;
-      if (!mapa[key].ultimo || dataHist > mapa[key].ultimo) mapa[key].ultimo = dataHist;
+      if (!mapa[key].projetos.includes(projNome)) {
+        mapa[key].projetos.push(projNome);
+        mapa[key].totalProjetos++;
+      }
+      mapa[key].comoCriador++;
+    });
+
+    // 2. Projetos onde é RESPONSÁVEL por alguma fase (via fases_acao)
+    fases.forEach(f => {
+      if (f.isDeleted || !f.projetoCliente || !f.responsavel) return;
+      const partes = (f.responsavel || '').split(',').map(p => p.trim()).filter(Boolean);
+      partes.forEach(parte => {
+        const p = normalizarPessoa(parte);
+        if (!p) return;
+        const cargo = getRole(p);
+        if (cargo !== 'Agricultor') return;
+
+        const key = p.nome.toLowerCase();
+        if (!mapa[key]) {
+          mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
+        }
+        if (!mapa[key].projetos.includes(f.projetoCliente!)) {
+          mapa[key].projetos.push(f.projetoCliente!);
+          mapa[key].totalProjetos++;
+        }
+        mapa[key].comoResponsavel++;
+      });
+    });
+
+    // 3. Projetos onde é RESPONSÁVEL por etapa (via responsaveisPorEtapa)
+    Object.entries(responsaveisPorEtapa).forEach(([chave, respList]) => {
+      const [projNome] = chave.split('::');
+      if (!projNome) return;
+      (respList || []).forEach(parte => {
+        const p = normalizarPessoa(parte);
+        if (!p) return;
+        const cargo = getRole(p);
+        if (cargo !== 'Agricultor') return;
+
+        const key = p.nome.toLowerCase();
+        if (!mapa[key]) {
+          mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
+        }
+        if (!mapa[key].projetos.includes(projNome)) {
+          mapa[key].projetos.push(projNome);
+          mapa[key].totalProjetos++;
+        }
+        mapa[key].comoResponsavel++;
+      });
     });
 
     return Object.values(mapa)
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 6);
-  }, [logsVisiveis, historicoAcoes, usuariosRoles]);
+      .filter(a => a.totalProjetos > 0)
+      .sort((a, b) => b.totalProjetos - a.totalProjetos);
+  }, [projetosCriadores, fases, responsaveisPorEtapa, usuariosRoles]);
 
   // ── Dados para a Aba de Cronograma & Prazos das 6 Fases ────────────────────
   const dadosCronogramaFases = useMemo(() => {
@@ -1499,30 +1525,30 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* SEÇÃO 4: ENGAJAMENTO & ATIVIDADE DOS AGRICULTORES (@terracafe) */}
+          {/* SEÇÃO 4: PROJETOS POR AGRICULTOR */}
           <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
                   <Users className="w-4 h-4 text-emerald-500" />
-                  Engajamento & Atividade dos Agricultores (@terracafe)
+                  Projetos em Atividades por Agricultor
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Colaboradores com perfil Agricultor mais atuantes no diário de campo ({periodoFilter})
+                  Quantidade de obras vinculadas a cada agricultor (como criador ou responsável)
                 </p>
               </div>
               <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-medium self-start sm:self-auto">
-                🌱 Apenas perfil Agricultor contabilizado
+                🌱 Apenas perfil Agricultor
               </span>
             </div>
 
-            {dadosAtividadeUsuarios.length === 0 ? (
+            {projetosPorAgricultor.length === 0 ? (
               <div className="text-center py-8 text-xs text-slate-400 italic bg-slate-50 dark:bg-[#070c18] rounded-lg border border-slate-100 dark:border-[#1e293b]">
-                Nenhuma atividade de agricultor registrada no período selecionado.
+                Nenhum projeto vinculado a agricultores no momento.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {dadosAtividadeUsuarios.map(colab => {
+                {projetosPorAgricultor.map(colab => {
                   const iniciais = (colab.nome || 'US')
                     .split(' ')
                     .filter(Boolean)
@@ -1537,7 +1563,7 @@ export default function DashboardPage() {
                       className="flex items-center justify-between p-3.5 rounded-lg bg-slate-50 dark:bg-[#070c18] border border-slate-100 dark:border-[#1e293b] hover:border-indigo-500/30 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-black text-xs flex items-center justify-center shrink-0 border border-indigo-500/20">
+                        <div className="w-9 h-9 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-xs flex items-center justify-center shrink-0 border border-emerald-500/20">
                           {iniciais}
                         </div>
                         <div className="min-w-0">
@@ -1550,25 +1576,35 @@ export default function DashboardPage() {
                             </p>
                           )}
                           <p className="text-[10px] text-slate-400 mt-0.5">
-                            {colab.hoje > 0 ? (
-                              <strong className="text-emerald-500 font-bold">✓ Atuou hoje ({colab.hoje})</strong>
+                            {colab.comoCriador > 0 && colab.comoResponsavel > 0 ? (
+                              <span className="text-emerald-500 font-medium">Criador + Responsável</span>
+                            ) : colab.comoCriador > 0 ? (
+                              <span className="text-blue-500 font-medium">Criador ({colab.comoCriador})</span>
                             ) : (
-                              `Último: ${colab.ultimo ? new Date(`${colab.ultimo}T00:00:00`).toLocaleDateString('pt-BR') : '—'}`
+                              <span className="text-indigo-500 font-medium">Responsável ({colab.comoResponsavel})</span>
                             )}
                           </p>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0 pl-3 border-l border-slate-200/60 dark:border-slate-800">
-                        <span className="text-base font-black text-slate-900 dark:text-white">
-                          {colab.total}
+                        <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                          {colab.totalProjetos}
                         </span>
-                        <span className="text-[10px] text-slate-400 block -mt-0.5">
-                          {colab.total === 1 ? 'ação' : 'ações'}
+                        <span className="text-[10px] text-slate-400 block -mt-1">
+                          {colab.totalProjetos === 1 ? 'projeto' : 'projetos'}
                         </span>
                         <div className="text-[9px] text-slate-400 mt-1 space-y-0.5">
-                          {colab.relatos > 0 && <div>{colab.relatos} {colab.relatos === 1 ? 'relato' : 'relatos'}</div>}
-                          {colab.alteracoes > 0 && <div>{colab.alteracoes} {colab.alteracoes === 1 ? 'alteração' : 'alterações'}</div>}
+                          {colab.comoCriador > 0 && (
+                            <div className="flex items-center gap-1 text-blue-500">
+                              <span>📝</span> {colab.comoCriador} {colab.comoCriador === 1 ? 'criado' : 'criados'}
+                            </div>
+                          )}
+                          {colab.comoResponsavel > 0 && (
+                            <div className="flex items-center gap-1 text-indigo-500">
+                              <span>👷</span> {colab.comoResponsavel} {colab.comoResponsavel === 1 ? 'como resp.' : 'como resp.'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
