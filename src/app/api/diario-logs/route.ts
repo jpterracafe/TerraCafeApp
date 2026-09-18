@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-import { requireSession, getQueryParam } from "@/lib/api";
+import { requireSession } from "@/lib/api";
 import {
   diarioLogCreateSchema,
   diarioLogDeleteSchema,

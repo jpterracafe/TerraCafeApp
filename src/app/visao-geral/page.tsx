@@ -5,19 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useToast } from '@/components/Toast';
 import {
-  Search, CheckCircle2, AlertCircle, Clock,
-  Calendar, Users, RefreshCw, FileText, Loader2, Tv,
-  AlertTriangle, ShieldAlert, Activity,
-  Layers, ArrowUpRight, TrendingUp, ChevronDown, LayoutGrid, List, Check
+  Search, RefreshCw, FileText, Loader2, Tv,
+  ShieldAlert, Layers, ChevronDown, LayoutGrid, List, Check
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '../irrigacao/execucao/page';
-
-// Utils para parsear responsáveis por email (formato: "email1,email2" ou "nome1,nome2")
-function parseResponsavelEmails(responsavel?: string): string[] {
-  if (!responsavel) return [];
-  return responsavel.split(',').map(part => part.trim()).filter(Boolean);
-}
+import {
+  parseResponsavelEmails,
+  isResponsavelVazio,
+  normalizeName,
+  TERMOS_GENERICOS_RESPONSAVEL,
+} from '@/lib/responsaveis';
 
 interface JustificativaItem {
   id: string;
@@ -46,23 +44,6 @@ const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: str
   { key: 'lavagem do sistema e testes',  label: 'Lavagem & Testes',            icon: '💧', desc: 'Limpeza, teste de pressão e estanqueidade', order: 5 },
   { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
-
-// Termos genéricos que não representam pessoas reais e não devem poluir a lista de responsáveis
-const TERMOS_GENERICOS_RESPONSAVEL = new Set([
-  'equipe',
-  'equipe técnica',
-  'equipe tecnica',
-  'equipe de campo',
-  'equipe geral',
-  'administrador',
-  'admin',
-  'não atribuído',
-  'nao atribuido',
-  'sem responsável',
-  'sem responsavel',
-  'sistema',
-]);
-
 
 export default function VisaoGeralDiretorPage() {
   const router = useRouter();
@@ -241,8 +222,7 @@ export default function VisaoGeralDiretorPage() {
            f.gabarito.trim().toLowerCase().includes(et.key.toLowerCase()) ||
            et.key.toLowerCase().includes(f.gabarito.trim().toLowerCase())) &&
           f.responsavel &&
-          f.responsavel.trim() &&
-          f.responsavel.trim() !== 'Não atribuído'
+          !isResponsavelVazio(f.responsavel)
         ).map(f => {
           const responsaveis = parseResponsavelEmails(f.responsavel);
           return responsaveis.filter(Boolean);
@@ -268,7 +248,7 @@ export default function VisaoGeralDiretorPage() {
 
         // Se houver responsáveis reais, remove termos genéricos como "Equipe", "Administrador", etc.
         const nomesReais = todosResponsaveis.filter(
-          r => !TERMOS_GENERICOS_RESPONSAVEL.has(r.trim().toLowerCase())
+          r => !TERMOS_GENERICOS_RESPONSAVEL.has(normalizeName(r))
         );
 
         const responsaveis = (nomesReais.length > 0 ? nomesReais : [])

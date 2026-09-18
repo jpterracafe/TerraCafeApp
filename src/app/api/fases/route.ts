@@ -2,21 +2,14 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-import { requireSession, getQueryParam } from "@/lib/api";
+import { requireSession } from "@/lib/api";
 import {
   faseCreateSchema,
   faseUpdateSchema,
   faseDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
-
-function parseResponsavelEmails(responsavel?: string): string[] {
-  if (!responsavel) return [];
-  
-  // Formato: emails separados por vírgula, ex: "thiago@email.com,arthur@email.com"
-  // Compatibilidade com formato antigo (nomes puros): também aceita
-  return responsavel.split(',').map(part => part.trim()).filter(Boolean);
-}
+import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET() {
@@ -52,7 +45,6 @@ export async function GET() {
     const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
 
     const sessionEmailLc = sessionEmail.toLowerCase();
-    const sessionNameLc = sessionName.toLowerCase();
 
     const fases = (data ?? [])
       .filter((f) => {
@@ -67,14 +59,14 @@ export async function GET() {
 
         // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
         if (criadorEmail && criadorEmail !== sessionEmailLc) {
-          // Verifica se o usuário é responsável pela fase (por email ou nome)
+          // Verifica se o usuário é responsável pela fase (por email ou por nome, item a item)
           const resp = (f.responsavel || "").trim();
           const responsaveis = parseResponsavelEmails(resp);
           const ehResponsavelEmail = responsaveis.includes(sessionEmailLc);
+          const nomeLc = normalizeName(sessionName);
           const ehResponsavelNome =
-            sessionNameLc &&
-            (responsaveis.some(r => r.trim().toLowerCase() === sessionNameLc) ||
-             resp.toLowerCase().includes(sessionNameLc));
+            nomeLc &&
+            responsaveis.some(r => normalizeName(r) === nomeLc);
 
           // Se não for responsável por email nem por nome, esconde a fase
           if (!ehResponsavelEmail && !ehResponsavelNome) {
@@ -109,7 +101,6 @@ export async function POST(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
-    const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
     const body = await req.json().catch(() => null);
     const parsed = faseCreateSchema.safeParse(body);
     if (!parsed.success) {
@@ -194,7 +185,6 @@ export async function PUT(req: Request) {
     const err = requireSession(session);
     if (err) return err;
 
-    const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
     const body = await req.json().catch(() => null);
     const parsed = faseUpdateSchema.safeParse(body);
     if (!parsed.success) {

@@ -127,7 +127,7 @@ export default function AdminImportarCSVPage() {
         const mappedFases = result.records.map((rec: NormalizedRecord, idx: number) => ({
           id: rec.idFirebird ? `fb-${rec.idFirebird}` : `import-${Date.now()}-${idx}`,
           gabarito: rec.nome,
-          responsavel: rec.responsavel || 'Não Definido',
+          responsavel: rec.responsavel || 'Não atribuído',
           dataInicio: rec.dataInicio ? rec.dataInicio.split('T')[0] : '2026-08-30',
           prazoDias: 15,
           status: (rec.status === 'Concluído' || rec.status === 'Em Andamento' || rec.status === 'Problema técnico') 

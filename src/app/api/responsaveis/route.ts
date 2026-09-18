@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-import { requireSession, getQueryParam } from "@/lib/api";
+import { requireSession } from "@/lib/api";
 import {
   responsavelCreateSchema,
   responsavelDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
-import { isAdminSession } from "@/lib/auth";
 
 // ── Helper: verifica se usuário é admin/diretor (vê todos os responsáveis)
 function isAdminOrDiretor(session: any): boolean {
@@ -153,6 +152,12 @@ export async function DELETE(req: Request) {
     const { id } = parsed.data;
 
     const db = getSupabase();
+
+    // Self ("USUARIO") é uma entrada virtual gerada em GET e não existe no banco
+    if (id === "self") {
+      return NextResponse.json({ ok: true });
+    }
+
     const sessionEmail = getSessionEmail(session);
     const adminView = isAdminOrDiretor(session);
 

@@ -31,6 +31,11 @@ import {
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../types';
 import { offlineFetch } from '@/lib/offline';
+import {
+  parseResponsavelEmails,
+  normalizeName,
+  TERMOS_GENERICOS_RESPONSAVEL,
+} from '@/lib/responsaveis';
 
 // ── Helpers para controle de versões de projetos (mantidos para compatibilidade) ──
 export function extractProjectBaseName(name: string): string {
@@ -64,22 +69,6 @@ export const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; de
   { key: 'lavagem do sistema e testes',  label: 'Lavagem & Testes',            icon: '💧', desc: 'Limpeza, teste de pressão e estanqueidade', order: 5 },
   { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
-
-const TERMOS_GENERICOS_RESPONSAVEL = new Set([
-  'equipe',
-  'equipe técnica',
-  'equipe tecnica',
-  'equipe de campo',
-  'equipe geral',
-  'administrador',
-  'admin',
-  'não atribuído',
-  'nao atribuido',
-  'sem responsável',
-  'sem responsavel',
-  'sistema',
-]);
-
 
 interface EtapaConfigItem {
   dataInicio: string;
@@ -235,14 +224,14 @@ export default function PainelOperacionalObrasPage() {
 
         const ultimoLog = logsEtapa[0] || null;
 
-        // Responsáveis da etapa (Config + Logs)
+        // // Responsáveis da etapa (Config + Logs)
         const respConfig = config.responsaveisPorEtapa[chaveEtapa] || [];
         const respLogs = logsEtapa
-          .flatMap(l => (l.responsavel || '').split(',').map(r => r.trim()))
+          .flatMap(l => parseResponsavelEmails(l.responsavel))
           .filter(Boolean);
 
         let todosResp = Array.from(new Set([...respConfig, ...respLogs])).filter(Boolean);
-        const respReais = todosResp.filter(r => !TERMOS_GENERICOS_RESPONSAVEL.has(r.trim().toLowerCase()));
+        const respReais = todosResp.filter(r => !TERMOS_GENERICOS_RESPONSAVEL.has(normalizeName(r)));
         todosResp = respReais.length > 0 ? respReais : [];
 
         const hasStarted = cfgFase?.hasStarted === true;

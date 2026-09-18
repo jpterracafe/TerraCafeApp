@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
+import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 
 export interface SessionUser {
   id?: string;
@@ -28,11 +29,6 @@ export interface ProjectAccessResult {
 interface FaseRow {
   projeto_cliente: string;
   responsavel: string | null;
-}
-
-function parseResponsavelEmails(responsavel?: string): string[] {
-  if (!responsavel) return [];
-  return responsavel.split(',').map(part => part.trim()).filter(Boolean);
 }
 
 interface CriadoresRow {
@@ -149,11 +145,12 @@ export function hasProjectAccess(
         
         // Check by email
         const temEmail = responsaveis.some(email => email === sessionEmail.toLowerCase());
-        
-        // Check by name (compatibilidade com formato antigo)
-        const temNome = r.toLowerCase() === sessionName.toLowerCase() || 
-                        r.toLowerCase().includes(sessionName.toLowerCase());
-        
+
+        // Check by name (compatibilidade com formato antigo de nomes puros)
+        const nomeLc = normalizeName(sessionName);
+        const temNome = nomeLc &&
+          responsaveis.some(nome => normalizeName(nome) === nomeLc);
+
         return temEmail || temNome;
       });
       if (ehResponsavel) return true;

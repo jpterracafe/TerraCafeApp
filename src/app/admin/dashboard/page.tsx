@@ -22,6 +22,12 @@ import {
 
 import { EtapaCampo } from '@/app/irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '@/app/irrigacao/execucao/page';
+import {
+  parseResponsavelEmails,
+  isResponsavelVazio,
+  normalizeName,
+  TERMOS_GENERICOS_RESPONSAVEL as TERMOS_GENERICOS_RESP,
+} from '@/lib/responsaveis';
 
 // ── Helper para extrair nome do usuário do email @terracafe.com ────────────────
 function extractUserName(emailOrName: string | undefined): string {
@@ -444,8 +450,7 @@ export default function DashboardPage() {
           !f.isDeleted &&
           (f.projetoCliente || '').trim() === nomeProjeto.trim() &&
           f.responsavel &&
-          f.responsavel.trim() !== '' &&
-          f.responsavel.trim() !== 'Não atribuído'
+          !isResponsavelVazio(f.responsavel)
         )
         .map(f => f.responsavel.trim());
 
@@ -453,28 +458,13 @@ export default function DashboardPage() {
         .filter(([k]) => k.startsWith(`${nomeProjeto}::`))
         .flatMap(([, v]) => v || []);
 
-      const TERMOS_GENERICOS_RESP = new Set([
-        'equipe',
-        'equipe técnica',
-        'equipe tecnica',
-        'equipe de campo',
-        'equipe geral',
-        'administrador',
-        'admin',
-        'não atribuído',
-        'nao atribuido',
-        'sem responsável',
-        'sem responsavel',
-        'sistema',
-      ]);
-
       const respTodosBruto = Array.from(
         new Set([...respFasesAcao, ...(responsaveisPorEtapa[configKey] || []), ...respOutrasEtapasDoProjeto])
       )
         .filter(Boolean)
         .map(r => String(r).trim());
 
-      const respReais = respTodosBruto.filter(r => !TERMOS_GENERICOS_RESP.has(r.toLowerCase()));
+      const respReais = respTodosBruto.filter(r => !TERMOS_GENERICOS_RESP.has(normalizeName(r)));
       const respTodos = (respReais.length > 0 ? respReais : [])
         .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
@@ -666,8 +656,7 @@ export default function DashboardPage() {
     // 2. Projetos onde é RESPONSÁVEL por alguma fase (via fases_acao)
     fases.forEach(f => {
       if (f.isDeleted || !f.projetoCliente || !f.responsavel) return;
-      const partes = (f.responsavel || '').split(',').map(p => p.trim()).filter(Boolean);
-      partes.forEach(parte => {
+      parseResponsavelEmails(f.responsavel).forEach(parte => {
         const p = normalizarPessoa(parte);
         if (!p) return;
         const cargo = getRole(p);
