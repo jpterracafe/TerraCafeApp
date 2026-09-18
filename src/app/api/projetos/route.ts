@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 
-// ── GET /api/projetos?responsavel=Nome&lixeira=true ───────────────────────────
-// Retorna nomes únicos de projetos ATIVOS por padrão.
+// ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
+// Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
 // Se ?lixeira=true → retorna projetos EXCLUÍDOS (na lixeira).
+// Se ?concluidos=true → retorna apenas projetos CONCLUÍDOS (não excluídos).
 // Se ?responsavel= for informado, filtra só os projetos onde essa pessoa
 // é responsável por pelo menos uma fase.
 export async function GET(req: Request) {
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
     const todos = searchParams.get("todos") === "true";
     const emailFiltro = searchParams.get("email")?.trim().toLowerCase() ?? "";
     const apenasMeus = searchParams.get("meus") === "true";
+    const concluidos = searchParams.get("concluidos") === "true";
 
     const sessionEmail = session.user?.email?.trim().toLowerCase() ?? "";
     const sessionName = session.user?.name?.trim() ?? "";
@@ -41,6 +43,20 @@ export async function GET(req: Request) {
         mapCriadores = { ...criadoresRow.valor };
       }
     } catch (_) {}
+
+    // 1b. Carrega status dos projetos (concluídos) de configuracoes_sistema
+    let mapStatus: Record<string, { status?: string; concluidoEm?: string }> = {};
+    try {
+      const { data: statusRow } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_status_v1")
+        .maybeSingle();
+      if (statusRow?.valor) {
+        mapStatus = { ...statusRow.valor };
+      }
+    } catch (_) {}
+    const ehConcluido = (nome: string): boolean => mapStatus[nome]?.status === "concluido";
 
     // 2. Complementa com user_projetos se a tabela existir
     const userProjetosPermitidos = new Set<string>();
@@ -122,10 +138,11 @@ export async function GET(req: Request) {
 
 
     if (detalhado) {
-      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; criador: any }>();
+      const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; concluidoEm: string | null; criador: any }>();
       for (const r of (data ?? []) as any[]) {
         const n = r.projeto_cliente as string;
         if (!temAcessoAoProjeto(n)) continue;
+        if (concluidos ? !ehConcluido(n) : ehConcluido(n)) continue;
 
         const criador = mapCriadores[n] || null;
         if (!mapa.has(n)) {
@@ -133,6 +150,7 @@ export async function GET(req: Request) {
             nome: n,
             prazoFinal: r.prazo_limite || "",
             excluidoEm: r.is_deleted ? r.updated_at : null,
+            concluidoEm: ehConcluido(n) ? mapStatus[n]?.concluidoEm || null : null,
             criador,
           });
         } else if (r.is_deleted && r.updated_at) {
@@ -148,7 +166,7 @@ export async function GET(req: Request) {
 
     let unicos = Array.from(
       new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
-    ).filter(n => temAcessoAoProjeto(n));
+    ).filter(n => temAcessoAoProjeto(n) && (concluidos ? ehConcluido(n) : !ehConcluido(n)));
 
     unicos.sort();
     return NextResponse.json({ projetos: unicos, criadores: mapCriadores });
@@ -437,5 +455,55 @@ export async function PATCH(req: Request) {
   } catch (e) {
     console.error("[PATCH /api/projetos]", e);
     return NextResponse.json({ error: "Erro ao restaurar projeto." }, { status: 500 });
+  }
+}
+
+// ── PUT /api/projetos ─────────────────────────────────────────────────────────
+// Marca/desmarca um projeto como CONCLUÍDO (body: { nome, concluido }).
+// - concluido: true  → move para a página de Projetos Concluídos.
+// - concluido: false → reabre o projeto (volta para a lista ativa).
+export async function PUT(req: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => null);
+    const nome = String(body?.nome ?? "").trim();
+    const concluido = body?.concluido === true;
+
+    if (!nome) {
+      return NextResponse.json({ error: "Nome do projeto obrigatório." }, { status: 400 });
+    }
+
+    const db = getSupabase();
+
+    const { data: row } = await db
+      .from("configuracoes_sistema")
+      .select("valor")
+      .eq("chave", "diario_projetos_status_v1")
+      .maybeSingle();
+
+    const mapStatus: Record<string, { status?: string; concluidoEm?: string }> = {
+      ...(row?.valor || {}),
+    };
+
+    if (concluido) {
+      mapStatus[nome] = { status: "concluido", concluidoEm: new Date().toISOString() };
+    } else {
+      delete mapStatus[nome];
+    }
+
+    await db.from("configuracoes_sistema").upsert({
+      chave: "diario_projetos_status_v1",
+      valor: mapStatus,
+      updated_at: new Date().toISOString(),
+    });
+
+    return NextResponse.json({ ok: true, projeto: nome, concluido });
+  } catch (e) {
+    console.error("[PUT /api/projetos]", e);
+    return NextResponse.json({ error: "Erro ao atualizar status do projeto." }, { status: 500 });
   }
 }

@@ -201,6 +201,10 @@ export default function DiarioCampoTimelinePage() {
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
   const [excluindoProjeto, setExcluindoProjeto] = useState(false);
 
+  // Modal Concluir Projeto (Enviar para Projetos Concluídos)
+  const [isConcluirProjetoModalOpen, setIsConcluirProjetoModalOpen] = useState(false);
+  const [concluindoProjeto, setConcluindoProjeto] = useState(false);
+
   // Modal Justificativas de Campo (Substitui Ajuste de Meta)
   const [isJustificativaModalOpen, setIsJustificativaModalOpen] = useState(false);
   const [justificativaMotivo, setJustificativaMotivo] = useState('Chuva no dia');
@@ -532,6 +536,24 @@ export default function DiarioCampoTimelinePage() {
 
     return concluidoPorConfig || temLogConcluido;
   }, [configEtapas, etapaKey, progressoManual, registros, selectedProjeto, selectedEtapa]);
+
+  // ── Conta quantas fases oficiais do projeto já estão concluídas ──────────────
+  const nFasesConcluidas = useMemo(() => {
+    if (!selectedProjeto) return 0;
+    return ETAPAS_CAMPO.filter(et => {
+      const chave = `${selectedProjeto}::${et.key}`;
+      const cfg = configEtapas[chave];
+      const concluidoPorConfig =
+        (cfg?.hasStarted === true && progressoManual[chave] === 100) ||
+        (cfg as any)?.status === 'Concluída';
+      const temLogConcluido = registros.some(r =>
+        r.projetoCliente === selectedProjeto &&
+        (r.atividade === et.key || (r.atividade || '').toLowerCase().includes(et.key.toLowerCase())) &&
+        (r.status || '').toLowerCase().includes('concluído')
+      );
+      return concluidoPorConfig || temLogConcluido;
+    }).length;
+  }, [configEtapas, progressoManual, registros, selectedProjeto]);
 
   const toggleResponsavelNaEtapa = (nome: string) => {
     const atuais = responsaveisPorEtapa[etapaKey] ?? [];
@@ -1133,6 +1155,33 @@ export default function DiarioCampoTimelinePage() {
       toastError(err.message || 'Falha ao excluir projeto.');
     } finally {
       setExcluindoProjeto(false);
+    }
+  };
+
+  // ── Concluir Projeto (Enviar para Projetos Concluídos) ──────────────────────
+  const handleConcluirProjeto = async () => {
+    if (!selectedProjeto) return;
+    const nomeProjeto = selectedProjeto;
+
+    setConcluindoProjeto(true);
+    try {
+      // (offline: fica na fila e sincroniza depois)
+      const res = await offlineFetch('/api/projetos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: nomeProjeto, concluido: true }),
+      });
+      if (!res.ok) throw new Error('Erro na API ao concluir.');
+
+      setIsConcluirProjetoModalOpen(false);
+      setSelectedProjeto('');
+      await loadProjetos();
+
+      success(`Projeto "${extractProjectBaseName(nomeProjeto)}" concluído! Ele foi para a página de Projetos Concluídos.`);
+    } catch (err: any) {
+      toastError(err.message || 'Falha ao concluir projeto.');
+    } finally {
+      setConcluindoProjeto(false);
     }
   };
 
@@ -1750,6 +1799,17 @@ export default function DiarioCampoTimelinePage() {
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Excluir Projeto</span>
+                    </button>
+
+                    {/* Botão Concluir Projeto (enviar para Projetos Concluídos) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsConcluirProjetoModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5 transition-all"
+                      title="Marcar este projeto como concluído (pode ser reaberto depois)"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Concluir Projeto</span>
                     </button>
                   </div>
                 </div>
@@ -3422,6 +3482,114 @@ export default function DiarioCampoTimelinePage() {
                     <><Loader2 className="w-4 h-4 animate-spin" /><span>Excluindo...</span></>
                   ) : (
                     <><Trash2 className="w-4 h-4" /><span>Mover para Lixeira</span></>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: CONFIRMAR CONCLUSÃO DE PROJETO (→ PROJETOS CONCLUÍDOS) ── */}
+      {isConcluirProjetoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-[#1e293b] bg-emerald-50 dark:bg-emerald-950/20">
+              <div className="p-2 rounded-xl bg-emerald-500/15 shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900 dark:text-white">Concluir Projeto</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">O projeto será movido para Projetos Concluídos</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsConcluirProjetoModalOpen(false)}
+                className="ml-auto p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/40 text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                Tem certeza que deseja concluir o projeto{' '}
+                <strong className="text-slate-900 dark:text-white">
+                  &ldquo;{extractProjectBaseName(selectedProjeto)}&rdquo;
+                </strong>?
+              </p>
+
+              {/* Resumo de fases concluídas */}
+              <div className="bg-slate-50 dark:bg-[#0b1329] border border-slate-200 dark:border-[#1e293b] rounded-xl p-3.5">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    Fases concluídas
+                  </span>
+                  <span>
+                    <strong className="text-emerald-600 dark:text-emerald-400">{nFasesConcluidas}</strong> / {ETAPAS_CAMPO.length}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-slate-200 dark:bg-[#1e293b] overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all duration-500"
+                    style={{ width: `${Math.round((nFasesConcluidas / Math.max(1, ETAPAS_CAMPO.length)) * 100)}%` }}
+                  />
+                </div>
+                {nFasesConcluidas < ETAPAS_CAMPO.length && (
+                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 leading-relaxed">
+                    Ainda há {ETAPAS_CAMPO.length - nFasesConcluidas} fase(s) sem conclusão registrada. Você pode concluir mesmo assim — o projeto ficará em Projetos Concluídos e poderá ser reaberto se precisar.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 text-xs text-emerald-800 dark:text-emerald-200 space-y-1 leading-relaxed">
+                <p className="font-bold flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  O que acontece ao concluir:
+                </p>
+                <ul className="list-disc list-inside space-y-0.5 ml-1">
+                  <li>O projeto some da lista do Diário de Campo</li>
+                  <li>Todos os registros e histórico são preservados</li>
+                  <li>Pode ser <strong>reaberto a qualquer momento</strong> em Projetos Concluídos</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConcluirProjetoModalOpen(false);
+                  window.location.href = '/irrigacao/concluidos';
+                }}
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1.5 transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                Ver Projetos Concluídos
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConcluirProjetoModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConcluirProjeto}
+                  disabled={concluindoProjeto}
+                  className="px-5 py-2.5 rounded-xl text-sm font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {concluindoProjeto ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /><span>Concluindo...</span></>
+                  ) : (
+                    <><CheckCircle2 className="w-4 h-4" /><span>Concluir Projeto</span></>
                   )}
                 </button>
               </div>

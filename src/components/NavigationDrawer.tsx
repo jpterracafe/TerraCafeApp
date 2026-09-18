@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState } from 'react';
-import { 
-  Menu, X, LayoutDashboard, BarChart2, Calendar, Layers, Users, Trash2, ShieldCheck, 
-  ExternalLink 
+import {
+  Menu, X, LayoutDashboard, BarChart2, Calendar, Layers, Users, Trash2, ShieldCheck,
+  ExternalLink, Archive
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -28,6 +28,7 @@ export default function NavigationDrawer() {
     { href: '/irrigacao/execucao', label: 'Cronograma & Execução', icon: Layers, color: 'text-indigo-500' },
     { href: '/irrigacao/responsaveis', label: 'Equipe & Responsáveis', icon: Users, color: 'text-emerald-500' },
     { href: '/irrigacao/lixeira', label: 'Lixeira de Projetos', icon: Trash2, color: 'text-rose-500' },
+    { href: '/irrigacao/concluidos', label: 'Projetos Concluídos', icon: Archive, color: 'text-emerald-500' },
     ...(isMasterDev ? [
       { href: '/admin/usuarios', label: 'Usuários do Sistema', icon: ShieldCheck, color: 'text-purple-500' }
     ] : []),
