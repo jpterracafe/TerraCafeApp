@@ -10,6 +10,14 @@ import {
   formatZodErrors,
 } from "@/lib/validators";
 
+function parseResponsavelEmails(responsavel?: string): string[] {
+  if (!responsavel) return [];
+  
+  // Formato: emails separados por vírgula, ex: "thiago@email.com,arthur@email.com"
+  // Compatibilidade com formato antigo (nomes puros): também aceita
+  return responsavel.split(',').map(part => part.trim()).filter(Boolean);
+}
+
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET() {
   try {
@@ -43,6 +51,9 @@ export async function GET() {
 
     const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
 
+    const userEmail = sessionEmail.toLowerCase();
+    const userName = sessionName.toLowerCase();
+
     const fases = (data ?? [])
       .filter((f) => {
         const pNome = (f.projeto_cliente || "").trim();
@@ -56,8 +67,12 @@ export async function GET() {
 
         // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
         if (criadorEmail && criadorEmail !== sessionEmail) {
-          const resp = (f.responsavel || "").trim().toLowerCase();
-          const ehResponsavel = resp && (resp === sessionName.toLowerCase() || resp.includes(sessionName.toLowerCase()));
+          // Verifica se o usuário é responsável pela fase (pelo email)
+          const resp = (f.responsavel || "").trim();
+          const responsaveis = parseResponsavelEmails(resp);
+          const ehResponsavel = responsaveis.includes(userEmail);
+          
+          // Se não for responsável por email, esconde a fase
           if (!ehResponsavel) {
             return false; // Oculta fase deste projeto para outro agricultor
           }
@@ -99,9 +114,23 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
 
+    const responsavelAtual = dataIn.responsavel || "Não atribuído";
+
+    // Se o responsavel atual for "Não atribuído", define como o email do usuário logado
+    let responsavelParaInserir = responsavelAtual;
+    if (responsavelAtual === "Não atribuído") {
+      responsavelParaInserir = userEmail;
+    } else {
+      // Adiciona o email do usuário logado se ainda não estiver na lista
+      const jaTem = parseResponsavelEmails(responsavelAtual).includes(userEmail);
+      if (!jaTem) {
+        responsavelParaInserir = `${responsavelAtual},${userEmail}`;
+      }
+    }
+
     const insertComProjeto = {
       gabarito: dataIn.gabarito,
-      responsavel: dataIn.responsavel,
+      responsavel: responsavelParaInserir,
       acao: dataIn.acao,
       prazo_limite: dataIn.prazoLimite,
       status: dataIn.status,
@@ -112,7 +141,7 @@ export async function POST(req: Request) {
 
     const insertSemProjeto = {
       gabarito: dataIn.gabarito,
-      responsavel: dataIn.responsavel,
+      responsavel: responsavelParaInserir,
       acao: dataIn.acao,
       prazo_limite: dataIn.prazoLimite,
       status: dataIn.status,
@@ -190,7 +219,26 @@ export async function PUT(req: Request) {
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (dataIn.gabarito       !== undefined) updates.gabarito       = dataIn.gabarito;
-    if (dataIn.responsavel    !== undefined) updates.responsavel    = dataIn.responsavel;
+    if (dataIn.responsavel    !== undefined) {
+      const responsavelAnterior = faseAntiga?.responsavel || "Não atribuído";
+      const responsavelDigitado = dataIn.responsavel;
+      
+      let novoResponsavel = responsavelDigitado;
+      
+      // Se o valor digitado for "Não atribuído", define como o email do usuário logado
+      if (responsavelDigitado === "Não atribuído") {
+        novoResponsavel = userEmail;
+      } else {
+        // Verifica se o email do usuário já está na lista, se não, adiciona
+        const jaTem = parseResponsavelEmails(responsavelDigitado).includes(userEmail);
+        if (!jaTem) {
+          // Adiciona o email do usuário logado à lista existente
+          novoResponsavel = `${responsavelDigitado},${userEmail}`;
+        }
+      }
+      
+      updates.responsavel = novoResponsavel;
+    }
     if (dataIn.prazoLimite    !== undefined) updates.prazo_limite   = dataIn.prazoLimite;
     if (dataIn.status         !== undefined) updates.status         = dataIn.status;
     if (dataIn.isDeleted      !== undefined) updates.is_deleted     = dataIn.isDeleted;

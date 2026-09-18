@@ -233,7 +233,12 @@ export default function VisaoGeralDiretorPage() {
           f.responsavel &&
           f.responsavel.trim() &&
           f.responsavel.trim() !== 'Não atribuído'
-        ).map(f => f.responsavel.trim());
+        ).map(f => {
+          const responsaveis = parseResponsavelEmails(f.responsavel);
+          return responsaveis.filter(Boolean);
+        });
+
+        const nomesReaisFases = respFasesAcao.flat();
 
         const logsEtapa = diarioLogs.filter(l =>
           l.projetoCliente &&
@@ -251,7 +256,7 @@ export default function VisaoGeralDiretorPage() {
         let todosResponsaveis = Array.from(
           new Set([
             ...respConfig.map(r => (r || '').trim()).filter(Boolean),
-            ...respFasesAcao,
+            ...nomesReaisFases,
             ...respDiarioLogs,
           ])
         ).filter(Boolean);
@@ -861,12 +866,26 @@ export default function VisaoGeralDiretorPage() {
                                   </td>
                                   <td className="py-2 px-3">
                                     <div className="flex flex-wrap gap-1">
-                                      {fase.responsaveis.length > 0
-                                        ? fase.responsaveis.map((r, i) => (
-                                          <span key={i} className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{r}</span>
-                                        ))
-                                        : <span className="text-slate-400 text-[10px] italic">—</span>
-                                      }
+{fase.responsavel && fase.responsavel.trim() && fase.responsavel.trim() !== 'Não atribuído'
+          ? (() => {
+              const responsaveis = parseResponsavelEmails(fase.responsavel);
+              // Extrai nome do email (parte antes de @) para display, ou usa o email completo
+              const nomes = responsaveis.map(r => r.split('@')[0] || r).filter(Boolean);
+              const temMeuEmail = responsaveis.some(r => r === sessionEmail?.toLowerCase());
+              const meuNome = temMeuEmail ? (sessionName || '') : '';
+              
+              const todosNomes = [...new Set([...nomes, meuNome])].filter(Boolean);
+              
+              return (
+                <div className="flex flex-wrap gap-1">
+                  {todosNomes.map((nome, i) => (
+                    <span key={i} className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-700' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{nome}</span>
+                  ))}
+                </div>
+              );
+            })()
+          : <span className="text-slate-400 text-[10px] italic">—</span>
+        }
                                     </div>
                                   </td>
                                   <td className="py-2 px-3 text-center">
@@ -984,12 +1003,26 @@ export default function VisaoGeralDiretorPage() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-2.5 px-4">
+<td className="py-2.5 px-4">
                               <div className="flex flex-wrap gap-1">
-                                {fase.responsaveis.length > 0
-                                  ? fase.responsaveis.map((resp, rIdx) => (
-                                    <span key={rIdx} className={`px-1.5 py-0.5 rounded font-bold text-[10px] border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-500/40' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{resp}</span>
-                                  ))
+                                {fase.responsavel && fase.responsavel.trim() && fase.responsavel.trim() !== 'Não atribuído'
+                                  ? (() => {
+                                      const responsaveis = parseResponsavelEmails(fase.responsavel);
+                                      // Extrai nome do email (parte antes de @) para display
+                                      const nomes = responsaveis.map(r => r.split('@')[0] || r).filter(Boolean);
+                                      const temMeuEmail = responsaveis.some(r => r === sessionEmail?.toLowerCase());
+                                      const meuNome = temMeuEmail ? (sessionName || '') : '';
+                                      
+                                      const todosNomes = [...new Set([...nomes, meuNome])].filter(Boolean);
+                                      
+                                      return (
+                                        <div className="flex flex-wrap gap-1">
+                                          {todosNomes.map((nome, i) => (
+                                            <span key={i} className={`px-1.5 py-0.5 rounded font-bold text-[10px] border ${isAtrasada ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-300 dark:border-rose-500/40' : 'bg-slate-100 dark:bg-[#16203a] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b]'}`}>{nome}</span>
+                                          ))}
+                                        </div>
+                                      );
+                                    })()
                                   : <span className="text-slate-400 italic text-[10px]">—</span>
                                 }
                               </div>
