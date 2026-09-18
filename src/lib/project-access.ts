@@ -176,7 +176,8 @@ export function filterConfigByAccess<T extends Record<string, unknown>>(
   
   for (const [key, value] of Object.entries(config)) {
     // Extrai o nome do projeto da chave (formato: "Projeto::etapa" ou apenas "Projeto")
-    const projectName = key.includes("::") ? key.split("::")[0] : key;
+    // Usa split com limite 2 para pegar apenas a primeira ocorrência de ::
+    const projectName = key.includes("::") ? key.split("::", 2)[0] : key;
     
     if (hasProjectAccess(projectName, access, fasesPorProjeto)) {
       filtered[key] = value;
