@@ -236,6 +236,10 @@ export default function VisaoGeralDiretorPage() {
           !f.isDeleted &&
           f.projetoCliente &&
           f.projetoCliente.trim() === nomeProjeto.trim() &&
+          f.gabarito &&
+          (f.gabarito.trim().toLowerCase() === et.key.toLowerCase() ||
+           f.gabarito.trim().toLowerCase().includes(et.key.toLowerCase()) ||
+           et.key.toLowerCase().includes(f.gabarito.trim().toLowerCase())) &&
           f.responsavel &&
           f.responsavel.trim() &&
           f.responsavel.trim() !== 'Não atribuído'
