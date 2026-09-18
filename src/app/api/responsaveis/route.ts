@@ -62,6 +62,36 @@ export async function GET() {
       };
     });
 
+    // Agricultor: garante que o próprio usuário logado apareça nas opções,
+    // para que ele possa se escolher como responsável das fases.
+    if (!adminView && sessionEmail) {
+      const sessionNome = (session?.user?.name || "")
+        .trim()
+        .toLowerCase();
+      const jaTemSelf = responsaveis.some(
+        (r) =>
+          r.user_email === sessionEmail ||
+          (sessionNome && r.nome.trim().toLowerCase() === sessionNome)
+      );
+
+      if (!jaTemSelf) {
+        const nomeSelf = session?.user?.name?.trim() || sessionEmail;
+        const parts = nomeSelf.split(" ");
+        const avatar =
+          parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : nomeSelf.substring(0, 2).toUpperCase() || "U";
+        responsaveis.unshift({
+          id: "self",
+          nome: nomeSelf,
+          cargo: "Agricultor",
+          origem: "USUARIO",
+          avatar,
+          user_email: sessionEmail,
+        });
+      }
+    }
+
     return NextResponse.json({ responsaveis });
   } catch (e) {
     console.error("[GET /api/responsaveis]", e);

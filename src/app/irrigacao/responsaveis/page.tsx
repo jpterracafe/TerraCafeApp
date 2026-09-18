@@ -109,6 +109,7 @@ export default function ResponsaveisPage() {
   };
 
   const openDelete = (r: Responsavel) => {
+    if (r.origem === 'USUARIO') return;
     if (r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor') return;
     setSelectedToDelete(r);
     setIsDeleteModalOpen(true);
@@ -214,7 +215,9 @@ export default function ResponsaveisPage() {
                   </td>
                   <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{r.cargo}</td>
                   <td className="px-6 py-4">
-                    {r.origem === 'BANCO_DADOS' ? (
+                    {r.origem === 'USUARIO' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Você</span>
+                    ) : r.origem === 'BANCO_DADOS' ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20"><Database className="w-3.5 h-3.5" />Importado do Banco</span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-500/10 text-slate-600 dark:text-slate-300 border border-slate-500/20"><User className="w-3.5 h-3.5" />Cadastro Manual</span>
@@ -222,10 +225,10 @@ export default function ResponsaveisPage() {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <button className={`p-3 rounded-lg transition-colors ${r.origem === 'BANCO_DADOS' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1e293b]'}`} disabled={r.origem === 'BANCO_DADOS'} title={r.origem === 'BANCO_DADOS' ? 'Edição bloqueada' : 'Editar Responsável'}>
+                      <button className={`p-3 rounded-lg transition-colors ${r.origem === 'BANCO_DADOS' || r.origem === 'USUARIO' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#1e293b]'}`} disabled={r.origem === 'BANCO_DADOS' || r.origem === 'USUARIO'} title={r.origem === 'BANCO_DADOS' ? 'Edição bloqueada' : r.origem === 'USUARIO' ? 'Você faz parte da equipe' : 'Editar Responsável'}>
                         <Edit2 className="w-4 h-4" />
                       </button>
-                      <button onClick={() => openDelete(r)} className={`p-3 rounded-lg transition-colors ${r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10'}`} disabled={r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor'} title="Remover Responsável">
+                      <button onClick={() => openDelete(r)} className={`p-3 rounded-lg transition-colors ${r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor' || r.origem === 'USUARIO' ? 'text-slate-600 cursor-not-allowed' : 'text-slate-500 dark:text-slate-400 hover:text-rose-400 hover:bg-rose-500/10'}`} disabled={r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor' || r.origem === 'USUARIO'} title={r.origem === 'USUARIO' ? 'Você faz parte da equipe' : 'Remover Responsável'}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

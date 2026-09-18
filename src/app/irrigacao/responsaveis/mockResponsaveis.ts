@@ -1,4 +1,4 @@
-export type OrigemResponsavel = 'BANCO_DADOS' | 'MANUAL';
+export type OrigemResponsavel = 'BANCO_DADOS' | 'MANUAL' | 'USUARIO';
 
 export interface Responsavel {
   id: string;
