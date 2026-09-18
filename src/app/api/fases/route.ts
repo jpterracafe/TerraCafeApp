@@ -67,13 +67,17 @@ export async function GET() {
 
         // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
         if (criadorEmail && criadorEmail !== sessionEmailLc) {
-          // Verifica se o usuário é responsável pela fase (pelo email)
+          // Verifica se o usuário é responsável pela fase (por email ou nome)
           const resp = (f.responsavel || "").trim();
           const responsaveis = parseResponsavelEmails(resp);
-          const ehResponsavel = responsaveis.includes(sessionEmailLc);
-          
-          // Se não for responsável por email, esconde a fase
-          if (!ehResponsavel) {
+          const ehResponsavelEmail = responsaveis.includes(sessionEmailLc);
+          const ehResponsavelNome =
+            sessionNameLc &&
+            (responsaveis.some(r => r.trim().toLowerCase() === sessionNameLc) ||
+             resp.toLowerCase().includes(sessionNameLc));
+
+          // Se não for responsável por email nem por nome, esconde a fase
+          if (!ehResponsavelEmail && !ehResponsavelNome) {
             return false; // Oculta fase deste projeto para outro agricultor
           }
         }
@@ -115,21 +119,8 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
 
-    const userEmail = sessionEmail;
-
-    const responsavelAtual = dataIn.responsavel || "Não atribuído";
-
-    // Se o responsavel atual for "Não atribuído", define como o email do usuário logado
-    let responsavelParaInserir = responsavelAtual;
-    if (responsavelAtual === "Não atribuído") {
-      responsavelParaInserir = userEmail;
-    } else {
-      // Adiciona o email do usuário logado se ainda não estiver na lista
-      const jaTem = parseResponsavelEmails(responsavelAtual).includes(userEmail);
-      if (!jaTem) {
-        responsavelParaInserir = `${responsavelAtual},${userEmail}`;
-      }
-    }
+    // O responsável é definido somente pelo que o usuário escolheu (opcional)
+    const responsavelParaInserir = dataIn.responsavel || "Não atribuído";
 
     const insertComProjeto = {
       gabarito: dataIn.gabarito,
@@ -224,24 +215,8 @@ export async function PUT(req: Request) {
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (dataIn.gabarito       !== undefined) updates.gabarito       = dataIn.gabarito;
     if (dataIn.responsavel    !== undefined) {
-      const responsavelAnterior = faseAntiga?.responsavel || "Não atribuído";
-      const responsavelDigitado = dataIn.responsavel;
-      
-      let novoResponsavel = responsavelDigitado;
-      
-      // Se o valor digitado for "Não atribuído", define como o email do usuário logado
-      if (responsavelDigitado === "Não atribuído") {
-        novoResponsavel = sessionEmail;
-      } else {
-        // Verifica se o email do usuário já está na lista, se não, adiciona
-        const jaTem = parseResponsavelEmails(responsavelDigitado).includes(sessionEmail);
-        if (!jaTem) {
-          // Adiciona o email do usuário logado à lista existente
-          novoResponsavel = `${responsavelDigitado},${sessionEmail}`;
-        }
-      }
-      
-      updates.responsavel = novoResponsavel;
+      // O responsável é definido somente pelo que o usuário escolheu (opcional)
+      updates.responsavel = dataIn.responsavel;
     }
     if (dataIn.prazoLimite    !== undefined) updates.prazo_limite   = dataIn.prazoLimite;
     if (dataIn.status         !== undefined) updates.status         = dataIn.status;

@@ -259,15 +259,10 @@ export default function VisaoGeralDiretorPage() {
            et.key.toLowerCase().includes(l.atividade.trim().toLowerCase()))
         ).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-        const respDiarioLogs = logsEtapa
-          .flatMap(l => (l.responsavel || '').split(',').map((r: string) => r.trim()))
-          .filter(Boolean);
-
         let todosResponsaveis = Array.from(
           new Set([
             ...respConfig.map(r => (r || '').trim()).filter(Boolean),
             ...nomesReaisFases,
-            ...respDiarioLogs,
           ])
         ).filter(Boolean);
 
