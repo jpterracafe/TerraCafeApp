@@ -65,17 +65,13 @@ export async function GET() {
     // Agricultor: garante que o próprio usuário logado apareça nas opções,
     // para que ele possa se escolher como responsável das fases.
     if (!adminView && sessionEmail) {
-      const sessionNome = (session?.user?.name || "")
-        .trim()
-        .toLowerCase();
+      const nomeSelf = session?.user?.name?.trim() || sessionEmail;
+      const targetNome = nomeSelf.trim().toLowerCase();
       const jaTemSelf = responsaveis.some(
-        (r) =>
-          r.user_email === sessionEmail ||
-          (sessionNome && r.nome.trim().toLowerCase() === sessionNome)
+        (r) => r.nome.trim().toLowerCase() === targetNome
       );
 
       if (!jaTemSelf) {
-        const nomeSelf = session?.user?.name?.trim() || sessionEmail;
         const parts = nomeSelf.split(" ");
         const avatar =
           parts.length >= 2
