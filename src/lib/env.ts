@@ -25,11 +25,24 @@ function optional(value: string | undefined): string | undefined {
 
 const raw = process.env;
 
+const NEXTAUTH_SECRET_DEFAULT = "terracafe_dev_secret_key_987654321_fixed";
+
+if (
+  typeof window === "undefined" &&
+  raw.NODE_ENV === "production" &&
+  (!raw.NEXTAUTH_SECRET || !raw.NEXTAUTH_SECRET.trim())
+) {
+  console.warn(
+    "[env] ⚠️ NEXTAUTH_SECRET não definido em produção — usando chave padrão de desenvolvimento. " +
+    "Defina uma chave forte no ambiente para proteger as sessões."
+  );
+}
+
 const env: EnvConfig = {
   SUPABASE_URL: optional(raw.SUPABASE_URL ?? raw.NEXT_PUBLIC_SUPABASE_URL),
   SUPABASE_SERVICE_ROLE_KEY: optional(raw.SUPABASE_SERVICE_ROLE_KEY),
   NEXTAUTH_URL: raw.NEXTAUTH_URL?.trim() || "http://localhost:3000",
-  NEXTAUTH_SECRET: raw.NEXTAUTH_SECRET?.trim() || "terracafe_dev_secret_key_987654321_fixed",
+  NEXTAUTH_SECRET: raw.NEXTAUTH_SECRET?.trim() || NEXTAUTH_SECRET_DEFAULT,
   ADMIN_EMAIL: optional(raw.ADMIN_EMAIL),
   ADMIN_PASSWORD: optional(raw.ADMIN_PASSWORD),
 };

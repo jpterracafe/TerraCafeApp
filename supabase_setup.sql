@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS fases_acao (
   observacoes  TEXT,
   projeto_cliente TEXT,
   is_deleted   BOOLEAN NOT NULL DEFAULT FALSE,
+  criado_por_email TEXT,
+  criado_por_nome  TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -79,8 +81,12 @@ CREATE TABLE IF NOT EXISTS diario_logs (
   status          TEXT NOT NULL DEFAULT 'Dentro do Programado',
   observacoes     TEXT NOT NULL DEFAULT '',
   projeto_cliente TEXT,
+  is_deleted      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Soft-delete dos logs (lixeira de projetos)
+ALTER TABLE diario_logs ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS idx_diario_logs_is_deleted ON diario_logs(is_deleted);
 
 -- ============================================================
 -- Desabilitar RLS — acesso controlado pelo service role key

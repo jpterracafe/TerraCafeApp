@@ -26,8 +26,12 @@ export default function LoginPage() {
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
       const role = (session.user as any).role;
-      if (role === 'Desenvolvedor' || role === 'Admin') {
+      if (role === 'Desenvolvedor') {
         router.replace('/admin/usuarios');
+      } else if (role === 'Admin') {
+        // Admin NÃO é master de /admin/usuarios (a página o redirecionaria
+        // para execucao) — vai direto para evitar o "quique" entre páginas.
+        router.replace('/irrigacao/execucao');
       } else if (role === 'Diretor') {
         router.replace('/visao-geral');
       } else if (role === 'Agricultor') {

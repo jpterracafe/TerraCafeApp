@@ -1,18 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import Papa from 'papaparse';
 import { getSupabase } from '@/lib/supabase';
 import env from '@/lib/env';
 
+// Limite de segurança: CSVs de projeto têm KBs; 5MB já é folga enorme.
+const MAX_CSV_BYTES = 5 * 1024 * 1024;
+
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const rawContent = formData.get('csvContent') as string | null;
 
     let csvText = '';
     if (file) {
+      if (file.size > MAX_CSV_BYTES) {
+        return NextResponse.json({ error: 'Arquivo muito grande. Máximo 5MB.' }, { status: 413 });
+      }
       csvText = await file.text();
     } else if (rawContent) {
+      if (rawContent.length > MAX_CSV_BYTES) {
+        return NextResponse.json({ error: 'Conteúdo muito grande. Máximo 5MB.' }, { status: 413 });
+      }
       csvText = rawContent;
     } else {
       return NextResponse.json({ error: 'Nenhum arquivo ou conteúdo CSV enviado.' }, { status: 400 });

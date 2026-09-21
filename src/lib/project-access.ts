@@ -42,7 +42,7 @@ interface UserProjetosRow {
 
 type FaseMap = Map<string, FaseRow[]>;
 
-interface LogRow {
+export interface LogRow {
   projeto_cliente?: string;
   projetoCliente?: string;
   [key: string]: unknown;

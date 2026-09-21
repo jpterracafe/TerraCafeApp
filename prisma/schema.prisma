@@ -73,6 +73,8 @@ model FaseAcao {
   observacoes     String?
   projetoCliente  String?   @map("projeto_cliente")
   isDeleted       Boolean   @default(false) @map("is_deleted")
+  criadoPorEmail  String?   @map("criado_por_email")
+  criadoPorNome   String?   @map("criado_por_nome")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt      @map("updated_at")
 
@@ -97,6 +99,7 @@ model DiarioLog {
   projetoCliente  String?  @map("projeto_cliente")
   midiaUrl        String?  @map("midia_url")
   midiaTipo       String?  @map("midia_tipo") // 'image' | 'video'
+  isDeleted       Boolean  @default(false) @map("is_deleted")
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([data(sort: Desc)])

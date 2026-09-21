@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
-
-function requireSession(session: any) {
-  if (!session?.user) return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
-  return null;
-}
+import { requireSession } from "@/lib/api";
 
 // ── GET /api/historico-fases?faseId=xxx ────────────────────────────────────────
 export async function GET(req: Request) {

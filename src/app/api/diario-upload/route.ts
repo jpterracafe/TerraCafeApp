@@ -33,7 +33,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Arquivo muito grande. Máximo 50MB." }, { status: 400 });
     }
 
-    const ext  = file.name.split(".").pop() ?? (isImage ? "jpg" : "mp4");
+    const rawExt = file.name.split(".").pop() ?? "";
+    // Só aceita extensão alfanumérica curta; senão usa padrão por tipo
+    const ext = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt.toLowerCase() : (isImage ? "jpg" : "mp4");
     const nome = `diario/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());

@@ -20,9 +20,9 @@ import {
   Trash2,
   Eye,
   EyeOff,
-  RefreshCw,
 } from 'lucide-react';
 import { UsuarioSistema, RoleSistema } from './mockUsuariosSistema';
+import { isMasterDevSession } from '@/lib/client-roles';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -94,8 +94,6 @@ export default function AdminUsuariosPage() {
     }
   };
 
-  const role = (session?.user as { role?: string } | undefined)?.role;
-
   const loadUsers = useCallback(async () => {
     setLoadingList(true);
     setListError('');
@@ -115,7 +113,7 @@ export default function AdminUsuariosPage() {
     }
   }, []);
 
-  const isMaster = role === 'Desenvolvedor' || session?.user?.email === 'joao2005souza@gmail.com';
+  const isMaster = isMasterDevSession(session);
 
   useEffect(() => {
     if (status === 'loading') return;
@@ -432,15 +430,31 @@ export default function AdminUsuariosPage() {
                       {u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleString('pt-BR') : '—'}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => setUserToDelete(u)}
-                        disabled={deletingId === u.id}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Excluir
-                      </button>
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleResetSenha(u)}
+                          disabled={resettingId === u.id}
+                          title="Gerar nova senha provisória para este usuário"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                        >
+                          {resettingId === u.id ? (
+                            <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5" />
+                          )}
+                          Resetar senha
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUserToDelete(u)}
+                          disabled={deletingId === u.id}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Excluir
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

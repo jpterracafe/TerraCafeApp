@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
+import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -120,11 +121,21 @@ export async function GET(req: Request) {
         if (criadorEmail === emailComparar) return true;
         if (userProjetosPermitidos.has(nome)) return true;
 
-        // Se for responsável direto por alguma fase do projeto
+        // É responsável direto por alguma fase do projeto.
+        // Mesma regra de /api/fases e project-access: igualdade por e-mail
+        // ou por nome normalizado (sem acento/caixa) — NUNCA substring
+        // ("Ana" não pode herdar acesso de "Mariana").
         const fasesDoProj = fasesPorProjeto.get(nome) || [];
+        const sessionEmailLc = sessionEmail.toLowerCase();
+        const nomeLc = normalizeName(sessionName);
         const ehResponsavel = fasesDoProj.some(f => {
-          const r = (f.responsavel || "").trim().toLowerCase();
-          return r && (r === sessionName.toLowerCase() || r.includes(sessionName.toLowerCase()));
+          const partes = parseResponsavelEmails((f.responsavel || "").trim());
+          return partes.some(p => {
+            const t = p.trim();
+            if (!t) return false;
+            if (t.includes("@")) return t.toLowerCase() === sessionEmailLc;
+            return !!nomeLc && normalizeName(t) === nomeLc;
+          });
         });
         if (ehResponsavel) return true;
 
@@ -226,7 +237,7 @@ export async function POST(req: Request) {
       criado_por_nome: userName,
     }));
 
-    let { error: insertError } = await db.from("fases_acao").insert(inserts);
+    const { error: insertError } = await db.from("fases_acao").insert(inserts);
     if (insertError) {
       // Fallback sem colunas extras se ainda não foi rodada a migração no Supabase
       const insertsBasico = fasesIniciais.map((f) => ({
@@ -239,7 +250,8 @@ export async function POST(req: Request) {
         projeto_cliente: nome,
         is_deleted: false,
       }));
-      await db.from("fases_acao").insert(insertsBasico);
+      const retry = await db.from("fases_acao").insert(insertsBasico);
+      if (retry.error) throw retry.error;
     }
 
     // Salva criador, dataInicio e prazoFinal nas configurações do sistema (Supabase)

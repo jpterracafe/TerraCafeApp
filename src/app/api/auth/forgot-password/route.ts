@@ -17,10 +17,10 @@
  */
 import { NextResponse } from "next/server";
 import { createHmac, randomBytes } from "crypto";
+import nodemailer from "nodemailer";
 import { getSupabase } from "@/lib/supabase";
 import env from "@/lib/env";
 import { forgotPasswordSchema, formatZodErrors } from "@/lib/validators";
-import { ZodError } from "zod";
 
 const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
@@ -97,8 +97,6 @@ export async function POST(req: Request) {
     const smtpHost = process.env.SMTP_HOST;
     if (smtpHost && process.env.SMTP_USER && process.env.SMTP_PASS) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const nodemailer = require("nodemailer");
         const transporter = nodemailer.createTransport({
           host: smtpHost,
           port: Number(process.env.SMTP_PORT || 587),
@@ -136,8 +134,8 @@ export async function POST(req: Request) {
         });
         emailSent = true;
         console.info("[forgot-password] E-mail enviado para:", email);
-      } catch (err: any) {
-        emailError = String(err?.message ?? err);
+      } catch (err: unknown) {
+        emailError = err instanceof Error ? err.message : String(err);
         console.error("[forgot-password] Erro ao enviar e-mail:", emailError);
       }
     }
@@ -160,11 +158,15 @@ export async function POST(req: Request) {
       ok: true,
       message: emailSent
         ? "Enviamos as instruções para o e-mail. Verifique sua caixa de entrada e o spam."
-        : "Link gerado com sucesso. Verifique o console do servidor para copiar o link de redefinição (envio de e-mail não configurado).",
+        : process.env.NODE_ENV === "production"
+          ? "Se o e-mail estiver cadastrado, o administrador foi notificado. Verifique o console do servidor."
+          : "Link gerado com sucesso. Verifique o console do servidor para copiar o link de redefinição (envio de e-mail não configurado).",
       emailSent,
-      // Expõe o link no JSON apenas em ambiente dev / SEM SMTP.
-      // Em produção com SMTP, o link nunca sai por esse endpoint.
-      debugLink: emailSent ? undefined : resetUrl,
+      // Expõe o link no JSON apenas FORA de produção e SEM SMTP.
+      // Em produção o link sai só pelo e-mail real ou console do servidor —
+      // senão qualquer pessoa poderia redefinir a senha de outro usuário
+      // apenas digitando o e-mail dele aqui.
+      debugLink: !emailSent && process.env.NODE_ENV !== "production" ? resetUrl : undefined,
     });
   } catch (e) {
     console.error("[POST /api/auth/forgot-password]", e);

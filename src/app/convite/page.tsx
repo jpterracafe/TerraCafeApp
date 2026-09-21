@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Lock, CheckCircle2, Leaf, ArrowRight, ShieldCheck } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Lock, CheckCircle2, Leaf, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 import ThemeToggle from '@/components/ThemeToggle';
 export default function ConvitePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') ?? '';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSetPassword = (e: React.FormEvent) => {
+  const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
@@ -30,10 +32,29 @@ export default function ConvitePage() {
       return;
     }
 
-    setTimeout(() => {
-      setIsSuccess(true);
+    if (!token) {
+      setError('Link de convite inválido ou expirado. Peça um novo link ao administrador ou use "Esqueci minha senha".');
       setIsLoading(false);
-    }, 1500);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, novaSenha: password, confirmarSenha: confirmPassword }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        setError(data.error || 'Não foi possível ativar a conta. O link pode ter expirado.');
+        return;
+      }
+      setIsSuccess(true);
+    } catch {
+      setError('Erro de conexão. Tente novamente.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,6 +76,13 @@ export default function ConvitePage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">Terra Café Irrigação</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">Defina sua senha corporativa</p>
         </div>
+
+        {!token && !isSuccess && (
+          <div className="bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-3 rounded-lg text-sm mb-6 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Este link não contém um convite válido. Se você recebeu login e senha do administrador, entre direto pelo <button type="button" onClick={() => router.push('/login')} className="underline font-medium">Login</button>.</span>
+          </div>
+        )}
 
         {isSuccess ? (
           <div className="flex flex-col items-center text-center animate-in zoom-in duration-300">

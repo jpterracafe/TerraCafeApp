@@ -8,7 +8,7 @@ import {
   diarioLogDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
-import { getUserProjectAccess, filterLogsByAccess } from "@/lib/project-access";
+import { getUserProjectAccess, filterLogsByAccess, type LogRow } from "@/lib/project-access";
 
 function mapLog(l: any) {
   return {
@@ -53,14 +53,30 @@ export async function GET() {
     } catch (_) {}
 
     const db = getSupabase();
-    const { data, error } = await db
+    // Exclui logs de projetos na lixeira (coluna criada na migration
+    // 20260922; fallback sem filtro em bancos ainda não migrados)
+    let data: LogRow[] | null = null;
+    const attempt = await db
       .from("diario_logs")
       .select("*")
+      .eq("is_deleted", false)
       .order("data", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200);
 
-    if (error) throw error;
+    if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("is_deleted"))) {
+      const fb = await db
+        .from("diario_logs")
+        .select("*")
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (fb.error) throw fb.error;
+      data = fb.data ?? [];
+    } else {
+      if (attempt.error) throw attempt.error;
+      data = attempt.data ?? [];
+    }
 
     // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas logs dos projetos permitidos
     const logsFiltrados = filterLogsByAccess(data ?? [], access, fasesPorProjeto);

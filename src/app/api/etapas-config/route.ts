@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/api";
 import { getSupabase } from "@/lib/supabase";
 import fs from "fs";
 import path from "path";
-import { getUserProjectAccess, filterConfigByAccess, hasProjectAccess } from "@/lib/project-access";
+import { getUserProjectAccess, filterConfigByAccess } from "@/lib/project-access";
 
 const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
 
@@ -286,14 +286,17 @@ export async function POST(req: Request) {
         // Sincroniza diretamente na tabela fases_acao para que ambas as fontes fiquem alinhadas
         if (body.tipo === "responsaveis" && body.dados) {
           for (const [chave, respList] of Object.entries(body.dados as Record<string, string[]>)) {
-            const [projNome, etapaKey] = chave.split("::");
+            // Mesma convenção de filterConfigByAccess: projeto = antes do 1º "::"
+            const [projNome, etapaKey] = chave.split("::", 2);
             if (projNome && etapaKey) {
               const respStr = Array.isArray(respList) && respList.length > 0 ? respList.join(", ") : "Não atribuído";
+              // Escapa curingas do ILIKE para não casar etapas além da desejada
+              const etapaSegura = etapaKey.replace(/[\\%_]/g, (m) => `\\${m}`);
               await db
                 .from("fases_acao")
                 .update({ responsavel: respStr, updated_at: new Date().toISOString() })
                 .eq("projeto_cliente", projNome)
-                .ilike("gabarito", `%${etapaKey}%`);
+                .ilike("gabarito", `%${etapaSegura}%`);
             }
           }
         }
