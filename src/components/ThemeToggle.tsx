@@ -4,23 +4,35 @@ import React, { useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 export default function ThemeToggle() {
-  const [isDark, setIsDark] = useState(true);
+  const savedInitialTheme = localStorage.getItem('terracafe_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const [isDark, setIsDark] = useState(() => {
+    if (savedInitialTheme === 'dark') return true;
+    if (savedInitialTheme === 'light') return false;
+    return prefersDark;
+  });
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('terracafe_theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    // We add the class to the document root based on selection
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setIsDark(true);
+    // Apply the initial theme class to document element
+    if (isDark) {
       document.documentElement.classList.add('dark');
-    } else if (savedTheme === 'light') {
-      setIsDark(false);
-      document.documentElement.classList.remove('dark');
     } else {
-      setIsDark(true);
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('dark');
     }
+  }, [isDark]);
+
+  // Sync theme when system preference changes (only if user hasn't set a preference)
+  useEffect(() => {
+    const onChange = () => {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (!localStorage.getItem('terracafe_theme')) {
+        setIsDark(prefersDark);
+        document.documentElement.classList.toggle('dark', prefersDark);
+      }
+    };
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', onChange);
+    return () => mediaQuery.removeEventListener('change', onChange);
   }, []);
 
   const setLightMode = () => {

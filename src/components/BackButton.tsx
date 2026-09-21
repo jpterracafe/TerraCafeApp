@@ -10,7 +10,10 @@ export default function BackButton({ fallback = "/irrigacao/execucao" }: { fallb
   return (
     <button
       onClick={() => {
-        if (window.history.length > 2) {
+        const historyLength = window.history.length;
+        // Se há mais de 2 entradas na história, usar router.back()
+        // Caso contrário, voltar para o fallback (geralmente a tela principal)
+        if (historyLength > 2) {
           router.back();
         } else {
           router.push(fallback);

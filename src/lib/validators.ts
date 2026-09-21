@@ -87,7 +87,6 @@ export const faseDeleteSchema = z.object({
 });
 
 const statusDiarioEnum = z.enum([
-  "Dentro do Programado",
   "Dentro do programado",
   "Acima",
   "Abaixo",

@@ -125,16 +125,20 @@ export function hasProjectAccess(
     return true;
   }
 
-  const criador = mapCriadores[projectName];
+const criador = mapCriadores[projectName];
   const criadorEmail = criador?.email?.trim().toLowerCase();
   
-  // Se o projeto tem criador cadastrado:
+  // Verifica acesso para projetos com OU sem criador definido
+  // 1. Diretor/Admin veem todos
+  if (isDiretorOuAdmin) return true;
+  
+  // 2. Tem permissão explícita via user_projetos (inclui projetos legacy)
+  if (allowedProjects.has(projectName)) return true;
+  
+  // 3. Se o projeto tem criador cadastrado: verifica se é o criador ou responsável
   if (criadorEmail) {
     // É o criador do projeto
     if (criadorEmail === sessionEmail) return true;
-    
-    // Tem permissão explícita via user_projetos
-    if (allowedProjects.has(projectName)) return true;
     
     // É responsável direto por alguma fase do projeto (por email ou nome)
     if (fasesPorProjeto) {
@@ -145,23 +149,44 @@ export function hasProjectAccess(
         
         // Check by email
         const temEmail = responsaveis.some(email => email === sessionEmail.toLowerCase());
-
+  
         // Check by name (compatibilidade com formato antigo de nomes puros)
         const nomeLc = normalizeName(sessionName);
         const temNome = nomeLc &&
           responsaveis.some(nome => normalizeName(nome) === nomeLc);
-
+  
         return temEmail || temNome;
       });
       if (ehResponsavel) return true;
     }
     
-    // Pertence a outro usuário -> oculta
+    // Pertence a outro usuário -> oculta (não tem criador nem permissão explícita)
     return false;
   }
   
-  // Projeto legado (sem criador definido): acessível
-  return true;
+  // Projeto legado (sem criador definido): verifica permissão explícita ou responsável
+  // Antes era sempre 'return true', agora também verifica fases e permissões
+  if (fasesPorProjeto) {
+    const fasesDoProj = fasesPorProjeto.get(projectName) || [];
+    const ehResponsavel = fasesDoProj.some(f => {
+      const r = (f.responsavel || "").trim();
+      const responsaveis = parseResponsavelEmails(r);
+      
+      // Check by email
+      const temEmail = responsaveis.some(email => email === sessionEmail.toLowerCase());
+  
+      // Check by name (compatibilidade com formato antigo de nomes puros)
+      const nomeLc = normalizeName(sessionName);
+      const temNome = nomeLc &&
+        responsaveis.some(nome => normalizeName(nome) === nomeLc);
+  
+      return temEmail || temNome;
+    });
+    if (ehResponsavel) return true;
+  }
+  
+  // Sem acesso direto — projeto legacy fica visível apenas se tem permissão user_projetos (já checado acima)
+  return false;
 }
 
 /**

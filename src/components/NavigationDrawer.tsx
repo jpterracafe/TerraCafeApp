@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
+import env from '@/lib/env';
 
 export default function NavigationDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,7 +20,7 @@ export default function NavigationDrawer() {
   const toggleDrawer = () => setIsOpen(!isOpen);
 
   const role = (session?.user as { role?: string } | undefined)?.role;
-  const isMasterDev = role === 'Desenvolvedor' || session?.user?.email === 'joao2005souza@gmail.com';
+  const isMasterDev = role === 'Desenvolvedor' || session?.user?.email === env.ADMIN_EMAIL;
 
   const navLinks = [
     { href: '/visao-geral', label: 'Resumo Geral Executivo (Paulo)', icon: LayoutDashboard, color: 'text-blue-500' },
