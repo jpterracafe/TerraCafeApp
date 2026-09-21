@@ -40,6 +40,16 @@ CREATE TABLE IF NOT EXISTS responsaveis (
   origem     TEXT NOT NULL DEFAULT 'MANUAL', -- 'MANUAL' | 'BANCO_DADOS'
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Vínculo responsável <-> login (users).
+-- user_id/user_email: preenchidos quando o admin cria um login para um
+-- responsável que foi cadastrado manualmente por um agricultor.
+-- criado_por_*: registra qual usuário cadastrou aquele responsável.
+ALTER TABLE responsaveis ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE responsaveis ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE responsaveis ADD COLUMN IF NOT EXISTS criado_por_email TEXT;
+ALTER TABLE responsaveis ADD COLUMN IF NOT EXISTS criado_por_nome TEXT;
+CREATE INDEX IF NOT EXISTS idx_responsaveis_user_email ON responsaveis(user_email);
+CREATE INDEX IF NOT EXISTS idx_responsaveis_user_id ON responsaveis(user_id);
 
 -- ============================================================
 -- TABELA: fases / ações de projetos

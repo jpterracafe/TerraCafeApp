@@ -8,6 +8,7 @@ import {
   responsavelDeleteSchema,
   formatZodErrors,
 } from "@/lib/validators";
+import { normalizeName, parseResponsavelEmails } from "@/lib/responsaveis";
 
 // ── Helper: verifica se usuário é admin/diretor (vê todos os responsáveis)
 function isAdminOrDiretor(session: any): boolean {
@@ -21,7 +22,23 @@ function getSessionEmail(session: any): string {
   return session?.user?.email?.trim().toLowerCase() ?? "";
 }
 
+function buildAvatar(nome: string): string {
+  const parts = (nome || "").trim().split(" ").filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return (nome || "").substring(0, 2).toUpperCase() || "U";
+}
+
 // ── GET /api/responsaveis ──────────────────────────────────────────────────────
+// Admin/Diretor: vê TODOS os responsáveis, com diferenciação:
+//   - temLogin=true  → já é agricultor (tem user vinculado por user_id,
+//     user_email ou nome igual ao de um user)
+//   - temLogin=false → foi criado por um agricultor e ainda não tem login
+//   - projetos: lista de projetos (fases_acao.projeto_cliente) onde esse
+//     responsável aparece — ao criar o login, esses projetos aparecem
+//     direto para a pessoa.
+// Agricultor: vê apenas os que ele mesmo cadastrou (+ entrada virtual "self").
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -30,59 +47,160 @@ export async function GET() {
 
     const db = getSupabase();
     const sessionEmail = getSessionEmail(session);
+    const sessionName = (session?.user?.name?.trim() ?? "") as string;
     const adminView = isAdminOrDiretor(session);
 
-    // Query base
-    let query = db.from("responsaveis").select("*");
-
-    // Se não for admin/diretor, filtra apenas os responsáveis criados pelo próprio usuário
+    // Query base — tolera banco sem as colunas novas (fallback)
+    let rows: any[] | null = null;
     if (!adminView && sessionEmail) {
-      query = query.eq("user_email", sessionEmail);
+      const attempt = await db
+        .from("responsaveis")
+        .select("*")
+        .eq("user_email", sessionEmail)
+        .order("created_at", { ascending: true });
+      if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email"))) {
+        // Coluna ainda não existe: retorna tudo e filtra em memória pelo criado_por
+        const fb = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
+        if (fb.error) throw fb.error;
+        rows = fb.data ?? [];
+      } else {
+        if (attempt.error) throw attempt.error;
+        rows = attempt.data ?? [];
+      }
+    } else {
+      const { data, error } = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
+      if (error) {
+        // Fallback para bancos antigos sem as colunas novas
+        if (error.code === "PGRST204" || error.message?.includes("user_email") || error.message?.includes("user_id")) {
+          const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
+          if (fb.error) throw fb.error;
+          rows = fb.data ?? [];
+        } else {
+          throw error;
+        }
+      } else {
+        rows = data ?? [];
+      }
     }
 
-    const { data, error } = await query.order("created_at", { ascending: true });
+    // Carrega users para marcar quem já tem login (match por id, email ou nome)
+    const usersByEmail = new Map<string, { id: string; name: string | null; email: string | null; role: string }>();
+    const usersByNormName = new Map<string, { id: string; name: string | null; email: string | null; role: string }>();
+    try {
+      const { data: users } = await db.from("users").select("id, name, email, role");
+      for (const u of (users ?? []) as { id: string; name: string | null; email: string | null; role: string }[]) {
+        if (u.email) usersByEmail.set(u.email.trim().toLowerCase(), u);
+        if (u.name) {
+          const k = normalizeName(u.name);
+          if (k && !usersByNormName.has(k)) usersByNormName.set(k, u);
+        }
+      }
+    } catch {
+      // silent — sem users, todos ficam temLogin=false
+    }
 
-    if (error) throw error;
+    // Carrega fases para mapear projetos vinculados por responsável
+    // (match por nome normalizado OU por email dentro da lista separada por vírgula)
+    const projetosPorResp = new Map<string, Set<string>>(); // normName -> projetos
+    const projetosPorEmail = new Map<string, Set<string>>(); // email -> projetos
+    try {
+      const { data: fases } = await db
+        .from("fases_acao")
+        .select("responsavel, projeto_cliente")
+        .eq("is_deleted", false)
+        .limit(5000);
+      for (const f of (fases ?? []) as { responsavel: string | null; projeto_cliente: string | null }[]) {
+        const proj = (f.projeto_cliente || "").trim();
+        if (!proj) continue;
+        for (const parte of parseResponsavelEmails(f.responsavel || "")) {
+          const p = parte.trim();
+          if (!p) continue;
+          if (p.includes("@")) {
+            const k = p.toLowerCase();
+            if (!projetosPorEmail.has(k)) projetosPorEmail.set(k, new Set());
+            projetosPorEmail.get(k)!.add(proj);
+          } else {
+            const k = normalizeName(p);
+            if (!k) continue;
+            if (!projetosPorResp.has(k)) projetosPorResp.set(k, new Set());
+            projetosPorResp.get(k)!.add(proj);
+          }
+        }
+      }
+    } catch {
+      // silent
+    }
 
-    const responsaveis = (data ?? []).map((r) => {
+    const responsaveis = (rows ?? []).map((r) => {
       const nome: string = r.nome ?? "";
-      const parts = nome.trim().split(" ");
-      const avatar =
-        parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : nome.substring(0, 2).toUpperCase() || "U";
+      const normNome = normalizeName(nome);
+      const vinculadoEmail = (r.user_email ?? "").trim().toLowerCase();
+      const vinculadoId = r.user_id ?? null;
+
+      // Tem login? 1) vínculo direto 2) email bate com users 3) nome bate com users
+      let userVinculado = null as null | { id: string; name: string | null; email: string | null; role: string };
+      if (vinculadoEmail && usersByEmail.has(vinculadoEmail)) {
+        userVinculado = usersByEmail.get(vinculadoEmail)!;
+      } else if (normNome && usersByNormName.has(normNome)) {
+        userVinculado = usersByNormName.get(normNome)!;
+      }
+      // Se há user_id mas o email mudou, tenta achar pelo id
+      const temLogin = Boolean(vinculadoId || userVinculado);
+
+      // Projetos vinculados (por nome + por email vinculado)
+      const projs = new Set<string>();
+      if (normNome && projetosPorResp.has(normNome)) {
+        for (const p of projetosPorResp.get(normNome)!) projs.add(p);
+      }
+      const emailParaProjs = (userVinculado?.email || vinculadoEmail || "").toLowerCase();
+      if (emailParaProjs && projetosPorEmail.has(emailParaProjs)) {
+        for (const p of projetosPorEmail.get(emailParaProjs)!) projs.add(p);
+      }
+      const projetos = Array.from(projs).sort();
+
       return {
         id: r.id,
         nome,
         cargo: r.cargo ?? "",
         origem: r.origem ?? "MANUAL",
-        avatar,
-        user_email: r.user_email ?? "", // Include for admin view
+        avatar: buildAvatar(nome),
+        user_email: r.user_email ?? userVinculado?.email ?? "",
+        user_id: vinculadoId ?? userVinculado?.id ?? null,
+        temLogin,
+        loginEmail: userVinculado?.email ?? (vinculadoEmail || null),
+        loginRole: userVinculado?.role ?? null,
+        criadoPorEmail: r.criado_por_email ?? r.user_email ?? null,
+        criadoPorNome: r.criado_por_nome ?? null,
+        projetos,
+        totalProjetos: projetos.length,
       };
     });
 
     // Agricultor: garante que o próprio usuário logado apareça nas opções,
     // para que ele possa se escolher como responsável das fases.
     if (!adminView && sessionEmail) {
-      const nomeSelf = session?.user?.name?.trim() || sessionEmail;
-      const targetNome = nomeSelf.trim().toLowerCase();
-      const jaTemSelf = responsaveis.some(
-        (r) => r.nome.trim().toLowerCase() === targetNome
-      );
+      const nomeSelf = sessionName || sessionEmail;
+      const targetNome = normalizeName(nomeSelf);
+      const jaTemSelf =
+        targetNome &&
+        responsaveis.some((r) => normalizeName(r.nome) === targetNome);
 
       if (!jaTemSelf) {
-        const parts = nomeSelf.split(" ");
-        const avatar =
-          parts.length >= 2
-            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-            : nomeSelf.substring(0, 2).toUpperCase() || "U";
         responsaveis.unshift({
           id: "self",
           nome: nomeSelf,
           cargo: "Agricultor",
           origem: "USUARIO",
-          avatar,
+          avatar: buildAvatar(nomeSelf),
           user_email: sessionEmail,
+          user_id: null,
+          temLogin: true,
+          loginEmail: sessionEmail,
+          loginRole: null,
+          criadoPorEmail: sessionEmail,
+          criadoPorNome: nomeSelf,
+          projetos: [],
+          totalProjetos: 0,
         });
       }
     }
@@ -110,24 +228,51 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
     const sessionEmail = getSessionEmail(session);
+    const sessionName = (session?.user?.name?.trim() ?? "") as string;
 
-    // Insere o responsável associado ao usuário logado
-    const { data, error } = await db
-      .from("responsaveis")
-      .insert({ nome, cargo, origem, user_email: sessionEmail })
-      .select("*")
-      .single();
-
-    if (error) throw error;
-
-    const parts = nome.trim().split(" ");
-    const avatar =
-      parts.length >= 2
-        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-        : nome.substring(0, 2).toUpperCase() || "U";
+    // Insere o responsável associado ao usuário logado (+ rastreio de quem criou).
+    // Tolerante a bancos sem as colunas novas.
+    const payloadFull: Record<string, unknown> = {
+      nome,
+      cargo,
+      origem,
+      user_email: sessionEmail,
+      criado_por_email: sessionEmail,
+      criado_por_nome: sessionName || null,
+    };
+    let data: any = null;
+    const attempt1 = await db.from("responsaveis").insert(payloadFull).select("*").single();
+    if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("user_email") || attempt1.error.message?.includes("criado_por"))) {
+      const attempt2 = await db
+        .from("responsaveis")
+        .insert({ nome, cargo, origem, user_email: sessionEmail })
+        .select("*")
+        .single();
+      if (attempt2.error && (attempt2.error.code === "PGRST204" || attempt2.error.message?.includes("user_email"))) {
+        const attempt3 = await db.from("responsaveis").insert({ nome, cargo, origem }).select("*").single();
+        if (attempt3.error) throw attempt3.error;
+        data = attempt3.data;
+      } else {
+        if (attempt2.error) throw attempt2.error;
+        data = attempt2.data;
+      }
+    } else {
+      if (attempt1.error) throw attempt1.error;
+      data = attempt1.data;
+    }
 
     return NextResponse.json({
-      responsavel: { id: data.id, nome: data.nome, cargo: data.cargo, origem: data.origem, avatar, user_email: data.user_email },
+      responsavel: {
+        id: data.id,
+        nome: data.nome,
+        cargo: data.cargo,
+        origem: data.origem,
+        avatar: buildAvatar(nome),
+        user_email: data.user_email ?? sessionEmail,
+        temLogin: false,
+        projetos: [],
+        totalProjetos: 0,
+      },
     });
   } catch (e) {
     console.error("[POST /api/responsaveis]", e);
@@ -170,7 +315,7 @@ export async function DELETE(req: Request) {
         .single();
 
       if (fetchError) throw fetchError;
-      if (!resp || resp.user_email !== sessionEmail) {
+      if (!resp || (resp as { user_email?: string }).user_email !== sessionEmail) {
         return NextResponse.json({ error: "Sem permissão para deletar este responsável." }, { status: 403 });
       }
     }

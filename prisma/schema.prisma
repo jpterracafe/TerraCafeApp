@@ -42,13 +42,20 @@ model ProjetoIrrigacao {
 
 // =====================================================================
 // TABELA: responsáveis (equipe de campo)
+// user_email/user_id: vínculo com o login (users) quando o responsável
+// passa a ter acesso ao sistema. criado_por_*: quem cadastrou (agricultor
+// que adicionou manualmente ou admin).
 // =====================================================================
 model Responsavel {
-  id         String   @id @default(cuid())
-  nome       String
-  cargo      String
-  origem     String   @default("MANUAL") // 'MANUAL' | 'BANCO_DADOS'
-  createdAt  DateTime @default(now()) @map("created_at")
+  id             String   @id @default(cuid())
+  nome           String
+  cargo          String
+  origem         String   @default("MANUAL") // 'MANUAL' | 'BANCO_DADOS'
+  userEmail      String?  @map("user_email")
+  userId         String?  @map("user_id")
+  criadoPorEmail String?  @map("criado_por_email")
+  criadoPorNome  String?  @map("criado_por_nome")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("responsaveis")
 }

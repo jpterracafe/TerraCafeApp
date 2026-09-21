@@ -6,6 +6,18 @@ export interface Responsavel {
   cargo: string;
   origem: OrigemResponsavel;
   avatar: string;
+  // ── Vínculo com login (preenchido pela API) ──
+  user_email?: string;
+  user_id?: string | null;
+  /** true = já é agricultor (tem login); false = criado por agricultor, sem login */
+  temLogin?: boolean;
+  loginEmail?: string | null;
+  loginRole?: string | null;
+  criadoPorEmail?: string | null;
+  criadoPorNome?: string | null;
+  /** projetos (fases) onde esse responsável aparece — vão direto p/ a pessoa ao criar login */
+  projetos?: string[];
+  totalProjetos?: number;
 }
 
 export const mockResponsaveis: Responsavel[] = [
