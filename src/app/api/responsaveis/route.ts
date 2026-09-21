@@ -50,16 +50,20 @@ export async function GET() {
     const sessionName = (session?.user?.name?.trim() ?? "") as string;
     const adminView = isAdminOrDiretor(session);
 
-    // Query base — tolera banco sem as colunas novas (fallback)
+    // Query base — tolera banco sem as colunas novas (fallback).
+    // Agricultor vê: o que ELE criou (criado_por_email) + o que está
+    // vinculado ao e-mail dele (user_email — legado ou login criado p/ ele).
+    // O OR garante que a linha NÃO suma da lista do criador quando o admin
+    // cria um login (user_email passa a ser o e-mail novo, mas criado_por fica).
     let rows: any[] | null = null;
     if (!adminView && sessionEmail) {
       const attempt = await db
         .from("responsaveis")
         .select("*")
-        .eq("user_email", sessionEmail)
+        .or(`criado_por_email.eq.${sessionEmail},user_email.eq.${sessionEmail}`)
         .order("created_at", { ascending: true });
-      if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email"))) {
-        // Coluna ainda não existe: retorna tudo e filtra em memória pelo criado_por
+      if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email") || attempt.error.message?.includes("criado_por"))) {
+        // Colunas ainda não existem: busca tudo e filtra em memória abaixo
         const fb = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
         if (fb.error) throw fb.error;
         rows = fb.data ?? [];
@@ -67,6 +71,16 @@ export async function GET() {
         if (attempt.error) throw attempt.error;
         rows = attempt.data ?? [];
       }
+      // Rede de segurança em memória (vale p/ os dois caminhos acima):
+      // nunca entrega ao agricultor linhas de outros donos.
+      rows = (rows ?? []).filter((r) => {
+        const dono = (r.criado_por_email ?? "").trim().toLowerCase();
+        const vinculado = (r.user_email ?? "").trim().toLowerCase();
+        if (dono) return dono === sessionEmail || vinculado === sessionEmail;
+        // Legado sem criado_por: dono = user_email (desde que não vinculado a login)
+        if (r.user_id) return vinculado === sessionEmail;
+        return vinculado === sessionEmail;
+      });
     } else {
       const { data, error } = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
       if (error) {
@@ -307,16 +321,33 @@ export async function DELETE(req: Request) {
     const adminView = isAdminOrDiretor(session);
 
     // Se não for admin, verifica se o responsável pertence ao usuário
+    // (dono = criado_por_email; user_email sozinho não basta, pois o admin
+    // pode ter trocado o user_email ao criar um login para a pessoa)
     if (!adminView) {
       const { data: resp, error: fetchError } = await db
         .from("responsaveis")
-        .select("user_email")
+        .select("user_email, criado_por_email, user_id")
         .eq("id", id)
         .single();
 
-      if (fetchError) throw fetchError;
-      if (!resp || (resp as { user_email?: string }).user_email !== sessionEmail) {
-        return NextResponse.json({ error: "Sem permissão para deletar este responsável." }, { status: 403 });
+      if (fetchError) {
+        // Banco sem as colunas novas: tenta só com user_email
+        if (fetchError.code === "PGRST204" || fetchError.message?.includes("criado_por") || fetchError.message?.includes("user_id")) {
+          const fb = await db.from("responsaveis").select("user_email").eq("id", id).single();
+          if (fb.error) throw fb.error;
+          if (!fb.data || (fb.data as { user_email?: string }).user_email !== sessionEmail) {
+            return NextResponse.json({ error: "Sem permissão para deletar este responsável." }, { status: 403 });
+          }
+        } else {
+          throw fetchError;
+        }
+      } else {
+        const dono = ((resp as { criado_por_email?: string | null }).criado_por_email ?? "").trim().toLowerCase();
+        const vinculado = ((resp as { user_email?: string | null }).user_email ?? "").trim().toLowerCase();
+        const ehDono = dono ? dono === sessionEmail : vinculado === sessionEmail && !(resp as { user_id?: string | null }).user_id;
+        if (!ehDono) {
+          return NextResponse.json({ error: "Sem permissão para deletar este responsável." }, { status: 403 });
+        }
       }
     }
 

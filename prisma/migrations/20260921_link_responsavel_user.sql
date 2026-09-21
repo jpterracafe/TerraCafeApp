@@ -24,7 +24,15 @@ ON public.responsaveis(user_email);
 CREATE INDEX IF NOT EXISTS idx_responsaveis_user_id
 ON public.responsaveis(user_id);
 
--- 3. Backfill: se já existe um user com o mesmo nome do responsável,
+-- 3. Backfill do DONO antes de qualquer vínculo: preserva quem cadastrou.
+-- (Em bancos onde user_email = e-mail do criador, ele vira criado_por_email.
+--  Precisa rodar ANTES do passo 4, que reutiliza user_email p/ o login.)
+UPDATE public.responsaveis
+SET criado_por_email = user_email
+WHERE criado_por_email IS NULL
+  AND user_email IS NOT NULL;
+
+-- 4. Backfill: se já existe um user com o mesmo nome do responsável,
 -- preenche user_id/user_email para marcar "tem login" automaticamente.
 -- (match case-insensitive, sem acento aproximado — o app faz o match
 -- normalizado em runtime; aqui é só uma ajuda inicial)
@@ -33,6 +41,7 @@ SET user_id = u.id,
     user_email = u.email
 FROM public.users u
 WHERE r.user_id IS NULL
+  AND r.user_email IS NULL
   AND r.nome IS NOT NULL
   AND u.name IS NOT NULL
   AND lower(trim(r.nome)) = lower(trim(u.name));

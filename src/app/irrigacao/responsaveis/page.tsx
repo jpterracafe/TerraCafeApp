@@ -30,6 +30,8 @@ export default function ResponsaveisPage() {
   const [loginSaving, setLoginSaving] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loginResult, setLoginResult] = useState<{ senha: string; projetos: string[]; aviso?: string | null } | null>(null);
+  const [loginConflito, setLoginConflito] = useState<{ email: string } | null>(null);
+  const [vinculando, setVinculando] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const loadResponsaveis = useCallback(async () => {
@@ -101,7 +103,35 @@ export default function ResponsaveisPage() {
     setLoginCargo('Agricultor');
     setLoginError('');
     setLoginResult(null);
+    setLoginConflito(null);
+    setVinculando(false);
     setLoginSaving(false);
+  };
+
+  const handleVincular = async () => {
+    if (!loginTarget || !loginConflito) return;
+    setVinculando(true);
+    setLoginError('');
+    try {
+      const res = await fetch('/api/admin/responsaveis/vincular', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responsavelId: loginTarget.id, userEmail: loginConflito.email }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(data.error || 'Não foi possível vincular.');
+        return;
+      }
+      setResponsaveis(prev => prev.map(r => r.id === loginTarget.id
+        ? { ...r, temLogin: true, loginEmail: loginConflito.email.toLowerCase(), user_email: loginConflito.email.toLowerCase(), user_id: data.user?.id ?? r.user_id }
+        : r));
+      closeCriarLogin();
+    } catch {
+      setLoginError('Erro de conexão. Tente novamente.');
+    } finally {
+      setVinculando(false);
+    }
   };
 
   const handleCriarLogin = async (e: React.FormEvent) => {
@@ -109,6 +139,7 @@ export default function ResponsaveisPage() {
     if (!loginTarget || !loginEmail.trim()) return;
     setLoginSaving(true);
     setLoginError('');
+    setLoginConflito(null);
     try {
       const res = await fetch('/api/admin/responsaveis/criar-login', {
         method: 'POST',
@@ -118,6 +149,7 @@ export default function ResponsaveisPage() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setLoginError(data.error || 'Não foi possível criar o login.');
+        if (data.conflito?.email) setLoginConflito({ email: data.conflito.email });
         return;
       }
       setLoginResult({ senha: data.senhaGerada, projetos: data.projetos ?? [], aviso: data.avisoHomonimos ?? null });
@@ -437,7 +469,20 @@ export default function ResponsaveisPage() {
                   </div>
                   <p className="text-xs text-slate-500">A senha é gerada aleatoriamente e fica visível na tela + salva para consulta.</p>
                   {loginError && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm">{loginError}</div>
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm space-y-2">
+                      <p>{loginError}</p>
+                      {loginConflito && (
+                        <button
+                          type="button"
+                          onClick={handleVincular}
+                          disabled={vinculando}
+                          className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-70"
+                        >
+                          {vinculando ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Link2 className="w-4 h-4" />}
+                          {vinculando ? 'Vinculando...' : `Vincular a ${loginConflito.email} em vez de criar outro`}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </form>
               ) : (

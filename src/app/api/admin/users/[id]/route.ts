@@ -60,6 +60,44 @@ export async function DELETE(
       throw deleteError;
     }
 
+    // Desvincula responsáveis ligados a esse login: eles voltam a aparecer
+    // como "Sem login" (como eram antes), SEM mexer nas fases — o nome
+    // continua nas fases/projetos, só o acesso ao sistema é removido.
+    // (Tolerante a bancos sem as colunas novas.)
+    try {
+      const un1 = await db.from("responsaveis").update({ user_id: null, user_email: null }).eq("user_id", id);
+      if (un1.error && (un1.error.code === "PGRST204" || un1.error.message?.includes("user_id"))) {
+        // Sem coluna user_id: nada a desvincular de forma segura
+        // (limpar user_email aqui apagaria também a informação de dono).
+      } else if (un1.error) {
+        console.warn("[DELETE /api/admin/users/[id]] Falha ao desvincular por user_id:", JSON.stringify(un1.error));
+      } else if (user.email) {
+        // Linhas vinculadas só por e-mail (user_id nulo, mas criado_por de outra pessoa)
+        const emailLc = user.email.trim().toLowerCase();
+        const un2 = await db
+          .from("responsaveis")
+          .update({ user_email: null })
+          .eq("user_email", emailLc)
+          .is("user_id", null)
+          .not("criado_por_email", "is", null)
+          .neq("criado_por_email", emailLc);
+        if (un2.error && un2.error.code !== "PGRST204" && !un2.error.message?.includes("criado_por")) {
+          console.warn("[DELETE /api/admin/users/[id]] Falha ao desvincular por email:", JSON.stringify(un2.error));
+        }
+      }
+    } catch (e) {
+      console.warn("[DELETE /api/admin/users/[id]] Desvinculação ignorada:", e);
+    }
+
+    // Limpeza best-effort de permissões explícitas (tabela pode nem existir)
+    try {
+      if (user.email) {
+        await db.from("user_projetos").delete().eq("user_email", user.email.trim().toLowerCase());
+      }
+    } catch {
+      // silent — tabela opcional
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[DELETE /api/admin/users/[id]]", error);

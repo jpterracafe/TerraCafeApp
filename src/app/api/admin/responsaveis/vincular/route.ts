@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
+import { normalizeName } from "@/lib/responsaveis";
 
 function podeVincular(session: unknown): boolean {
   const role = (session as { user?: { role?: string } } | null)?.user?.role || "";
@@ -37,9 +38,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Usuário não encontrado para este e-mail." }, { status: 404 });
     }
 
-    const { data: resp } = await db.from("responsaveis").select("id").eq("id", responsavelId).maybeSingle();
+    const { data: resp } = await db.from("responsaveis").select("id, nome").eq("id", responsavelId).maybeSingle();
     if (!resp) {
       return NextResponse.json({ error: "Responsável não encontrado." }, { status: 404 });
+    }
+
+    // Guarda: os nomes precisam bater — senão os projetos NÃO aparecem para
+    // a pessoa (o acesso é por match de nome) e o vínculo ficaria mentiroso.
+    const nomeResp = String((resp as { nome?: string }).nome ?? "");
+    const nomeUser = String((user as { name?: string | null }).name ?? "");
+    if (normalizeName(nomeResp) !== normalizeName(nomeUser)) {
+      return NextResponse.json(
+        { error: `Os nomes não conferem ("${nomeResp}" ≠ "${nomeUser}"). Vincule apenas ao login da mesma pessoa — senão os projetos não aparecem para ela.` },
+        { status: 400 }
+      );
     }
 
     const attempt = await db
