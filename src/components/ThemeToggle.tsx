@@ -4,13 +4,22 @@ import React, { useEffect, useState } from 'react';
 import { Sun, Moon } from 'lucide-react';
 
 export default function ThemeToggle() {
-  const savedInitialTheme = localStorage.getItem('terracafe_theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const [isDark, setIsDark] = useState(() => {
-    if (savedInitialTheme === 'dark') return true;
-    if (savedInitialTheme === 'light') return false;
-    return prefersDark;
-  });
+  // SSR-safe: o primeiro render (servidor) sempre assume "dark", igual ao
+  // script inline do layout. O valor real do localStorage é aplicado após
+  // montar, só no browser — nunca encosta em window/localStorage no SSR.
+  const [isDark, setIsDark] = useState(true);
+
+  // Sincroniza com a preferência salva ao montar (client-only)
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('terracafe_theme');
+      if (saved === 'dark') setIsDark(true);
+      else if (saved === 'light') setIsDark(false);
+      else setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
+    } catch {
+      // mantém dark
+    }
+  }, []);
 
   useEffect(() => {
     // Apply the initial theme class to document element
