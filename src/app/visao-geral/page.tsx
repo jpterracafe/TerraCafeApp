@@ -548,6 +548,8 @@ export default function VisaoGeralDiretorPage() {
               <span>Atualizar</span>
             </button>
 
+            {/* Botão Painel Operacional OCULTO (página /irrigacao/execucao desativada por enquanto) */}
+            {false && (
             <button
               onClick={() => router.push('/irrigacao/execucao')}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all"
@@ -555,6 +557,7 @@ export default function VisaoGeralDiretorPage() {
               <Layers className="w-3.5 h-3.5 text-blue-500" />
               <span>Painel Operacional</span>
             </button>
+            )}
 
             <button
               onClick={() => router.push('/irrigacao/diario-campo')}

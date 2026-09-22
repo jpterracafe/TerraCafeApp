@@ -4,7 +4,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-export default function BackButton({ fallback = "/irrigacao/execucao" }: { fallback?: string }) {
+export default function BackButton({ fallback = "/irrigacao/diario-campo" }: { fallback?: string }) {
   const router = useRouter();
 
   return (

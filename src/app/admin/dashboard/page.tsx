@@ -908,6 +908,8 @@ export default function DashboardPage() {
             Diário de Campo
           </Link>
 
+          {/* Botão Cronograma OCULTO (página /irrigacao/execucao desativada por enquanto) */}
+          {false && (
           <Link
             href="/irrigacao/execucao"
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all"
@@ -915,6 +917,7 @@ export default function DashboardPage() {
             <Layers className="w-3.5 h-3.5" />
             Cronograma
           </Link>
+          )}
 
           <button
             onClick={() => {

@@ -30,15 +30,15 @@ export default function LoginPage() {
         router.replace('/admin/usuarios');
       } else if (role === 'Admin') {
         // Admin NÃO é master de /admin/usuarios (a página o redirecionaria
-        // para execucao) — vai direto para evitar o "quique" entre páginas.
-        router.replace('/irrigacao/execucao');
+        // para diario-campo) — vai direto para evitar o "quique" entre páginas.
+        router.replace('/irrigacao/diario-campo');
       } else if (role === 'Diretor') {
         router.replace('/visao-geral');
       } else if (role === 'Agricultor') {
         router.replace('/irrigacao/diario-campo');
       } else {
-        // Colaborador e outros roles vão para execução
-        router.replace('/irrigacao/execucao');
+        // Colaborador e outros roles vão para o diário (execução oculta)
+        router.replace('/irrigacao/diario-campo');
       }
     }
   }, [session, status, router]);

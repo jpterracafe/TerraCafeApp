@@ -51,7 +51,7 @@ export default function AdminImportarCSVPage() {
     if (status === 'loading') return;
     const role = (session?.user as { role?: string } | undefined)?.role;
     if (status !== 'authenticated' || role !== 'Desenvolvedor') {
-      router.push(status === 'authenticated' ? '/irrigacao/execucao' : '/login');
+      router.push(status === 'authenticated' ? '/irrigacao/diario-campo' : '/login');
     } else {
       setIsAuthorized(true);
     }
@@ -206,11 +206,11 @@ export default function AdminImportarCSVPage() {
           <LogoutButton />
           
           <Link 
-            href="/irrigacao/execucao"
+            href="/irrigacao/diario-campo"
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 text-sm"
           >
             <Layers className="w-4 h-4" />
-            Ver no Painel de Irrigação
+            Ver no Diário de Campo
           </Link>
         </div>
       </div>
@@ -362,10 +362,10 @@ export default function AdminImportarCSVPage() {
               </h3>
               {previewData.length > 0 && (
                 <Link 
-                  href="/irrigacao/execucao"
+                  href="/irrigacao/diario-campo"
                   className="text-xs font-medium text-blue-500 hover:text-blue-400 flex items-center gap-1"
                 >
-                  Abrir no Painel <ArrowRight className="w-3.5 h-3.5" />
+                  Abrir no Diário <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               )}
             </div>

@@ -119,7 +119,7 @@ export default function AdminUsuariosPage() {
     if (status === 'loading') return;
     if (status !== 'authenticated' || !isMaster) {
       if (status === 'authenticated' && !isMaster) {
-        router.push('/irrigacao/execucao');
+        router.push('/irrigacao/diario-campo');
       }
       return;
     }
@@ -291,7 +291,7 @@ export default function AdminUsuariosPage() {
           </Link>
 
           <Link 
-            href="/irrigacao/execucao"
+            href="/irrigacao/diario-campo"
             className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1e293b] px-4 py-2 rounded-lg font-medium transition-all"
           >
             <LayoutDashboard className="w-4 h-4" />

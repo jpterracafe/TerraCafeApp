@@ -20,14 +20,20 @@ export default function NavigationDrawer() {
   const toggleDrawer = () => setIsOpen(!isOpen);
 
   // Mesma regra da página /admin/usuarios: só Desenvolvedor/master vê o link
-  // (a página redireciona quem não é master para /irrigacao/execucao).
+  // (a página redireciona quem não é master para /irrigacao/diario-campo).
   const isMasterDev = isMasterDevSession(session);
+
+  // Página /irrigacao/execucao OCULTA por decisão de produto (arquivo mantido
+  // em src/app/irrigacao/execucao/page.tsx — para reexibir, descomente abaixo).
+  const SHOW_EXECUCAO = false;
 
   const navLinks = [
     { href: '/visao-geral', label: 'Resumo Geral Executivo (Paulo)', icon: LayoutDashboard, color: 'text-blue-500' },
     { href: '/admin/dashboard', label: 'Visão do Diretor (Dashboards)', icon: BarChart2, color: 'text-cyan-500' },
     { href: '/irrigacao/diario-campo', label: 'Diário de Campo', icon: Calendar, color: 'text-amber-500' },
-    { href: '/irrigacao/execucao', label: 'Cronograma & Execução', icon: Layers, color: 'text-indigo-500' },
+    ...(SHOW_EXECUCAO ? [
+      { href: '/irrigacao/execucao', label: 'Cronograma & Execução', icon: Layers, color: 'text-indigo-500' }
+    ] : []),
     { href: '/irrigacao/responsaveis', label: 'Equipe & Responsáveis', icon: Users, color: 'text-emerald-500' },
     { href: '/irrigacao/lixeira', label: 'Lixeira de Projetos', icon: Trash2, color: 'text-rose-500' },
     { href: '/irrigacao/concluidos', label: 'Projetos Concluídos', icon: Archive, color: 'text-emerald-500' },
