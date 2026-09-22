@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   X,
   Lock,
+  Key,
   FileSpreadsheet,
   Trash2,
   Eye,
@@ -60,8 +61,25 @@ export default function AdminUsuariosPage() {
   const [userToDelete, setUserToDelete] = useState<UsuarioSistema | null>(null);
   // Controla quais senhas estão visíveis: Set de IDs com senha revelada
   const [senhasVisiveis, setSenhasVisiveis] = useState<Set<string>>(new Set());
+  // Feedback visual de cópia da senha por ID
+  const [copiedSenhaId, setCopiedSenhaId] = useState<string | null>(null);
   // IDs com reset em andamento
   const [resettingId, setResettingId] = useState<string | null>(null);
+  // Modal de edição manual de senha
+  const [editSenhaUser, setEditSenhaUser] = useState<UsuarioSistema | null>(null);
+  const [editSenhaInput, setEditSenhaInput] = useState('');
+  const [editSenhaLoading, setEditSenhaLoading] = useState(false);
+  const [editSenhaError, setEditSenhaError] = useState('');
+
+  const copySenha = (id: string, senha: string) => {
+    try {
+      navigator.clipboard.writeText(senha);
+      setCopiedSenhaId(id);
+      setTimeout(() => setCopiedSenhaId(null), 2000);
+    } catch {
+      // fallback
+    }
+  };
 
   const toggleSenha = (id: string) => {
     setSenhasVisiveis((prev) => {
@@ -71,8 +89,16 @@ export default function AdminUsuariosPage() {
     });
   };
 
+  const toggleTodasSenhas = () => {
+    const todosIdsComSenha = usuarios.filter((u) => !!u.senhaGerada).map((u) => u.id);
+    if (senhasVisiveis.size >= todosIdsComSenha.length && todosIdsComSenha.length > 0) {
+      setSenhasVisiveis(new Set());
+    } else {
+      setSenhasVisiveis(new Set(todosIdsComSenha));
+    }
+  };
+
   const handleResetSenha = async (u: UsuarioSistema) => {
-    if (!confirm(`Resetar a senha de ${u.nome}? Uma nova senha será gerada e ficará visível na tabela.`)) return;
     setResettingId(u.id);
     try {
       const res = await fetch(`/api/admin/users/${u.id}`, { method: 'PATCH' });
@@ -87,10 +113,46 @@ export default function AdminUsuariosPage() {
       );
       // Revela automaticamente a nova senha
       setSenhasVisiveis((prev) => new Set(prev).add(u.id));
+      copySenha(u.id, data.novaSenha);
     } catch {
       alert('Erro de conexão ao resetar senha.');
     } finally {
       setResettingId(null);
+    }
+  };
+
+  const handleSaveCustomSenha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editSenhaUser) return;
+    const senha = editSenhaInput.trim();
+    if (senha.length < 4) {
+      setEditSenhaError('A senha deve ter pelo menos 4 caracteres.');
+      return;
+    }
+    setEditSenhaLoading(true);
+    setEditSenhaError('');
+    try {
+      const res = await fetch(`/api/admin/users/${editSenhaUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ novaSenha: senha }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEditSenhaError(data.error || 'Erro ao alterar senha.');
+        return;
+      }
+      setUsuarios((prev) =>
+        prev.map((usr) => usr.id === editSenhaUser.id ? { ...usr, senhaGerada: data.novaSenha } : usr)
+      );
+      setSenhasVisiveis((prev) => new Set(prev).add(editSenhaUser.id));
+      copySenha(editSenhaUser.id, data.novaSenha);
+      setEditSenhaUser(null);
+      setEditSenhaInput('');
+    } catch {
+      setEditSenhaError('Erro de conexão ao alterar senha.');
+    } finally {
+      setEditSenhaLoading(false);
     }
   };
 
@@ -131,6 +193,7 @@ export default function AdminUsuariosPage() {
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState<RoleSistema>('Agricultor');
+  const [novaSenhaManual, setNovaSenhaManual] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [inviteError, setInviteError] = useState('');
@@ -191,6 +254,7 @@ export default function AdminUsuariosPage() {
           nome: novoNome.trim(),
           email: novoEmail.trim(),
           cargo: novoCargo,
+          senha: novaSenhaManual.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -241,6 +305,7 @@ export default function AdminUsuariosPage() {
     setNovoEmail('');
     setNovoNome('');
     setNovoCargo('Agricultor');
+    setNovaSenhaManual('');
     setInviteError('');
     setInviteLoading(false);
   };
@@ -337,7 +402,31 @@ export default function AdminUsuariosPage() {
                 <th className="px-6 py-4 font-medium">Usuário</th>
                 <th className="px-6 py-4 font-medium">Nível de Acesso (Cargo)</th>
                 <th className="px-6 py-4 font-medium">Status da Conta</th>
-                <th className="px-6 py-4 font-medium">Senha Provisória</th>
+                <th className="px-6 py-4 font-medium">
+                  <div className="flex items-center gap-2">
+                    <span>Senha Provisória</span>
+                    {usuarios.some((u) => !!u.senhaGerada) && (
+                      <button
+                        type="button"
+                        onClick={toggleTodasSenhas}
+                        className="text-[11px] font-normal normal-case text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Revelar ou ocultar todas as senhas"
+                      >
+                        {senhasVisiveis.size > 0 ? (
+                          <>
+                            <EyeOff className="w-3.5 h-3.5" />
+                            <span>Ocultar todas</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Revelar todas</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </th>
                 <th className="px-6 py-4 font-medium">Último Login</th>
                 <th className="px-6 py-4 font-medium text-right">Ações</th>
               </tr>
@@ -410,20 +499,44 @@ export default function AdminUsuariosPage() {
                     <td className="px-6 py-4">
                       {temSenha ? (
                         <div className="flex items-center gap-2">
-                          <code className={`font-mono text-sm tracking-widest transition-all select-all ${senhaVisivel ? 'text-emerald-400' : 'text-slate-400'}`}>
+                          <code className={`font-mono text-sm tracking-widest transition-all select-all font-semibold ${senhaVisivel ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400'}`}>
                             {senhaVisivel ? u.senhaGerada : '••••••••'}
                           </code>
                           <button
                             type="button"
                             onClick={() => toggleSenha(u.id)}
-                            className="p-1.5 rounded-md text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                            className="p-1.5 rounded-md text-slate-400 hover:text-blue-500 hover:bg-blue-500/10 transition-colors"
                             title={senhaVisivel ? 'Ocultar senha' : 'Revelar senha'}
                           >
                             {senhaVisivel ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => copySenha(u.id, u.senhaGerada!)}
+                            className={`p-1.5 rounded-md transition-colors ${copiedSenhaId === u.id ? 'text-emerald-500 bg-emerald-500/10' : 'text-slate-400 hover:text-emerald-500 hover:bg-emerald-500/10'}`}
+                            title="Copiar senha"
+                          >
+                            {copiedSenhaId === u.id ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                          </button>
                         </div>
                       ) : (
-                        <span className="text-xs text-slate-500 italic">Não disponível</span>
+                        <div className="inline-flex items-center gap-2">
+                          <span className="text-xs text-amber-500/90 font-medium italic">Não definida</span>
+                          <button
+                            type="button"
+                            onClick={() => handleResetSenha(u)}
+                            disabled={resettingId === u.id}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20 transition-all disabled:opacity-50"
+                            title="Gerar senha provisória agora"
+                          >
+                            {resettingId === u.id ? (
+                              <span className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                            ) : (
+                              <Key className="w-3 h-3" />
+                            )}
+                            Gerar
+                          </button>
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
@@ -433,23 +546,36 @@ export default function AdminUsuariosPage() {
                       <div className="inline-flex items-center justify-end gap-2">
                         <button
                           type="button"
+                          onClick={() => {
+                            setEditSenhaUser(u);
+                            setEditSenhaInput(u.senhaGerada || '');
+                            setEditSenhaError('');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-blue-500 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors"
+                          title="Definir senha personalizada para este usuário"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          Alterar
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleResetSenha(u)}
                           disabled={resettingId === u.id}
                           title="Gerar nova senha provisória para este usuário"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors disabled:opacity-50"
                         >
                           {resettingId === u.id ? (
                             <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                           ) : (
                             <Lock className="w-3.5 h-3.5" />
                           )}
-                          Resetar senha
+                          Resetar
                         </button>
                         <button
                           type="button"
                           onClick={() => setUserToDelete(u)}
                           disabled={deletingId === u.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors disabled:opacity-50"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           Excluir
@@ -525,6 +651,19 @@ export default function AdminUsuariosPage() {
                       <option value="Admin">🛡️ Admin (Administrador da Plataforma)</option>
                       <option value="Diretor">👔 Diretor (Acompanhamento Executivo)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                      Senha Provisória (Opcional)
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Deixe em branco para gerar aleatória (8 caracteres)"
+                      value={novaSenhaManual}
+                      onChange={(e) => setNovaSenhaManual(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500 transition-colors placeholder:font-sans placeholder:text-slate-500"
+                    />
                   </div>
 
                   {inviteError && (
@@ -619,6 +758,89 @@ export default function AdminUsuariosPage() {
                 {deletingId === userToDelete.id ? 'Excluindo...' : 'Excluir do banco'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL - ALTERAR SENHA DO USUÁRIO */}
+      {editSenhaUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl shadow-black overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                  <Key className="w-5 h-5 text-blue-500" />
+                  Alterar Senha do Usuário
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {editSenhaUser.nome} ({editSenhaUser.email})
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditSenhaUser(null);
+                  setEditSenhaInput('');
+                  setEditSenhaError('');
+                }}
+                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomSenha} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Digite a nova senha (mínimo 4 caracteres)"
+                    value={editSenhaInput}
+                    onChange={(e) => setEditSenhaInput(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1.5">
+                  A senha será salva de forma segura e ficará visível na tabela para o desenvolvedor master.
+                </p>
+              </div>
+
+              {editSenhaError && (
+                <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 p-3 rounded-lg text-sm flex items-center gap-2">
+                  <Lock className="w-4 h-4 shrink-0" />
+                  {editSenhaError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditSenhaUser(null);
+                    setEditSenhaInput('');
+                    setEditSenhaError('');
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSenhaLoading || !editSenhaInput.trim()}
+                  className="px-5 py-2.5 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2 disabled:opacity-60"
+                >
+                  {editSenhaLoading ? (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Key className="w-4 h-4" />
+                  )}
+                  {editSenhaLoading ? 'Salvando...' : 'Salvar Nova Senha'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

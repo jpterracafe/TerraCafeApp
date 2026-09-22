@@ -53,14 +53,14 @@ function notify() {
 }
 
 export function isOnline(): boolean {
-  if (typeof navigator === "undefined") return true;
+  if (typeof window === "undefined" || typeof navigator === "undefined") return true;
   return navigator.onLine !== false;
 }
 
 function readQueue(): QueuedRequest[] {
-  if (typeof localStorage === "undefined") return [];
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return [];
   try {
-    const raw = localStorage.getItem(QUEUE_KEY);
+    const raw = window.localStorage.getItem(QUEUE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? (parsed as QueuedRequest[]) : [];
   } catch {
@@ -69,9 +69,9 @@ function readQueue(): QueuedRequest[] {
 }
 
 function writeQueue(items: QueuedRequest[]) {
-  if (typeof localStorage === "undefined") return;
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+    window.localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
   } catch (e) {
     console.error("[offline] Falha ao persistir fila de sincronização:", e);
   }
@@ -93,9 +93,9 @@ interface CacheEntry {
 }
 
 function readCache(): Record<string, CacheEntry> {
-  if (typeof localStorage === "undefined") return {};
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return {};
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = window.localStorage.getItem(CACHE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === "object" ? (parsed as Record<string, CacheEntry>) : {};
   } catch {
@@ -104,16 +104,16 @@ function readCache(): Record<string, CacheEntry> {
 }
 
 function writeCache(cache: Record<string, CacheEntry>) {
-  if (typeof localStorage === "undefined") return;
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return;
   try {
     const entries = Object.entries(cache)
       .sort((a, b) => b[1].ts - a[1].ts)
       .slice(0, MAX_CACHE_ENTRIES);
-    localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)));
   } catch {
     // Cota cheia — descarta o cache (é best-effort) e segue
     try {
-      localStorage.removeItem(CACHE_KEY);
+      window.localStorage.removeItem(CACHE_KEY);
     } catch {
       // noop
     }

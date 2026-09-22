@@ -145,11 +145,18 @@ export async function PATCH(
       return NextResponse.json({ ok: true, role: novoCargo, cargo: novoCargo });
     }
 
-    // 2. Reset de senha aleatória (se não enviou role) com CSPRNG
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    // 2. Reset de senha aleatória ou definição manual de senha
     let novaSenha = "";
-    for (let i = 0; i < 8; i++) {
-      novaSenha += chars.charAt(randomInt(chars.length));
+    if (body.novaSenha || body.senha || body.password) {
+      novaSenha = String(body.novaSenha || body.senha || body.password).trim();
+      if (novaSenha.length < 4) {
+        return NextResponse.json({ error: "A senha deve ter no mínimo 4 caracteres." }, { status: 400 });
+      }
+    } else {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      for (let i = 0; i < 8; i++) {
+        novaSenha += chars.charAt(randomInt(chars.length));
+      }
     }
 
     const hashed = await bcrypt.hash(novaSenha, 10);
@@ -164,7 +171,7 @@ export async function PATCH(
       throw error;
     }
 
-    return NextResponse.json({ novaSenha });
+    return NextResponse.json({ ok: true, novaSenha });
   } catch (error) {
     console.error("[PATCH /api/admin/users/[id]]", error);
     return NextResponse.json({ error: "Erro ao processar alteração." }, { status: 500 });

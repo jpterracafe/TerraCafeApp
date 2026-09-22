@@ -21,23 +21,34 @@ export async function GET() {
     }
 
     const db = getSupabase();
-    const { data: users, error } = await db
+    let usersList: any[] = [];
+    const { data: withSenhaTemp, error: errTemp } = await db
       .from("users")
-      .select("id, name, email, role, created_at")
+      .select("id, name, email, role, senha_temp, created_at")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("[GET /api/admin/users]", error);
-      return NextResponse.json({ error: "Erro ao conectar ao banco de dados." }, { status: 500 });
+    if (!errTemp && withSenhaTemp) {
+      usersList = withSenhaTemp;
+    } else {
+      const { data: fallback, error: errFallback } = await db
+        .from("users")
+        .select("id, name, email, role, created_at")
+        .order("created_at", { ascending: false });
+      if (errFallback) {
+        console.error("[GET /api/admin/users]", errFallback);
+        return NextResponse.json({ error: "Erro ao conectar ao banco de dados." }, { status: 500 });
+      }
+      usersList = fallback ?? [];
     }
 
-    // Compatível: mantém o campo senhaTemp (sempre null aqui) para não quebrar
-    // a tipagem da tela, mas NÃO expõe mais senha_temp em listagem.
-    // A senha temporária continua retornada uma única vez no POST/PATCH.
     return NextResponse.json({
-      users: (users ?? []).map((u: any) => ({
-        id: u.id, name: u.name, email: u.email,
-        role: u.role, senhaTemp: null, createdAt: u.created_at,
+      users: usersList.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        senhaTemp: u.senha_temp ?? null,
+        createdAt: u.created_at,
       })),
     });
   } catch (error) {
@@ -79,11 +90,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Já existe um usuário com este e-mail." }, { status: 409 });
     }
 
-    // Gerar senha aleatória (8 chars maiúsculos/números sem ambiguidade) com CSPRNG
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let senhaGerada = "";
-    for (let i = 0; i < 8; i++) {
-      senhaGerada += chars.charAt(randomInt(chars.length));
+    // Senha informada pelo admin ou gerada aleatoriamente (8 chars maiúsculos/números)
+    const senhaInformada = String(body?.senha || body?.password || "").trim();
+    let senhaGerada = senhaInformada;
+    if (!senhaGerada) {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      for (let i = 0; i < 8; i++) {
+        senhaGerada += chars.charAt(randomInt(chars.length));
+      }
     }
 
     const hashed = await bcrypt.hash(senhaGerada, 10);

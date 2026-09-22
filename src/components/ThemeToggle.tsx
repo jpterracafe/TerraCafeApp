@@ -32,12 +32,15 @@ export default function ThemeToggle() {
 
   // Sync theme when system preference changes (only if user hasn't set a preference)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const onChange = () => {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (!localStorage.getItem('terracafe_theme')) {
-        setIsDark(prefersDark);
-        document.documentElement.classList.toggle('dark', prefersDark);
-      }
+      try {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (!window.localStorage?.getItem('terracafe_theme')) {
+          setIsDark(prefersDark);
+          document.documentElement.classList.toggle('dark', prefersDark);
+        }
+      } catch {}
     };
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     mediaQuery.addEventListener('change', onChange);
@@ -45,14 +48,26 @@ export default function ThemeToggle() {
   }, []);
 
   const setLightMode = () => {
-    document.documentElement.classList.remove('dark');
-    localStorage.setItem('terracafe_theme', 'light');
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.remove('dark');
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage?.setItem('terracafe_theme', 'light');
+      } catch {}
+    }
     setIsDark(false);
   };
 
   const setDarkMode = () => {
-    document.documentElement.classList.add('dark');
-    localStorage.setItem('terracafe_theme', 'dark');
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.add('dark');
+    }
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage?.setItem('terracafe_theme', 'dark');
+      } catch {}
+    }
     setIsDark(true);
   };
 
