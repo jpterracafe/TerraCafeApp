@@ -12,13 +12,15 @@ import BackButton from '@/components/BackButton';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  LineChart, Line, Legend, Area, AreaChart,
+  Legend, Area, AreaChart,
 } from 'recharts';
 import {
-  ChevronRight, Layers, AlertTriangle, CheckCircle2, Clock,
+  ChevronRight, Layers, AlertTriangle, CheckCircle2,
   Users, Activity, TrendingUp, BarChart2, RefreshCw, Briefcase,
   FileDown, Calendar, Info, Sparkles, X, Wrench, Eye, ArrowUpRight, CloudRain
 } from 'lucide-react';
+import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
+import { hojeSP } from '@/lib/validators';
 
 import { EtapaCampo } from '@/app/irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '@/app/irrigacao/execucao/page';
@@ -76,22 +78,6 @@ function ChartInfoTooltip({ text }: { text: string }) {
   );
 }
 
-interface HistoricoItem {
-  id: string;
-  faseId: string;
-  campo: string;
-  valorAnterior: string;
-  valorNovo: string;
-  usuario: string;
-  criadoEm: string;
-}
-
-interface ResponsavelItem {
-  id: string;
-  nome: string;
-  cargo?: string;
-}
-
 interface FaseAcaoItem {
   id: string;
   gabarito: string;
@@ -139,9 +125,7 @@ export default function DashboardPage() {
   // Dados brutos
   const [fases, setFases] = useState<FaseAcaoItem[]>([]);
   const [logs, setLogs] = useState<DiarioLog[]>([]);
-  const [, setResponsaveis] = useState<ResponsavelItem[]>([]);
   const [projetosList, setProjetosList] = useState<string[]>([]);
-  const [historicoAcoes, setHistoricoAcoes] = useState<HistoricoItem[]>([]);
 
   // Configurações salvas do Diário
   const [configEtapas, setConfigEtapas] = useState<Record<string, EtapaConfig>>({});
@@ -164,9 +148,10 @@ export default function DashboardPage() {
     if (status !== 'authenticated') router.push('/login');
   }, [status, router]);
 
-  // Carrega dados das APIs e localStorage
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // Carrega dados das APIs e localStorage.
+  // silent=true (polling/foco) atualiza sem piscar o skeleton cheio.
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       // Ler localStorage
       try {
@@ -185,22 +170,18 @@ export default function DashboardPage() {
         console.error('[dashboard] Erro ao ler localStorage:', e);
       }
 
-      const [fasesRes, respRes, logsRes, projRes, configRes, histRes, rolesRes] = await Promise.all([
+      const [fasesRes, logsRes, projRes, configRes, rolesRes] = await Promise.all([
         fetch('/api/fases'),
-        fetch('/api/responsaveis'),
         fetch('/api/diario-logs'),
         fetch('/api/projetos'),
         fetch('/api/etapas-config'),
-        fetch('/api/historico-fases'),
         fetch('/api/usuarios-roles'),
       ]);
 
       const fasesJson  = fasesRes.ok  ? await fasesRes.json()  : { fases: [] };
-      const respJson   = respRes.ok   ? await respRes.json()   : { responsaveis: [] };
       const logsJson   = logsRes.ok   ? await logsRes.json()   : { logs: [] };
       const projJson   = projRes.ok   ? await projRes.json()   : { projetos: [] };
       const configJson = configRes.ok ? await configRes.json() : null;
-      const histJson   = histRes.ok   ? await histRes.json()   : { historico: [] };
       const rolesJson  = rolesRes.ok  ? await rolesRes.json()  : { users: [] };
 
       if (configJson) {
@@ -215,8 +196,6 @@ export default function DashboardPage() {
         setProjetosCriadores(projJson.criadores);
       }
 
-      setHistoricoAcoes(histJson.historico ?? []);
-
       // Mapeamento de cargos de usuários
       const roleMap: Record<string, string> = {};
       (rolesJson.users || []).forEach((u: { name?: string; email?: string; role?: string }) => {
@@ -227,7 +206,6 @@ export default function DashboardPage() {
 
       const allFases: FaseAcaoItem[] = fasesJson.fases ?? [];
       const allLogs: DiarioLog[] = logsJson.logs ?? [];
-      const allResp: ResponsavelItem[] = respJson.responsaveis ?? [];
       const fromApiProj: string[] = projJson.projetos ?? [];
 
       // Monta lista única de projetos ativos
@@ -254,7 +232,6 @@ export default function DashboardPage() {
 
       setFases(allFases.filter(f => !f.isDeleted));
       setLogs(allLogs);
-      setResponsaveis(allResp);
       setProjetosList(unicos);
       setLastUpdate(new Date());
     } catch (err) {
@@ -282,7 +259,7 @@ export default function DashboardPage() {
     const startPolling = () => {
       if (timerId) return;
       timerId = setInterval(() => {
-        if (!loading) loadData();
+        if (!loading) void loadData(true);
       }, REFRESH_MS);
     };
 
@@ -295,7 +272,7 @@ export default function DashboardPage() {
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!loading) loadData();
+        if (!loading) void loadData(true);
         startPolling();
       } else {
         stopPolling();
@@ -303,7 +280,7 @@ export default function DashboardPage() {
     };
 
     const onFocus = () => {
-      if (!loading) loadData();
+      if (!loading) void loadData(true);
     };
 
     startPolling();
@@ -346,7 +323,7 @@ export default function DashboardPage() {
           const datas = logsProjeto.map(l => l.data).sort();
           dataStart = datas[0];
         } else {
-          dataStart = hoje.toISOString().split('T')[0];
+          dataStart = hojeSP();
         }
       }
 
@@ -502,12 +479,13 @@ export default function DashboardPage() {
   }, [logsFiltradosPeriodo, selectedProjetoFilter]);
 
   // ── KPIs Globais do Diretor ─────────────────────────────────────────────────
+  // Vazios honestos: sem obras/logs no escopo, mostra "—" em vez de 100%.
   const kpisDiretor = useMemo(() => {
     const totalObras = obrasCampo.length;
     const obrasNoRitmo = obrasCampo.filter(o => o.saude === 'normal' || o.saude === 'excelente').length;
     const obrasAlerta = obrasCampo.filter(o => o.saude === 'alerta').length;
     const obrasChuva = obrasCampo.filter(o => o.saude === 'chuva').length;
-    const indiceSaude = totalObras > 0 ? Math.round((obrasNoRitmo / totalObras) * 100) : 100;
+    const indiceSaude = totalObras > 0 ? Math.round((obrasNoRitmo / totalObras) * 100) : null;
 
     // Rendimento dos logs recentes
     let countAcima = 0;
@@ -524,11 +502,11 @@ export default function DashboardPage() {
     });
 
     const totalLogsVisiveis = logsVisiveis.length;
-    const taxaRendimentoBom = totalLogsVisiveis > 0 
-      ? Math.round(((countAcima + countDentro) / totalLogsVisiveis) * 100) 
-      : 100;
+    const taxaRendimentoBom = totalLogsVisiveis > 0
+      ? Math.round(((countAcima + countDentro) / totalLogsVisiveis) * 100)
+      : null;
 
-    const hojeStr = new Date().toISOString().split('T')[0];
+    const hojeStr = hojeSP();
     const logsHoje = logs.filter(l => l.data === hojeStr).length;
 
     return {
@@ -564,28 +542,29 @@ export default function DashboardPage() {
     });
   }, [obrasCampo]);
 
-  // 2. Gráfico Donut de Rendimento de Campo
+  // 2. Gráfico Donut de Rendimento de Campo (categorias zeradas aparecem com 0).
   const dadosDonutRendimento = useMemo(() => {
     return [
       { name: 'Dentro do Programado', value: kpisDiretor.countDentro, fill: '#10b981' },
       { name: 'Acima (Acelerado)',     value: kpisDiretor.countAcima,  fill: '#3b82f6' },
       { name: 'Abaixo (Atraso/Risco)', value: kpisDiretor.countAbaixo, fill: '#f43f5e' },
       { name: 'Chuva / Paralisação',   value: kpisDiretor.countChuva,  fill: '#06b6d4' },
-    ].filter(item => item.value > 0);
+    ];
   }, [kpisDiretor]);
 
   // 3. Atividade Diária nos Últimos 14 Dias (Timeline de Registros)
   const dadosTimelineAtividade = useMemo(() => {
     const dias = 14;
     const resultado: { dia: string; dataCompleta: string; registros: number; acima: number; abaixo: number }[] = [];
+    const fmtSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
 
     for (let i = dias - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dStr = d.toISOString().split('T')[0];
+      const dStr = fmtSP.format(d);
       const logsDoDia = logsVisiveis.filter(l => l.data === dStr);
 
-      const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
       resultado.push({
         dia: label,
         dataCompleta: dStr,
@@ -618,7 +597,8 @@ export default function DashboardPage() {
         email = trimmed.toLowerCase();
         nome = extractUserName(email);
       } else {
-        const clean = trimmed.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+        // Normaliza removendo acentos (João → joao) em vez de destruir letras.
+        const clean = trimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9._-]/g, '');
         email = `${clean}@terracafe.com`;
         nome = extractUserName(trimmed);
       }
@@ -630,7 +610,7 @@ export default function DashboardPage() {
       const nomeLower = (p.nome || '').toLowerCase().trim();
       if (emailLower && usuariosRoles[emailLower]) return usuariosRoles[emailLower];
       if (nomeLower && usuariosRoles[nomeLower]) return usuariosRoles[nomeLower];
-      if (emailLower === 'joao2005souza@gmail.com') return 'Desenvolvedor';
+      if (emailLower === ADMIN_MASTER_EMAIL.toLowerCase()) return 'Desenvolvedor';
       return 'Agricultor';
     };
 
@@ -725,7 +705,7 @@ export default function DashboardPage() {
           (l.status || '').toLowerCase().includes('concluído') || 
           (l.status || '').toLowerCase().includes('concluido')
         );
-        const isConc = temConcluido || cfg?.status === 'Concluída';
+        const isConc = temConcluido || (cfg?.status || '').toLowerCase().includes('concluíd') || (cfg?.status || '').toLowerCase().includes('concluid');
 
         if (isConc) {
           concluidas++;
@@ -786,7 +766,7 @@ export default function DashboardPage() {
           (l.status || '').toLowerCase().includes('concluído') || 
           (l.status || '').toLowerCase().includes('concluido')
         );
-        const isConc = temConcluido || cfg?.status === 'Concluída';
+        const isConc = temConcluido || (cfg?.status || '').toLowerCase().includes('concluíd') || (cfg?.status || '').toLowerCase().includes('concluid');
 
         let atrasoDias = 0;
         let diasRest = 0;
@@ -902,7 +882,7 @@ export default function DashboardPage() {
           <LogoutButton />
 
           <button
-            onClick={loadData}
+            onClick={() => void loadData()}
             title="Atualizar dados do servidor"
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e293b] text-xs font-semibold shadow-sm transition-all"
           >
@@ -934,7 +914,7 @@ export default function DashboardPage() {
             className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-lg shadow-blue-600/25 transition-all"
           >
             <FileDown className="w-4 h-4" />
-            Relatório PDF
+            Relatório
           </button>
         </div>
       </div>
@@ -969,7 +949,7 @@ export default function DashboardPage() {
         {/* Controles de Período e Abas */}
         <div className="flex flex-wrap items-center gap-3 shrink-0">
           {/* Período */}
-          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs">
+          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs" title="O período filtra rendimento, ritmo e apontamentos. Situação atual das obras e cronograma usam sempre os dados mais recentes.">
             <span className="text-slate-400 px-2 text-[10px] uppercase font-bold">Período:</span>
             {(['7d', '15d', '30d', 'tudo'] as const).map(p => (
               <button
@@ -1039,10 +1019,12 @@ export default function DashboardPage() {
             <Sparkles className="w-4 h-4 text-emerald-500" />
           </div>
           <p className="text-2xl font-bold text-emerald-500 tracking-tight">
-            {kpisDiretor.indiceSaude}%
+            {kpisDiretor.indiceSaude === null ? '—' : `${kpisDiretor.indiceSaude}%`}
           </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-            {kpisDiretor.obrasNoRitmo} de {kpisDiretor.totalObras} no ritmo ideal
+            {kpisDiretor.totalObras > 0
+              ? `${kpisDiretor.obrasNoRitmo} de ${kpisDiretor.totalObras} no ritmo ideal`
+              : 'Sem obras no escopo'}
           </p>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-500" />
         </div>
@@ -1054,10 +1036,12 @@ export default function DashboardPage() {
             <TrendingUp className="w-4 h-4 text-blue-400" />
           </div>
           <p className="text-2xl font-bold text-blue-500 dark:text-blue-400 tracking-tight">
-            {kpisDiretor.taxaRendimentoBom}%
+            {kpisDiretor.taxaRendimentoBom === null ? '—' : `${kpisDiretor.taxaRendimentoBom}%`}
           </p>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-            {kpisDiretor.countAcima + kpisDiretor.countDentro} dias normais/acima
+            {kpisDiretor.totalLogsPeriodo > 0
+              ? `${kpisDiretor.countAcima + kpisDiretor.countDentro} dias normais/acima`
+              : 'Sem apontamentos no período'}
           </p>
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-400" />
         </div>
@@ -1112,7 +1096,7 @@ export default function DashboardPage() {
       {activeTab === 'campo' && (
         <div className="space-y-6">
 
-          {/* SEÇÃO 1: PIPELINE / RADAR DAS 5 ETAPAS DE CAMPO */}
+          {/* SEÇÃO 1: PIPELINE / RADAR DAS 6 ETAPAS DE CAMPO */}
           <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-5 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
               <div>
@@ -1161,11 +1145,11 @@ export default function DashboardPage() {
                       {ETAPAS_CAMPO_ORDEM[idx]?.desc}
                     </p>
 
-                    {/* Obras presentes nesta etapa */}
+                    {/* Obras presentes nesta etapa (todas, com rolagem) */}
                     <div className="mt-3 pt-2.5 border-t border-slate-200/60 dark:border-slate-800/80">
                       {etp.obrasCount > 0 ? (
-                        <div className="space-y-1">
-                          {etp.obrasNomes.slice(0, 3).map(nomeObra => (
+                        <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+                          {etp.obrasNomes.map(nomeObra => (
                             <button
                               key={nomeObra}
                               onClick={() => setSelectedProjetoFilter(nomeObra)}
@@ -1175,11 +1159,6 @@ export default function DashboardPage() {
                               <span className="truncate">{nomeObra}</span>
                             </button>
                           ))}
-                          {etp.obrasNomes.length > 3 && (
-                            <span className="text-[10px] text-slate-400 block mt-1">
-                              +{etp.obrasNomes.length - 3} outra(s) obra(s)
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <span className="text-[10px] text-slate-400 italic">Nenhuma obra ativa</span>
@@ -1207,7 +1186,7 @@ export default function DashboardPage() {
                 {kpisDiretor.totalLogsPeriodo} apontamentos analisados ({periodoFilter})
               </p>
 
-              {dadosDonutRendimento.length > 0 ? (
+              {kpisDiretor.totalLogsPeriodo > 0 ? (
                 <>
                   <div className="relative h-44 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1233,7 +1212,7 @@ export default function DashboardPage() {
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-2xl font-black text-slate-900 dark:text-white">{kpisDiretor.taxaRendimentoBom}%</span>
+                      <span className="text-2xl font-black text-slate-900 dark:text-white">{kpisDiretor.taxaRendimentoBom === null ? '—' : `${kpisDiretor.taxaRendimentoBom}%`}</span>
                       <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Eficiência</span>
                     </div>
                   </div>
@@ -1247,7 +1226,7 @@ export default function DashboardPage() {
                           <span className="text-slate-600 dark:text-slate-300 truncate">{item.name}</span>
                         </div>
                         <span className="font-bold text-slate-900 dark:text-white shrink-0 ml-2">
-                          {item.value} ({Math.round((item.value / kpisDiretor.totalLogsPeriodo) * 100)}%)
+                          {item.value} ({kpisDiretor.totalLogsPeriodo > 0 ? Math.round((item.value / kpisDiretor.totalLogsPeriodo) * 100) : 0}%)
                         </span>
                       </div>
                     ))}
@@ -1281,6 +1260,14 @@ export default function DashboardPage() {
                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
                         <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
                       </linearGradient>
+                      <linearGradient id="gradAcima" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="gradAbaixo" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                      </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.5} />
                     <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
@@ -1300,15 +1287,39 @@ export default function DashboardPage() {
                       dot={{ fill: '#3b82f6', r: 3, strokeWidth: 0 }}
                       activeDot={{ r: 5, fill: '#60a5fa' }}
                     />
+                    <Area
+                      type="monotone"
+                      dataKey="acima"
+                      name="Acima"
+                      stroke="#10b981"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      fill="url(#gradAcima)"
+                      dot={false}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="abaixo"
+                      name="Abaixo"
+                      stroke="#f43f5e"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 3"
+                      fill="url(#gradAbaixo)"
+                      dot={false}
+                    />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-[#1e293b] mt-2">
                 <span>Total de registros nos últimos 14 dias: <strong className="text-slate-900 dark:text-white">{dadosTimelineAtividade.reduce((acc, d) => acc + d.registros, 0)}</strong></span>
-                <span className="text-emerald-500 font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" /> Campo em operação contínua
-                </span>
+                {dadosTimelineAtividade.some(d => d.registros > 0) ? (
+                  <span className="text-emerald-500 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Campo em operação contínua
+                  </span>
+                ) : (
+                  <span className="font-semibold">Sem apontamentos no período</span>
+                )}
               </div>
             </div>
           </div>
@@ -1694,9 +1705,10 @@ export default function DashboardPage() {
                     labelStyle={{ color: '#fff' }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Bar dataKey="concluidas" name="Concluídas" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="ativas"     name="No Prazo"   fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="atrasadas"  name="Atrasadas"  fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="concluidas" name="Concluídas"   fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="ativas"     name="No Prazo"     fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="atrasadas"  name="Atrasadas"    fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="naoIniciadas" name="Não iniciadas" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
