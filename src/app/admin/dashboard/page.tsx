@@ -133,6 +133,8 @@ export default function DashboardPage() {
   const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
   const [projetosPrazoFinal, setProjetosPrazoFinal] = useState<Record<string, string>>({});
   const [usuariosRoles, setUsuariosRoles] = useState<Record<string, string>>({});
+  // Logins que existem de verdade (para ocultar perfis já excluídos).
+  const [usuariosSistema, setUsuariosSistema] = useState<{ nome: string; email: string; role: string }[]>([]);
   const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
 
   // Controles de Visualização
@@ -196,13 +198,17 @@ export default function DashboardPage() {
         setProjetosCriadores(projJson.criadores);
       }
 
-      // Mapeamento de cargos de usuários
+      // Mapeamento de cargos de usuários + lista de logins ativos
       const roleMap: Record<string, string> = {};
+      const ativos: { nome: string; email: string; role: string }[] = [];
       (rolesJson.users || []).forEach((u: { name?: string; email?: string; role?: string }) => {
-        if (u.email) roleMap[u.email.toLowerCase().trim()] = u.role || 'Agricultor';
-        if (u.name) roleMap[u.name.toLowerCase().trim()] = u.role || 'Agricultor';
+        const role = u.role || 'Agricultor';
+        if (u.email) roleMap[u.email.toLowerCase().trim()] = role;
+        if (u.name) roleMap[u.name.toLowerCase().trim()] = role;
+        ativos.push({ nome: (u.name || '').trim(), email: (u.email || '').toLowerCase().trim(), role });
       });
       setUsuariosRoles(roleMap);
+      setUsuariosSistema(ativos);
 
       const allFases: FaseAcaoItem[] = fasesJson.fases ?? [];
       const allLogs: DiarioLog[] = logsJson.logs ?? [];
@@ -577,15 +583,31 @@ export default function DashboardPage() {
   }, [logsVisiveis]);
 
   // ── Projetos por Agricultor (Criador + Responsável) ───────────────────────────
+  // Só exibe quem tem login ATIVO no sistema (perfis excluídos somem) e não
+  // mostra e-mail na tela.
   const projetosPorAgricultor = useMemo(() => {
     const mapa: Record<string, {
       nome: string;
-      email: string;
       projetos: string[];
       totalProjetos: number;
       comoCriador: number;
       comoResponsavel: number;
     }> = {};
+
+    const norm = (s: string) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+
+    // Índices dos logins ativos: e-mail exato, nome exato e formas normalizadas.
+    const emailsAtivos = new Set(usuariosSistema.map(u => u.email).filter(Boolean));
+    const nomesAtivos = new Set(usuariosSistema.map(u => u.nome.toLowerCase()).filter(Boolean));
+    const normAtivos = new Set<string>();
+    usuariosSistema.forEach(u => {
+      if (u.email) {
+        normAtivos.add(norm(u.email));
+        normAtivos.add(norm(u.email.split('@')[0]));
+      }
+      if (u.nome) normAtivos.add(norm(u.nome));
+    });
 
     const normalizarPessoa = (raw: string) => {
       const trimmed = (raw || '').trim();
@@ -605,13 +627,31 @@ export default function DashboardPage() {
       return { nome, email };
     };
 
-    const getRole = (p: { nome: string; email: string }): string => {
+    // Retorna o cargo apenas se a pessoa corresponde a um login ativo.
+    // Desconhecidos (logins excluídos ou nomes avulsos sem conta) → null.
+    const getRoleAtivo = (p: { nome: string; email: string }): string | null => {
       const emailLower = (p.email || '').toLowerCase().trim();
       const nomeLower = (p.nome || '').toLowerCase().trim();
-      if (emailLower && usuariosRoles[emailLower]) return usuariosRoles[emailLower];
-      if (nomeLower && usuariosRoles[nomeLower]) return usuariosRoles[nomeLower];
       if (emailLower === ADMIN_MASTER_EMAIL.toLowerCase()) return 'Desenvolvedor';
-      return 'Agricultor';
+      if (emailLower && emailsAtivos.has(emailLower)) return usuariosRoles[emailLower] || 'Agricultor';
+      if (nomeLower && nomesAtivos.has(nomeLower)) return usuariosRoles[nomeLower] || 'Agricultor';
+      if (normAtivos.has(norm(emailLower)) || normAtivos.has(norm(nomeLower))) {
+        return usuariosRoles[emailLower] || usuariosRoles[nomeLower] || 'Agricultor';
+      }
+      return null;
+    };
+
+    const registrar = (p: { nome: string }, projNome: string, como: 'criador' | 'responsavel') => {
+      const key = p.nome.toLowerCase();
+      if (!mapa[key]) {
+        mapa[key] = { nome: p.nome, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
+      }
+      if (!mapa[key].projetos.includes(projNome)) {
+        mapa[key].projetos.push(projNome);
+        mapa[key].totalProjetos++;
+      }
+      if (como === 'criador') mapa[key].comoCriador++;
+      else mapa[key].comoResponsavel++;
     };
 
     // 1. Projetos onde é CRIADOR (via diario_projetos_criadores_v1)
@@ -619,18 +659,8 @@ export default function DashboardPage() {
       if (!criador?.email) return;
       const p = normalizarPessoa(criador.email);
       if (!p) return;
-      const cargo = getRole(p);
-      if (cargo !== 'Agricultor') return;
-
-      const key = p.nome.toLowerCase();
-      if (!mapa[key]) {
-        mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
-      }
-      if (!mapa[key].projetos.includes(projNome)) {
-        mapa[key].projetos.push(projNome);
-        mapa[key].totalProjetos++;
-      }
-      mapa[key].comoCriador++;
+      if (getRoleAtivo(p) !== 'Agricultor') return;
+      registrar(p, projNome, 'criador');
     });
 
     // 2. Projetos onde é RESPONSÁVEL por alguma fase (via fases_acao)
@@ -639,18 +669,8 @@ export default function DashboardPage() {
       parseResponsavelEmails(f.responsavel).forEach(parte => {
         const p = normalizarPessoa(parte);
         if (!p) return;
-        const cargo = getRole(p);
-        if (cargo !== 'Agricultor') return;
-
-        const key = p.nome.toLowerCase();
-        if (!mapa[key]) {
-          mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
-        }
-        if (!mapa[key].projetos.includes(f.projetoCliente!)) {
-          mapa[key].projetos.push(f.projetoCliente!);
-          mapa[key].totalProjetos++;
-        }
-        mapa[key].comoResponsavel++;
+        if (getRoleAtivo(p) !== 'Agricultor') return;
+        registrar(p, f.projetoCliente!, 'responsavel');
       });
     });
 
@@ -661,25 +681,15 @@ export default function DashboardPage() {
       (respList || []).forEach(parte => {
         const p = normalizarPessoa(parte);
         if (!p) return;
-        const cargo = getRole(p);
-        if (cargo !== 'Agricultor') return;
-
-        const key = p.nome.toLowerCase();
-        if (!mapa[key]) {
-          mapa[key] = { nome: p.nome, email: p.email, projetos: [], totalProjetos: 0, comoCriador: 0, comoResponsavel: 0 };
-        }
-        if (!mapa[key].projetos.includes(projNome)) {
-          mapa[key].projetos.push(projNome);
-          mapa[key].totalProjetos++;
-        }
-        mapa[key].comoResponsavel++;
+        if (getRoleAtivo(p) !== 'Agricultor') return;
+        registrar(p, projNome, 'responsavel');
       });
     });
 
     return Object.values(mapa)
       .filter(a => a.totalProjetos > 0)
       .sort((a, b) => b.totalProjetos - a.totalProjetos);
-  }, [projetosCriadores, fases, responsaveisPorEtapa, usuariosRoles]);
+  }, [projetosCriadores, fases, responsaveisPorEtapa, usuariosRoles, usuariosSistema]);
 
   // ── Dados para a Aba de Cronograma & Prazos das 6 Fases ────────────────────
   const dadosCronogramaFases = useMemo(() => {
@@ -1534,11 +1544,11 @@ export default function DashboardPage() {
                   Projetos em Atividades por Agricultor
                 </h3>
                 <p className="text-xs text-slate-400">
-                  Quantidade de obras vinculadas a cada agricultor (como criador ou responsável)
+                  Obras vinculadas a cada agricultor com login ativo (como criador ou responsável)
                 </p>
               </div>
               <span className="text-[11px] px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50 font-medium self-start sm:self-auto">
-                🌱 Apenas perfil Agricultor
+                🌱 Apenas Agricultores ativos
               </span>
             </div>
 
@@ -1570,11 +1580,6 @@ export default function DashboardPage() {
                           <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
                             {colab.nome}
                           </p>
-                          {colab.email && (
-                            <p className="text-[10px] text-slate-400 truncate">
-                              {colab.email}
-                            </p>
-                          )}
                           <p className="text-[10px] text-slate-400 mt-0.5">
                             {colab.comoCriador > 0 && colab.comoResponsavel > 0 ? (
                               <span className="text-emerald-500 font-medium">Criador + Responsável</span>
