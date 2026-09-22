@@ -856,6 +856,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-700 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans transition-colors">
+      <div className="max-w-[1600px] mx-auto w-full">
 
       {/* ── HEADER EXECUTIVO ──────────────────────────────────────────────────── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 border-b border-slate-200 dark:border-[#1e293b] pb-6">
@@ -1714,9 +1715,9 @@ export default function DashboardPage() {
 
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dadosCronogramaFases.porFase} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                <BarChart data={dadosCronogramaFases.porFase} margin={{ top: 10, right: 20, left: -20, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.5} />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} interval={0} angle={-18} textAnchor="end" />
                   <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
                   <RTooltip
                     contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 8, fontSize: 11 }}
@@ -1749,7 +1750,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full min-w-[960px] text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/80 dark:bg-[#0a1020]/60 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-[#1e293b]">
                     <th className="py-2.5 px-4">Obra / Fazenda</th>
@@ -1896,6 +1897,7 @@ export default function DashboardPage() {
         </div>
       )}
 
+      </div>
     </div>
   );
 }

@@ -656,7 +656,7 @@ export default function VisaoGeralDiretorPage() {
           </div>
 
           {/* Filtro status */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 flex-shrink-0">
+          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 flex-shrink-0 max-w-full overflow-x-auto">
             {([
               { id: 'todos', label: 'Todas' },
               { id: 'atrasado', label: '🚨 Atraso' },
@@ -679,7 +679,7 @@ export default function VisaoGeralDiretorPage() {
           </div>
 
           {/* Toggle Resumido / Detalhado */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 ml-auto shrink-0">
+          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 sm:ml-auto shrink-0">
             <button
               type="button"
               onClick={() => setModoView('resumido')}

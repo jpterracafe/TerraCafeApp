@@ -103,8 +103,8 @@ export function DiarioSkeleton() {
       </div>
 
       <div className="flex gap-6 flex-1">
-        {/* Sidebar */}
-        <div className="w-80 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4 space-y-4">
+        {/* Sidebar (só em desktop, igual à página real) */}
+        <div className="hidden lg:block w-80 shrink-0 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4 space-y-4">
           <Skeleton className="h-5 w-36" />
           <Skeleton className="h-9 w-full rounded-lg" />
           <div className="space-y-2 pt-1">
@@ -172,6 +172,7 @@ export function DiarioSkeleton() {
 export function DashboardSkeleton() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] p-4 md:p-6 lg:p-8">
+      <div className="max-w-[1600px] mx-auto w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="space-y-2">
@@ -187,9 +188,9 @@ export function DashboardSkeleton() {
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[...Array(4)].map((_, i) => (
+      {/* KPIs (6 cards, igual ao placar real) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-8">
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-5 border-l-4 border-l-slate-200 dark:border-l-slate-700">
             <div className="flex justify-between mb-3">
               <Skeleton className="h-3 w-20" />
@@ -226,7 +227,7 @@ export function DashboardSkeleton() {
       {/* Cards de projeto */}
       <div className="mb-6">
         <Skeleton className="h-5 w-48 mb-4" />
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {[...Array(2)].map((_, i) => (
             <div key={i} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl overflow-hidden">
               <div className="h-1 bg-slate-200 dark:bg-[#1e293b]" />
@@ -255,6 +256,7 @@ export function DashboardSkeleton() {
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );

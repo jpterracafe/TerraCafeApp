@@ -239,7 +239,7 @@ export default function ProjetosConcluidosPage() {
             <div key={nomeProjeto} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl overflow-hidden shadow-lg shadow-black/5">
 
               {/* Cabeçalho do projeto */}
-              <div className="flex items-center gap-4 p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-5">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
                   <Briefcase className="w-5 h-5 text-emerald-400" />
                 </div>
@@ -291,8 +291,8 @@ export default function ProjetosConcluidosPage() {
 
               {/* Fases do projeto (expandível) */}
               {isExpanded && (
-                <div className="border-t border-slate-100 dark:border-[#1e293b]">
-                  <table className="w-full text-sm">
+                <div className="border-t border-slate-100 dark:border-[#1e293b] overflow-x-auto">
+                  <table className="w-full text-sm min-w-[560px]">
                     <thead className="bg-slate-50 dark:bg-[#0b1329]">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fase</th>

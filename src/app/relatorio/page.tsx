@@ -146,6 +146,22 @@ function RelatorioContent() {
           @page { margin: 15mm 12mm; size: A4 portrait; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .no-print { display: none !important; }
+          thead { display: table-header-group; }
+          tr, .kpi-card, .etapa-card { page-break-inside: avoid; }
+          .table-scroll { overflow: visible !important; }
+        }
+        /* Grids responsivos (mobile → desktop) */
+        .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+        .etapas-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table-scroll table { min-width: 560px; }
+        @media (min-width: 640px) {
+          .kpi-grid { grid-template-columns: repeat(4, 1fr); }
+          .etapas-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (min-width: 900px) {
+          .etapas-grid { grid-template-columns: repeat(6, 1fr); }
+          .table-scroll table { min-width: 0; }
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; background: #fff; line-height: 1.4; }
@@ -172,7 +188,7 @@ function RelatorioContent() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '24px 20px' }}>
 
         {/* CABEÇALHO */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 14, borderBottom: '2.5px solid #2563eb' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 20, paddingBottom: 14, borderBottom: '2.5px solid #2563eb' }}>
           <div>
             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 }}>
               TerraCafé Irrigação · Relatório Executivo de Diretoria
@@ -193,12 +209,12 @@ function RelatorioContent() {
         </div>
 
         {/* KPIS EXECUTIVOS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 20 }}>
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
+        <div className="kpi-grid">
+          <div className="kpi-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Apontamentos Campo</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#2563eb', marginTop: 2 }}>{logs.length}</div>
           </div>
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
+          <div className="kpi-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Eficiência no Ritmo</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#10b981', marginTop: 2 }}>
               {logs.length > 0 
@@ -206,13 +222,13 @@ function RelatorioContent() {
                 : '100%'}
             </div>
           </div>
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
+          <div className="kpi-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Paradas por Chuva</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: '#0891b2', marginTop: 2 }}>
               {logs.filter(l => (l.status || '').toLowerCase().includes('chuva')).length}
             </div>
           </div>
-          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
+          <div className="kpi-card" style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 12px' }}>
             <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>Tarefas Contratuais</div>
             <div style={{ fontSize: 20, fontWeight: 900, color: atrasadas > 0 ? '#e11d48' : '#334155', marginTop: 2 }}>
               {concluidas}/{totalAcoes} <span style={{ fontSize: 11, fontWeight: 500, color: '#64748b' }}>({atrasadas} atrasos)</span>
@@ -223,12 +239,12 @@ function RelatorioContent() {
         {/* RADAR DAS 6 ETAPAS DE CAMPO DA IRRIGAÇÃO */}
         <div style={{ marginBottom: 20 }}>
           <h2>Ciclo Técnico de Campo (6 Fases da Irrigação)</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
+          <div className="etapas-grid">
             {ETAPAS_CAMPO.map((etp) => {
               const logsEtp = logs.filter(l => (l.atividade || '').toLowerCase().includes(etp.key.toLowerCase()));
               const count = logsEtp.length;
               return (
-                <div key={etp.key} style={{ background: count > 0 ? '#eff6ff' : '#f8fafc', border: `1px solid ${count > 0 ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+                <div key={etp.key} className="etapa-card" style={{ background: count > 0 ? '#eff6ff' : '#f8fafc', border: `1px solid ${count > 0 ? '#bfdbfe' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
                   <div style={{ fontSize: 18, marginBottom: 2 }}>{etp.icon}</div>
                   <div style={{ fontSize: 9.5, fontWeight: 700, color: '#1e293b' }}>{etp.label}</div>
                   <div style={{ fontSize: 10, color: count > 0 ? '#2563eb' : '#94a3b8', fontWeight: 800, marginTop: 3 }}>
@@ -244,6 +260,7 @@ function RelatorioContent() {
         {logsRecentes.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <h2>Apontamentos Recentes de Campo (Diário de Obras)</h2>
+            <div className="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -272,6 +289,7 @@ function RelatorioContent() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
@@ -279,6 +297,7 @@ function RelatorioContent() {
         {fases.length > 0 && (
           <div style={{ marginBottom: 20 }}>
             <h2>Pipeline Contratual & Suprimentos</h2>
+            <div className="table-scroll">
             <table>
               <thead>
                 <tr>
@@ -305,6 +324,7 @@ function RelatorioContent() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

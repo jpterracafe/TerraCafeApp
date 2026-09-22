@@ -1995,8 +1995,8 @@ export default function DiarioCampoTimelinePage() {
                         Contador da Etapa: <strong className={`capitalize ${isFaseConcluida ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>{selectedEtapa}</strong>
                       </span>
                     </div>
-                    <div className="flex items-baseline gap-3">
-                      <span className={`text-3xl md:text-4xl font-extrabold tracking-tight ${
+                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                      <span className={`text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight ${
                         isFaseConcluida 
                           ? 'text-emerald-600 dark:text-emerald-400' 
                           : statsContador.hasStarted
@@ -3050,7 +3050,7 @@ export default function DiarioCampoTimelinePage() {
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                       Período do Histórico:
                     </label>
-                    <div className="grid grid-cols-4 gap-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                       {[
                         { id: '7dias', label: '7 dias' },
                         { id: '15dias', label: '15 dias' },

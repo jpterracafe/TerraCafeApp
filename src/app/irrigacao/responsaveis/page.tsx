@@ -277,14 +277,14 @@ export default function ResponsaveisPage() {
             <input type="text" placeholder="Buscar por nome ou cargo..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs font-medium">
-              <button onClick={() => setFiltroLogin('todos')} className={`px-3 py-1.5 rounded-md transition-colors ${filtroLogin === 'todos' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs font-medium max-w-full overflow-x-auto">
+              <button onClick={() => setFiltroLogin('todos')} className={`px-3 py-1.5 rounded-md transition-colors whitespace-nowrap ${filtroLogin === 'todos' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 Todos ({responsaveis.length})
               </button>
-              <button onClick={() => setFiltroLogin('com')} className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 ${filtroLogin === 'com' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
+              <button onClick={() => setFiltroLogin('com')} className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap ${filtroLogin === 'com' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <ShieldCheck className="w-3.5 h-3.5" />Com login ({totalComLogin})
               </button>
-              <button onClick={() => setFiltroLogin('sem')} className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 ${filtroLogin === 'sem' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
+              <button onClick={() => setFiltroLogin('sem')} className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1 whitespace-nowrap ${filtroLogin === 'sem' ? 'bg-amber-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>
                 <UserPlus className="w-3.5 h-3.5" />Sem login ({totalSemLogin})
               </button>
             </div>
