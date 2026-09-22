@@ -1253,7 +1253,7 @@ export default function DiarioCampoTimelinePage() {
 
       setIsJustificativaModalOpen(false);
       setJustificativaTexto('');
-      success('Justificativa oficial registrada! O Diretor Paulo poderá consultá-la.');
+      success('Justificativa oficial registrada! O Diretor poderá consultá-la.');
     } catch (err: any) {
       toastError('Erro ao registrar justificativa.');
     } finally {
@@ -2097,7 +2097,7 @@ export default function DiarioCampoTimelinePage() {
                     title={
                       isFaseConcluida
                         ? 'Fase concluída - justificativas bloqueadas'
-                        : 'Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor Paulo'
+                        : 'Registrar ocorrências de campo (chuva, quebras, atrasos) para justificativa do diretor'
                     }
                   >
                     <CloudRain className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-amber-500'}`} />
@@ -2244,7 +2244,7 @@ export default function DiarioCampoTimelinePage() {
                         <AlertCircle className="w-3.5 h-3.5" />
                         Ocorrências / Justificativas Registradas ({projetoJustificativas[selectedProjeto].length}):
                       </span>
-                      <span className="text-[10px] text-slate-400">Visível ao Diretor Paulo</span>
+                      <span className="text-[10px] text-slate-400">Visível ao Diretor</span>
                     </div>
                     <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                       {projetoJustificativas[selectedProjeto].map((j) => (
@@ -2772,7 +2772,7 @@ export default function DiarioCampoTimelinePage() {
                   Regra de Governança da Diretoria
                 </div>
                 <p className="text-[11px] leading-relaxed">
-                  O prazo final definido aqui é fixo e não poderá ser aumentado. Em caso de atrasos por chuva, quebras ou peças, utilize o botão <strong>Registrar Justificativa</strong> no Diário de Campo para prestar contas ao Diretor Paulo.
+                  O prazo final definido aqui é fixo e não poderá ser aumentado. Em caso de atrasos por chuva, quebras ou peças, utilize o botão <strong>Registrar Justificativa</strong> no Diário de Campo para prestar contas ao Diretor.
                 </p>
               </div>
 
@@ -2879,7 +2879,7 @@ export default function DiarioCampoTimelinePage() {
                   className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 resize-none"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
-                  Esta justificativa ficará salva no histórico permanente para auditoria do Diretor Paulo.
+                  Esta justificativa ficará salva no histórico permanente para auditoria do Diretor.
                 </p>
               </div>
             </div>

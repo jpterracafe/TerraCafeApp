@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { extractUsernameFromEmail } from '@/lib/auth-utils';
+import { isMasterDevSession } from '@/lib/client-roles';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
@@ -145,10 +146,19 @@ export default function DashboardPage() {
   // Modal / Lightbox de Foto
   const [fotoModal, setFotoModal] = useState<DiarioLog | null>(null);
 
+  // Acesso restrito: só logins de Admin, Diretor ou Desenvolvedor/master.
+  const podeVerDiretor = useMemo(() => {
+    if (!session?.user) return false;
+    const role = (session.user as { role?: string }).role;
+    if (role === 'Admin' || role === 'Diretor' || role === 'Desenvolvedor') return true;
+    return isMasterDevSession(session);
+  }, [session]);
+
   useEffect(() => {
     if (status === 'loading') return;
     if (status !== 'authenticated') router.push('/login');
-  }, [status, router]);
+    else if (!podeVerDiretor) router.push('/irrigacao/diario-campo');
+  }, [status, router, podeVerDiretor]);
 
   // Carrega dados das APIs e localStorage.
   // silent=true (polling/foco) atualiza sem piscar o skeleton cheio.
@@ -840,7 +850,7 @@ export default function DashboardPage() {
     };
   }, [projetosList, configEtapas, logs, projetosPrazoFinal]);
 
-  if (status === 'loading' || loading) {
+  if (status === 'loading' || loading || !podeVerDiretor) {
     return <DashboardSkeleton />;
   }
 

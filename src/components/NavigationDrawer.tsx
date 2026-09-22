@@ -23,13 +23,19 @@ export default function NavigationDrawer() {
   // (a página redireciona quem não é master para /irrigacao/diario-campo).
   const isMasterDev = isMasterDevSession(session);
 
+  // Visão do Diretor: só quem tem login de Admin, Diretor ou Desenvolvedor/master.
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
+  const canSeeDiretor = isMasterDev || userRole === 'Admin' || userRole === 'Diretor';
+
   // Página /irrigacao/execucao OCULTA por decisão de produto (arquivo mantido
   // em src/app/irrigacao/execucao/page.tsx — para reexibir, descomente abaixo).
   const SHOW_EXECUCAO = false;
 
   const navLinks = [
-    { href: '/visao-geral', label: 'Resumo Geral Executivo (Paulo)', icon: LayoutDashboard, color: 'text-blue-500' },
-    { href: '/admin/dashboard', label: 'Visão do Diretor (Dashboards)', icon: BarChart2, color: 'text-cyan-500' },
+    { href: '/visao-geral', label: 'Resumo Geral Executivo (Diretor)', icon: LayoutDashboard, color: 'text-blue-500' },
+    ...(canSeeDiretor ? [
+      { href: '/admin/dashboard', label: 'Visão do Diretor (Dashboards)', icon: BarChart2, color: 'text-cyan-500' }
+    ] : []),
     { href: '/irrigacao/diario-campo', label: 'Diário de Campo', icon: Calendar, color: 'text-amber-500' },
     ...(SHOW_EXECUCAO ? [
       { href: '/irrigacao/execucao', label: 'Cronograma & Execução', icon: Layers, color: 'text-indigo-500' }
