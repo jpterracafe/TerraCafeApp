@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { extractUsernameFromEmail } from '@/lib/auth-utils';
 import { isMasterDevSession } from '@/lib/client-roles';
+import Image from 'next/image';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
@@ -1485,10 +1486,13 @@ export default function DashboardPage() {
                               className="relative w-14 h-14 rounded-lg overflow-hidden shrink-0 border border-slate-200 dark:border-slate-700 group cursor-pointer"
                               title="Clique para ampliar foto de campo"
                             >
-                              <img
-                                src={obra.ultimoLog?.midiaUrl}
+                              <Image
+                                src={obra.ultimoLog?.midiaUrl || ''}
                                 alt="Foto de Campo"
-                                className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                                fill
+                                sizes="56px"
+                                loading="lazy"
+                                className="object-cover transition-transform group-hover:scale-110"
                               />
                               <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Eye className="w-4 h-4 text-white" />
@@ -1876,6 +1880,8 @@ export default function DashboardPage() {
               <img
                 src={fotoModal.midiaUrl}
                 alt="Foto de Campo"
+                loading="lazy"
+                decoding="async"
                 className="max-h-[70vh] w-auto object-contain"
               />
             </div>

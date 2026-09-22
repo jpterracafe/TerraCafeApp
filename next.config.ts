@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Micro-otimização: remove header X-Powered-By das respostas.
+  poweredByHeader: false,
+  experimental: {
+    // Reduz o JS inicial agrupando imports de libs pesadas (lucide + recharts).
+    optimizePackageImports: ['lucide-react', 'recharts'],
+  },
   images: {
     remotePatterns: [
       {

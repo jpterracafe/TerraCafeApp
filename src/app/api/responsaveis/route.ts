@@ -50,21 +50,23 @@ export async function GET() {
     const sessionName = (session?.user?.name?.trim() ?? "") as string;
     const adminView = isAdminOrDiretor(session);
 
-    // Query base — tolera banco sem as colunas novas (fallback).
+    // Query base — colunas explícitas (menos bytes) + tolera banco sem as
+    // colunas novas (fallback).
     // Agricultor vê: o que ELE criou (criado_por_email) + o que está
     // vinculado ao e-mail dele (user_email — legado ou login criado p/ ele).
     // O OR garante que a linha NÃO suma da lista do criador quando o admin
     // cria um login (user_email passa a ser o e-mail novo, mas criado_por fica).
     let rows: any[] | null = null;
+    const RESP_COLS = "id, nome, cargo, origem, user_email, user_id, criado_por_email, criado_por_nome, created_at";
     if (!adminView && sessionEmail) {
       const attempt = await db
         .from("responsaveis")
-        .select("*")
+        .select(RESP_COLS)
         .or(`criado_por_email.eq.${sessionEmail},user_email.eq.${sessionEmail}`)
         .order("created_at", { ascending: true });
       if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email") || attempt.error.message?.includes("criado_por"))) {
-        // Colunas ainda não existem: busca tudo e filtra em memória abaixo
-        const fb = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
+        // Colunas ainda não existem: busca só as básicas e filtra em memória abaixo
+        const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
         if (fb.error) throw fb.error;
         rows = fb.data ?? [];
       } else {
@@ -82,7 +84,7 @@ export async function GET() {
         return vinculado === sessionEmail;
       });
     } else {
-      const { data, error } = await db.from("responsaveis").select("*").order("created_at", { ascending: true });
+      const { data, error } = await db.from("responsaveis").select(RESP_COLS).order("created_at", { ascending: true });
       if (error) {
         // Fallback para bancos antigos sem as colunas novas
         if (error.code === "PGRST204" || error.message?.includes("user_email") || error.message?.includes("user_id")) {

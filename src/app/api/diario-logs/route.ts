@@ -54,12 +54,14 @@ export async function GET() {
     } catch (_) {}
 
     const db = getSupabase();
+    // Colunas explícitas (menos bytes por resposta que select("*")).
+    const LOG_COLS = "id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, is_deleted, created_at";
     // Exclui logs de projetos na lixeira (coluna criada na migration
     // 20260922; fallback sem filtro em bancos ainda não migrados)
     let data: LogRow[] | null = null;
     const attempt = await db
       .from("diario_logs")
-      .select("*")
+      .select(LOG_COLS)
       .eq("is_deleted", false)
       .order("data", { ascending: false })
       .order("created_at", { ascending: false })
@@ -68,7 +70,7 @@ export async function GET() {
     if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("is_deleted"))) {
       const fb = await db
         .from("diario_logs")
-        .select("*")
+        .select("id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, created_at")
         .order("data", { ascending: false })
         .order("created_at", { ascending: false })
         .limit(200);
@@ -124,17 +126,18 @@ export async function POST(req: Request) {
     const insertMinimo = insertBase;
 
     let row: any = null;
+    const RETURN_COLS = "id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo";
 
-    const attempt1 = await db.from("diario_logs").insert(insertComTudo).select("*").single();
+    const attempt1 = await db.from("diario_logs").insert(insertComTudo).select(RETURN_COLS).single();
 
     if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("projeto_cliente"))) {
       // projeto_cliente não existe — tenta sem ela mas mantém mídia
       console.warn("[POST /api/diario-logs] Coluna projeto_cliente não existe, tentando sem ela.");
-      const attempt2 = await db.from("diario_logs").insert(insertSemProjeto).select("*").single();
+      const attempt2 = await db.from("diario_logs").insert(insertSemProjeto).select("id, data, responsavel, atividade, status, observacoes, midia_url, midia_tipo").single();
       if (attempt2.error && (attempt2.error.code === "PGRST204" || attempt2.error.message?.includes("midia"))) {
         // colunas de mídia também não existem — insere só o mínimo
         console.warn("[POST /api/diario-logs] Colunas de mídia não existem, inserindo sem mídia.");
-        const attempt3 = await db.from("diario_logs").insert(insertMinimo).select("*").single();
+        const attempt3 = await db.from("diario_logs").insert(insertMinimo).select("id, data, responsavel, atividade, status, observacoes").single();
         if (attempt3.error) throw attempt3.error;
         row = attempt3.data;
       } else {

@@ -147,10 +147,13 @@ export async function POST(req: Request) {
 
     let data: any = null;
 
+    // Colunas explícitas (menos bytes por resposta que select("*")).
+    const FASE_COLS = "id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted";
+
     const attempt1 = await db
       .from("fases_acao")
       .insert(insertComProjeto)
-      .select("*")
+      .select(FASE_COLS)
       .single();
 
     if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("projeto_cliente") || attempt1.error.message?.includes("criado_por"))) {
@@ -167,7 +170,8 @@ export async function POST(req: Request) {
       const attempt2 = await db
         .from("fases_acao")
         .insert(retry)
-        .select("*")
+        // Select sem as colunas novas (o retry só cai aqui em banco não migrado).
+        .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, is_deleted")
         .single();
       if (attempt2.error) throw attempt2.error;
       data = attempt2.data;
@@ -246,7 +250,7 @@ export async function PUT(req: Request) {
       .from("fases_acao")
       .update(updates)
       .eq("id", body.id)
-      .select("*")
+      .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
       .single();
 
     if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("projeto_cliente"))) {
@@ -257,7 +261,7 @@ export async function PUT(req: Request) {
         .from("fases_acao")
         .update(updatesSemProjeto)
         .eq("id", body.id)
-        .select("*")
+        .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, is_deleted")
         .single();
       data  = attempt2.data;
       error = attempt2.error;

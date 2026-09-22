@@ -62,10 +62,10 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
 
-    // 1. Busca o responsável
+    // 1. Busca o responsável (só colunas usadas abaixo)
     const { data: resp, error: respErr } = await db
       .from("responsaveis")
-      .select("*")
+      .select("id, nome, user_id, user_email")
       .eq("id", responsavelId)
       .maybeSingle();
     if (respErr) throw respErr;

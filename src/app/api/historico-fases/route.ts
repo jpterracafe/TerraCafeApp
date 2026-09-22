@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     const db = getSupabase();
     let query = db
       .from("historico_fases")
-      .select("*")
+      .select("id, fase_id, campo, valor_anterior, valor_novo, usuario, created_at")
       .order("created_at", { ascending: false })
       .limit(100);
 

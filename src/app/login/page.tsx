@@ -68,8 +68,14 @@ export default function LoginPage() {
     }
   };
 
-  // Don't flash content while checking session
-  if (status === 'loading') return null;
+  // Mostra um indicador em vez de tela preta enquanto checa a sessão
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#0a0f0d] flex items-center justify-center" aria-label="Carregando">
+        <div className="w-8 h-8 rounded-full border-2 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0f0d] text-slate-100 flex items-center justify-center p-4 relative overflow-hidden font-sans select-none">
