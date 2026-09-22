@@ -117,3 +117,39 @@ export function formatZodErrors(err: z.ZodError): string {
   const path = first.path.length > 0 ? `${first.path.join(".")}: ` : "";
   return `${path}${first.message}`;
 }
+
+// ── Normalização compatível de status (aceita variações, grava canônico) ──
+// Não rejeita valores legados; apenas unifica case na escrita para acabar com
+// "Dentro do programado" x "Dentro do Programado" se espalhando pelo banco.
+const STATUS_FASE_MAP: Record<string, string> = {
+  "dentro do programado": "Dentro do programado",
+  "fora do programado": "Fora do programado",
+  "concluído": "Concluído",
+  "concluido": "Concluído",
+  "em atraso": "Em atraso",
+  "pendente": "Pendente",
+  "cancelado": "Cancelado",
+};
+
+const STATUS_DIARIO_MAP: Record<string, string> = {
+  "dentro do programado": "Dentro do Programado",
+  "acima": "Acima",
+  "abaixo": "Abaixo",
+  "fora do programado": "Fora do Programado",
+  "concluído": "Concluído",
+  "concluido": "Concluído",
+  "em atraso": "Em atraso",
+  "pendente": "Pendente",
+};
+
+export function normalizeStatusFase(v: unknown): unknown {
+  if (typeof v !== "string") return v;
+  const key = v.trim().toLowerCase();
+  return STATUS_FASE_MAP[key] ?? v.trim();
+}
+
+export function normalizeStatusDiario(v: unknown): unknown {
+  if (typeof v !== "string") return v;
+  const key = v.trim().toLowerCase();
+  return STATUS_DIARIO_MAP[key] ?? v.trim();
+}

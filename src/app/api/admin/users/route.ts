@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import bcrypt from "bcrypt";
+import { randomInt } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession, extractUsernameFromEmail } from "@/lib/auth";
 
@@ -22,31 +23,21 @@ export async function GET() {
     const db = getSupabase();
     const { data: users, error } = await db
       .from("users")
-      .select("id, name, email, role, senha_temp, created_at")
+      .select("id, name, email, role, created_at")
       .order("created_at", { ascending: false });
 
     if (error) {
-      // Fallback sem senha_temp caso a coluna ainda não exista
-      console.warn("[GET /api/admin/users] Tentando sem senha_temp:", JSON.stringify(error));
-      const { data: fallback, error: fallbackErr } = await db
-        .from("users")
-        .select("id, name, email, role, created_at")
-        .order("created_at", { ascending: false });
-
-      if (fallbackErr) throw fallbackErr;
-
-      return NextResponse.json({
-        users: (fallback ?? []).map((u) => ({
-          id: u.id, name: u.name, email: u.email,
-          role: u.role, senhaTemp: null, createdAt: u.created_at,
-        })),
-      });
+      console.error("[GET /api/admin/users]", error);
+      return NextResponse.json({ error: "Erro ao conectar ao banco de dados." }, { status: 500 });
     }
 
+    // Compatível: mantém o campo senhaTemp (sempre null aqui) para não quebrar
+    // a tipagem da tela, mas NÃO expõe mais senha_temp em listagem.
+    // A senha temporária continua retornada uma única vez no POST/PATCH.
     return NextResponse.json({
       users: (users ?? []).map((u: any) => ({
         id: u.id, name: u.name, email: u.email,
-        role: u.role, senhaTemp: u.senha_temp ?? null, createdAt: u.created_at,
+        role: u.role, senhaTemp: null, createdAt: u.created_at,
       })),
     });
   } catch (error) {
@@ -88,19 +79,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Já existe um usuário com este e-mail." }, { status: 409 });
     }
 
-    // Gerar senha aleatória (8 chars maiúsculos/números sem ambiguidade)
+    // Gerar senha aleatória (8 chars maiúsculos/números sem ambiguidade) com CSPRNG
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let senhaGerada = "";
     for (let i = 0; i < 8; i++) {
-      senhaGerada += chars.charAt(Math.floor(Math.random() * chars.length));
+      senhaGerada += chars.charAt(randomInt(chars.length));
     }
 
     const hashed = await bcrypt.hash(senhaGerada, 10);
-    console.log("[POST /api/admin/users] Criando usuário:", {
-      nome, email, cargo,
-      senhaTamanho: senhaGerada.length,
-      hashPrefix: hashed.substring(0, 15) + "...",
-    });
+    // Log operacional sem dados sensíveis (sem senha/hash/e-mail).
 
     // Tenta inserir com senha_temp; fallback sem ela se a coluna não existir
     let userId: string;

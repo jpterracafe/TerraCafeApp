@@ -24,6 +24,9 @@ import { forgotPasswordSchema, formatZodErrors } from "@/lib/validators";
 
 const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
+// Bucket em memória por IP (reseta ao reiniciar — suficiente como freio anti-abuso).
+const rateBuckets = new Map<string, { start: number; count: number }>();
+
 interface Payload {
   sub: string;          // user id ou 'admin'
   email: string;
@@ -32,7 +35,7 @@ interface Payload {
 }
 
 function signToken(payload: Payload): string {
-  const secret = env.NEXTAUTH_SECRET ?? "terracafe_dev_secret_key_987654321_fixed";
+  const secret = env.NEXTAUTH_SECRET;
   const header  = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const body    = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const hmac    = createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
@@ -46,6 +49,21 @@ function buildResetUrl(token: string): string {
 
 export async function POST(req: Request) {
   try {
+    // Rate-limit simples em memória (10 tentativas / 10 min por IP) — generoso,
+    // não quebra uso normal, apenas freia abuso automatizado.
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
+    const now = Date.now();
+    const bucket = rateBuckets.get(ip);
+    if (bucket && now - bucket.start < 10 * 60 * 1000 && bucket.count >= 10) {
+      return NextResponse.json(
+        { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." },
+        { status: 429 }
+      );
+    }
+    rateBuckets.set(ip, bucket && now - bucket.start < 10 * 60 * 1000
+      ? { start: bucket.start, count: bucket.count + 1 }
+      : { start: now, count: 1 });
+
     const body = await req.json().catch(() => null);
     const parsed = forgotPasswordSchema.safeParse(body);
     if (!parsed.success) {
@@ -140,8 +158,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── 4. Fallback: imprime o link no console (sempre funciona) ──
-    if (!emailSent) {
+    // ── 4. Fallback: imprime o link no console apenas fora de produção ──
+    // Em produção, o link sai só por e-mail real (sem vazar resetUrl em log).
+    if (!emailSent && process.env.NODE_ENV !== "production") {
       console.log(
         "\n" + "=".repeat(72) + "\n" +
         "🚨 [FORGOT PASSWORD] ENVIO DE E-MAIL NÃO CONFIGURADO\n" +

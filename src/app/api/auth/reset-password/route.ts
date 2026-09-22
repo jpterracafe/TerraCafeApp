@@ -26,7 +26,7 @@ function verifyToken(raw: string): Payload | null {
     const [headerB64, bodyB64, sigB64] = raw.split(".");
     if (!headerB64 || !bodyB64 || !sigB64) return null;
 
-    const secret = env.NEXTAUTH_SECRET ?? "terracafe_dev_secret_key_987654321_fixed";
+    const secret = env.NEXTAUTH_SECRET;
     const expectedSig = createHmac("sha256", secret)
       .update(`${headerB64}.${bodyB64}`)
       .digest();

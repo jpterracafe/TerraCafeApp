@@ -7,6 +7,7 @@ import {
   diarioLogCreateSchema,
   diarioLogDeleteSchema,
   formatZodErrors,
+  normalizeStatusDiario,
 } from "@/lib/validators";
 import { getUserProjectAccess, filterLogsByAccess, type LogRow } from "@/lib/project-access";
 
@@ -101,7 +102,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
     }
     const dataIn = parsed.data;
-    const { data, responsavel, atividade, status, observacoes, projetoCliente, midiaUrl, midiaTipo } = dataIn;
+    const { data, responsavel, atividade, observacoes, projetoCliente, midiaUrl, midiaTipo } = dataIn;
+    const status = normalizeStatusDiario(dataIn.status);
 
     const db = getSupabase();
 
@@ -151,7 +153,9 @@ export async function POST(req: Request) {
   }
 }
 
-// ── DELETE /api/diario-logs?id=xxx ────────────────────────────────────────────
+// ── DELETE /api/diario-logs?id=xxx&hard=true ───────────────────────────────
+// Compatível com fases: por padrão SOFT DELETE (is_deleted=true), que some do
+// GET mas permite restauração via lixeira. Use ?hard=true para exclusão física.
 export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -166,8 +170,21 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: formatZodErrors(parsed.error) }, { status: 400 });
     }
     const { id } = parsed.data;
+    const hard = searchParams.get("hard") === "true";
 
     const db = getSupabase();
+    if (!hard) {
+      const attempt = await db.from("diario_logs").update({ is_deleted: true }).eq("id", id);
+      if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("is_deleted"))) {
+        // Banco ainda sem a coluna: fallback para hard delete (comportamento anterior).
+        const fb = await db.from("diario_logs").delete().eq("id", id);
+        if (fb.error) throw fb.error;
+      } else if (attempt.error) {
+        throw attempt.error;
+      }
+      return NextResponse.json({ ok: true, soft: true });
+    }
+
     const { error } = await db.from("diario_logs").delete().eq("id", id);
     if (error) throw error;
 

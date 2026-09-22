@@ -8,6 +8,7 @@ import {
   faseUpdateSchema,
   faseDeleteSchema,
   formatZodErrors,
+  normalizeStatusFase,
 } from "@/lib/validators";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 
@@ -118,7 +119,7 @@ export async function POST(req: Request) {
       responsavel: responsavelParaInserir,
       acao: dataIn.acao,
       prazo_limite: dataIn.prazoLimite,
-      status: dataIn.status,
+      status: normalizeStatusFase(dataIn.status),
       observacoes: dataIn.observacoes,
       projeto_cliente: dataIn.projetoCliente,
       is_deleted: false,
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
       responsavel: responsavelParaInserir,
       acao: dataIn.acao,
       prazo_limite: dataIn.prazoLimite,
-      status: dataIn.status,
+      status: normalizeStatusFase(dataIn.status),
       observacoes: dataIn.observacoes,
       is_deleted: false,
     };
@@ -209,7 +210,7 @@ export async function PUT(req: Request) {
       updates.responsavel = dataIn.responsavel;
     }
     if (dataIn.prazoLimite    !== undefined) updates.prazo_limite   = dataIn.prazoLimite;
-    if (dataIn.status         !== undefined) updates.status         = dataIn.status;
+    if (dataIn.status         !== undefined) updates.status         = normalizeStatusFase(dataIn.status);
     if (dataIn.isDeleted      !== undefined) updates.is_deleted     = dataIn.isDeleted;
     if (dataIn.observacoes    !== undefined) updates.observacoes    = dataIn.observacoes;
     if (dataIn.acao           !== undefined) updates.acao           = dataIn.acao;
@@ -290,7 +291,14 @@ export async function PUT(req: Request) {
     }
 
     if (insertsHistorico.length > 0) {
-      void db.from("historico_fases").insert(insertsHistorico);
+      // Await com try/catch: garante persistência da auditoria sem derrubar
+      // a resposta em caso de falha transitória (antes era fire-and-forget).
+      try {
+        const { error: histError } = await db.from("historico_fases").insert(insertsHistorico);
+        if (histError) console.warn("[PUT /api/fases] Falha ao gravar histórico:", histError.message);
+      } catch (histErr) {
+        console.warn("[PUT /api/fases] Falha ao gravar histórico:", histErr);
+      }
     }
 
     return NextResponse.json({

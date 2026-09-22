@@ -126,3 +126,25 @@ model HistoricoFase {
   @@index([faseId])
   @@map("historico_fases")
 }
+
+// =====================================================================
+// TABELAS OPCIONAIS (já usadas via supabase-js — modelos aditivos, sem
+// migration destrutiva; servem de documentação/futuro Prisma Client)
+// =====================================================================
+model ConfiguracaoSistema {
+  chave     String   @id
+  valor     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracoes_sistema")
+}
+
+model UserProjeto {
+  id          String  @id @default(cuid())
+  projetoNome String  @map("projeto_nome")
+  userEmail   String? @map("user_email")
+
+  @@index([userEmail])
+  @@index([projetoNome])
+  @@map("user_projetos")
+}

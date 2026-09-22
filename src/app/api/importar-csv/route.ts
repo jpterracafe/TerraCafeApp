@@ -53,6 +53,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'O arquivo CSV está vazio.' }, { status: 400 });
     }
 
+    // Superfície de avisos de parse (sem quebrar arquivos válidos): erros
+    // parciais passam a ser reportados em vez de silenciados.
+    const parseWarnings = parsed.errors.slice(0, 5).map((e) => ({
+      row: (e as any)?.row ?? null,
+      message: (e as any)?.message ?? 'Erro de parse',
+    }));
+
+    const seenFirebird = new Set<number>();
+    let duplicateInFile = 0;
+
     const normalizedRecords = rows.map((row) => {
       const idRaw = row['ID'] || row['CODIGO'] || row['ID_PROJETO'] || row['ID_FASE'] || row['IDFIREBIRD'];
       const nome = row['NOME'] || row['PROJETO'] || row['DESCRICAO'] || row['TITULO'] || row['FASE'] || 'Projeto Sem Nome';
@@ -61,8 +71,20 @@ export async function POST(req: NextRequest) {
       const dataInicioRaw = row['DATA_INICIO'] || row['DATA'] || row['CRIADO_EM'] || null;
       const areaTotalRaw = row['AREA_TOTAL'] || row['AREA'] || row['HECTARES'] || null;
 
-      const idFirebird = idRaw ? parseInt(String(idRaw).replace(/\D/g, ''), 10) || null : null;
-      const areaTotal = areaTotalRaw ? parseFloat(String(areaTotalRaw).replace(',', '.')) || null : null;
+      // Extrai apenas dígitos; valores sem dígito viram null (evita colisão "AB12" x "12"
+      // sendo tratada como igual sem aviso — duplicata intra-arquivo é contabilizada).
+      const digits = idRaw ? String(idRaw).replace(/\D/g, '') : '';
+      const idFirebird = digits ? parseInt(digits, 10) || null : null;
+      if (idFirebird !== null) {
+        if (seenFirebird.has(idFirebird)) duplicateInFile++;
+        else seenFirebird.add(idFirebird);
+      }
+      // Área: aceita vírgula decimal, rejeita negativo/NaN (vira null, sem quebrar).
+      let areaTotal: number | null = null;
+      if (areaTotalRaw !== null && areaTotalRaw !== undefined && String(areaTotalRaw).trim() !== '') {
+        const n = parseFloat(String(areaTotalRaw).replace(',', '.'));
+        areaTotal = Number.isFinite(n) && n >= 0 ? n : null;
+      }
 
       let dataInicio: string | null = null;
       if (dataInicioRaw) {
@@ -121,6 +143,8 @@ export async function POST(req: NextRequest) {
       totalRows: rows.length,
       savedCount,
       errorsCount,
+      duplicateInFile,
+      parseWarnings,
       isDbConfigured,
       records: normalizedRecords,
       message: isDbConfigured

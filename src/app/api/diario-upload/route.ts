@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { randomBytes } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
     const rawExt = file.name.split(".").pop() ?? "";
     // Só aceita extensão alfanumérica curta; senão usa padrão por tipo
     const ext = /^[a-z0-9]{2,5}$/i.test(rawExt) ? rawExt.toLowerCase() : (isImage ? "jpg" : "mp4");
-    const nome = `diario/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const nome = `diario/${Date.now()}-${randomBytes(8).toString("hex")}.${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const db     = getSupabase();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import bcrypt from "bcrypt";
+import { randomInt } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession } from "@/lib/auth";
 import env from "@/lib/env";
@@ -144,11 +145,11 @@ export async function PATCH(
       return NextResponse.json({ ok: true, role: novoCargo, cargo: novoCargo });
     }
 
-    // 2. Reset de senha aleatória (se não enviou role)
+    // 2. Reset de senha aleatória (se não enviou role) com CSPRNG
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     let novaSenha = "";
     for (let i = 0; i < 8; i++) {
-      novaSenha += chars.charAt(Math.floor(Math.random() * chars.length));
+      novaSenha += chars.charAt(randomInt(chars.length));
     }
 
     const hashed = await bcrypt.hash(novaSenha, 10);

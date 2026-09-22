@@ -81,8 +81,8 @@ export const authOptions: NextAuthOptions = {
 
           const senhaValida = await bcrypt.compare(senhaDigitada, user.password);
           if (!senhaValida) {
-            console.error("[auth] Senha INCORRETA para:", emailNormalizado);
-            console.error("[auth] Hash armazenado (primeiros 20):", String(user.password).substring(0, 20) + "...");
+            // Log genérico sem expor e-mail ou fragmento de hash (anti-enumeração).
+            console.error("[auth] Falha de autenticação: credenciais inválidas.");
             return null;
           }
 
@@ -91,7 +91,7 @@ export const authOptions: NextAuthOptions = {
             ? user.name 
             : extractUsernameFromEmail(emailNormalizado);
 
-          console.log("[auth] Login de usuário OK:", emailNormalizado, "role=" + user.role, "name=" + displayName);
+          console.log("[auth] Login de usuário OK: role=" + user.role);
           return {
             id: user.id,
             name: displayName,
@@ -142,15 +142,19 @@ export const authOptions: NextAuthOptions = {
 
 /**
  * Verifica se a sessão atual pertence a um administrador.
- * Admin = role "Desenvolvedor" OU email igual ao ADMIN_EMAIL das env vars.
+ * Admin = role "Desenvolvedor" OU email igual ao ADMIN_EMAIL das env vars
+ * (case-insensitive) OU e-mail master legado do client (compatibilidade).
  */
 export function isAdminSession(
   session: { user?: { email?: string | null; role?: string } } | null
 ): boolean {
   if (!session?.user) return false;
   const { role, email } = session.user;
-  return (
-    role === "Desenvolvedor" ||
-    Boolean(email && env.ADMIN_EMAIL && email === env.ADMIN_EMAIL)
-  );
+  if (role === "Desenvolvedor") return true;
+  const emailLc = email?.trim().toLowerCase();
+  if (!emailLc) return false;
+  if (env.ADMIN_EMAIL && emailLc === env.ADMIN_EMAIL.trim().toLowerCase()) return true;
+  // Compatível com src/lib/client-roles.ts (ADMIN_MASTER_EMAIL legado)
+  if (emailLc === "joao2005souza@gmail.com") return true;
+  return false;
 }

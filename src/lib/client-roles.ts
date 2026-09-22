@@ -13,5 +13,7 @@ export function isMasterDevSession(session: {
 } | null): boolean {
   if (!session?.user) return false;
   const { role, email } = session.user;
-  return role === "Desenvolvedor" || email === ADMIN_MASTER_EMAIL;
+  if (role === "Desenvolvedor") return true;
+  // Case-insensitive para unificar com isAdminSession (server).
+  return email?.trim().toLowerCase() === ADMIN_MASTER_EMAIL.toLowerCase();
 }
