@@ -411,7 +411,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ ok: true, hardDeleted: true });
     }
 
-    // Soft delete — marca fases e logs como is_deleted=true
+    // Soft delete — marca fases e logs como is_deleted=true.
+    // diario_logs não tem coluna updated_at no schema: atualiza só is_deleted
+    // (antes o update com updated_at falhava silencioso e o log ficava visível).
     const agora = new Date().toISOString();
     await db
       .from("fases_acao")
@@ -419,10 +421,11 @@ export async function DELETE(req: Request) {
       .eq("projeto_cliente", nome);
 
     try {
-      await db
+      const r = await db
         .from("diario_logs")
-        .update({ is_deleted: true, updated_at: agora })
+        .update({ is_deleted: true })
         .eq("projeto_cliente", nome);
+      if (r.error) throw r.error;
     } catch (_) { /* ignora se tabela diario_logs não tiver coluna is_deleted */ }
 
     return NextResponse.json({ ok: true, softDeleted: true, projeto: nome });
@@ -457,10 +460,11 @@ export async function PATCH(req: Request) {
       .eq("projeto_cliente", nome);
 
     try {
-      await db
+      const r = await db
         .from("diario_logs")
-        .update({ is_deleted: false, updated_at: agora })
+        .update({ is_deleted: false })
         .eq("projeto_cliente", nome);
+      if (r.error) throw r.error;
     } catch (_) { /* ignora */ }
 
     return NextResponse.json({ ok: true, restaurado: true, projeto: nome });

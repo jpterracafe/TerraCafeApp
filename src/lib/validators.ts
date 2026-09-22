@@ -97,7 +97,7 @@ const statusDiarioEnum = z.enum([
 ]);
 
 export const diarioLogCreateSchema = z.object({
-  data: z.union([z.string().trim().min(1), z.date()]).optional().default(() => new Date().toISOString().split("T")[0]),
+  data: z.union([z.string().trim().min(1), z.date()]).optional().default(() => hojeSP()),
   responsavel: z.string().trim().min(1, { message: "responsavel é obrigatório." }).max(300, { message: "responsavel muito longo." }),
   atividade: z.string().trim().min(1, { message: "atividade muito curta." }).max(500, { message: "atividade muito longa." }),
   status: z.union([statusDiarioEnum, z.string().trim().max(80)]).optional().default("Dentro do programado"),
@@ -152,4 +152,16 @@ export function normalizeStatusDiario(v: unknown): unknown {
   if (typeof v !== "string") return v;
   const key = v.trim().toLowerCase();
   return STATUS_DIARIO_MAP[key] ?? v.trim();
+}
+
+// ── Data "hoje" no fuso de São Paulo (YYYY-MM-DD) ──
+// Evita virar o dia anterior após 21h (bug do toISOString UTC no BRT).
+export function hojeSP(timeZone = "America/Sao_Paulo"): string {
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(new Date());
 }

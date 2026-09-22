@@ -114,6 +114,12 @@ export async function POST(req: Request) {
     // O responsável é definido somente pelo que o usuário escolheu (opcional)
     const responsavelParaInserir = dataIn.responsavel || "Não atribuído";
 
+    // Atribuição de autoria (compatível): preenche criado_por_* da sessão para
+    // fases avulsas não ficarem sem dono. Fallback sem as colunas em bancos
+    // ainda não migrados.
+    const criadoPorEmail = (session as any)?.user?.email?.trim().toLowerCase() ?? null;
+    const criadoPorNome = (session as any)?.user?.name?.trim() || null;
+
     const insertComProjeto = {
       gabarito: dataIn.gabarito,
       responsavel: responsavelParaInserir,
@@ -123,6 +129,8 @@ export async function POST(req: Request) {
       observacoes: dataIn.observacoes,
       projeto_cliente: dataIn.projetoCliente,
       is_deleted: false,
+      criado_por_email: criadoPorEmail,
+      criado_por_nome: criadoPorNome,
     };
 
     const insertSemProjeto = {
@@ -133,6 +141,8 @@ export async function POST(req: Request) {
       status: normalizeStatusFase(dataIn.status),
       observacoes: dataIn.observacoes,
       is_deleted: false,
+      criado_por_email: criadoPorEmail,
+      criado_por_nome: criadoPorNome,
     };
 
     let data: any = null;
@@ -143,11 +153,20 @@ export async function POST(req: Request) {
       .select("*")
       .single();
 
-    if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("projeto_cliente"))) {
-      console.warn("[POST /api/fases] Coluna projeto_cliente não existe, inserindo sem ela.");
+    if (attempt1.error && (attempt1.error.code === "PGRST204" || attempt1.error.message?.includes("projeto_cliente") || attempt1.error.message?.includes("criado_por"))) {
+      // Banco sem alguma coluna nova: remove do payload só as colunas
+      // reclamadas e retenta (modo compatível com bancos não migrados).
+      console.warn("[POST /api/fases] Coluna ausente no banco, inserindo em modo compatível.");
+      const msg: string = attempt1.error.message ?? "";
+      const retry: Record<string, unknown> = { ...insertComProjeto };
+      if (msg.includes("projeto_cliente")) delete retry.projeto_cliente;
+      if (msg.includes("criado_por")) {
+        delete retry.criado_por_email;
+        delete retry.criado_por_nome;
+      }
       const attempt2 = await db
         .from("fases_acao")
-        .insert(insertSemProjeto)
+        .insert(retry)
         .select("*")
         .single();
       if (attempt2.error) throw attempt2.error;

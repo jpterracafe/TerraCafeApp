@@ -5,11 +5,24 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
 
+// Freio anti-abuso em memória (30 uploads / 10 min por IP) — generoso.
+const uploadBuckets = new Map<string, { start: number; count: number }>();
+
 // ── POST /api/diario-upload ───────────────────────────────────────────────────
 // Recebe multipart/form-data com campo "file"
 // Devolve { url, tipo }
 export async function POST(req: Request) {
   try {
+    const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
+    const now = Date.now();
+    const b = uploadBuckets.get(ip);
+    if (b && now - b.start < 10 * 60 * 1000 && b.count >= 30) {
+      return NextResponse.json({ error: "Muitos uploads. Aguarde alguns minutos." }, { status: 429 });
+    }
+    uploadBuckets.set(ip, b && now - b.start < 10 * 60 * 1000
+      ? { start: b.start, count: b.count + 1 }
+      : { start: now, count: 1 });
+
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;

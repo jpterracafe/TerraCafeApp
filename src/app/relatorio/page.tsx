@@ -56,6 +56,7 @@ function RelatorioContent() {
   const [fases, setFases]   = useState<FaseAcaoItem[]>([]);
   const [logs, setLogs]     = useState<DiarioLogItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -64,11 +65,17 @@ function RelatorioContent() {
   }, [status, router]);
 
   const load = useCallback(async () => {
+    setLoadError('');
     try {
       const [resFases, resLogs] = await Promise.all([
         fetch('/api/fases'),
         fetch('/api/diario-logs'),
       ]);
+
+      if (!resFases.ok || !resLogs.ok) {
+        // Antes o relatório vazio era renderizado em silêncio; agora avisa.
+        setLoadError('Não foi possível carregar os dados do relatório. Tente recarregar a página.');
+      }
 
       if (resFases.ok) {
         const { fases: all } = await resFases.json();
@@ -85,6 +92,8 @@ function RelatorioContent() {
           : (allLogs ?? []).filter((l: DiarioLogItem) => (l.projetoCliente ?? '').trim() === projeto.trim());
         setLogs(filtradosLogs);
       }
+    } catch {
+      setLoadError('Erro de conexão ao carregar o relatório. Tente recarregar a página.');
     } finally {
       setLoading(false);
     }
@@ -100,7 +109,17 @@ function RelatorioContent() {
 
   const totalAcoes = fases.length;
   const concluidas = fases.filter(f => f.status === 'Concluído').length;
-  const atrasadas  = fases.filter(f => f.status !== 'Concluído' && new Date(`${f.prazoLimite}T00:00:00Z`) < new Date()).length;
+  // Atraso por dia (não por hora): compara a meia-noite local do prazo com a
+  // meia-noite local de hoje — antes, o próprio dia já caía como "atrasada"
+  // por comparar `T00:00:00Z` com o horário atual.
+  const hojeMeiaNoite = new Date();
+  hojeMeiaNoite.setHours(0, 0, 0, 0);
+  const atrasadas  = fases.filter(f => {
+    if (f.status === 'Concluído' || !f.prazoLimite) return false;
+    const prazo = new Date(`${String(f.prazoLimite).slice(0, 10)}T00:00:00`);
+    if (isNaN(prazo.getTime())) return false;
+    return prazo < hojeMeiaNoite;
+  }).length;
   const pctGeral   = totalAcoes > 0 ? Math.round((concluidas / totalAcoes) * 100) : 0;
 
   // Responsáveis únicos
@@ -108,8 +127,14 @@ function RelatorioContent() {
   const respLogs  = logs.map(l => l.responsavel);
   const responsaveis = Array.from(new Set([...respFases, ...respLogs])).filter(Boolean);
 
-  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
   const nomeProjeto = (!projeto || projeto === '__todos__') ? 'Consolidado Geral de Obras' : projeto;
+
+  if (loadError) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#b91c1c', padding: 24, textAlign: 'center' }}>
+      {loadError}
+    </div>
+  );
 
   // Resumo de Campo
   const logsRecentes = logs.slice(0, 8);

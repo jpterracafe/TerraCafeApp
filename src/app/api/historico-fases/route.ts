@@ -59,13 +59,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "faseId e campo são obrigatórios." }, { status: 400 });
     }
 
+    // Validação compatível anti-forjamento: a fase precisa existir.
+    // Chamadas legítimas (PUT /api/fases) sempre informam fase real.
+    const faseId = String(body.faseId);
+    const campo = String(body.campo).slice(0, 80);
+
     const db = getSupabase();
+    const { data: faseExiste } = await db
+      .from("fases_acao")
+      .select("id")
+      .eq("id", faseId)
+      .maybeSingle();
+    if (!faseExiste) {
+      return NextResponse.json({ error: "Fase não encontrada." }, { status: 404 });
+    }
+
     const { error } = await db.from("historico_fases").insert({
-      fase_id: body.faseId,
-      campo: body.campo,
-      valor_anterior: body.valorAnterior ?? "",
-      valor_novo: body.valorNovo ?? "",
-      usuario: body.usuario ?? "Sistema",
+      fase_id: faseId,
+      campo,
+      valor_anterior: String(body.valorAnterior ?? "").slice(0, 500),
+      valor_novo: String(body.valorNovo ?? "").slice(0, 500),
+      usuario: String(body.usuario ?? "Sistema").slice(0, 120),
     });
 
     if (error) throw error;

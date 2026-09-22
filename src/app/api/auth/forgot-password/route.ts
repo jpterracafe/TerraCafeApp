@@ -86,8 +86,9 @@ export async function POST(req: Request) {
         .eq("email", email)
         .maybeSingle();
       if (!user) {
-        // 🔒 Anti-enumeração: retorna sucesso mesmo para e-mail inexistente
-        console.info("[forgot-password] E-mail não encontrado (silêncio proposital):", email);
+        // 🔒 Anti-enumeração: retorna sucesso mesmo para e-mail inexistente.
+        // Log genérico sem expor o e-mail consultado.
+        console.info("[forgot-password] Solicitação para e-mail não cadastrado (silêncio proposital).");
         return NextResponse.json({
           ok: true,
           message:
@@ -151,7 +152,7 @@ export async function POST(req: Request) {
             </div>`,
         });
         emailSent = true;
-        console.info("[forgot-password] E-mail enviado para:", email);
+        console.info("[forgot-password] E-mail de recuperação enviado.");
       } catch (err: unknown) {
         emailError = err instanceof Error ? err.message : String(err);
         console.error("[forgot-password] Erro ao enviar e-mail:", emailError);

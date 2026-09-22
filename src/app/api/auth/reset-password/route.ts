@@ -21,6 +21,21 @@ interface Payload {
   exp: number;
 }
 
+// Freio anti-abuso em memória (20 tentativas / 10 min por IP) — generoso,
+// não afeta uso normal.
+const resetBuckets = new Map<string, { start: number; count: number }>();
+
+function rateLimited(req: Request): boolean {
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim() || "local";
+  const now = Date.now();
+  const b = resetBuckets.get(ip);
+  if (b && now - b.start < 10 * 60 * 1000 && b.count >= 20) return true;
+  resetBuckets.set(ip, b && now - b.start < 10 * 60 * 1000
+    ? { start: b.start, count: b.count + 1 }
+    : { start: now, count: 1 });
+  return false;
+}
+
 function verifyToken(raw: string): Payload | null {
   try {
     const [headerB64, bodyB64, sigB64] = raw.split(".");
@@ -45,6 +60,12 @@ function verifyToken(raw: string): Payload | null {
 
 export async function POST(req: Request) {
   try {
+    if (rateLimited(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Muitas tentativas. Aguarde alguns minutos." },
+        { status: 429 }
+      );
+    }
     const body = await req.json().catch(() => null);
     const parsed = resetPasswordSchema.safeParse(body);
     if (!parsed.success) {

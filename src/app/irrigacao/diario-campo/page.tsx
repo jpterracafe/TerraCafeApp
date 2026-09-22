@@ -593,12 +593,19 @@ export default function DiarioCampoTimelinePage() {
     if (!isImg && !isVid) return;
     setMidiaFile(file);
     setMidiaTipo(isImg ? 'image' : 'video');
-    setMidiaPreview(URL.createObjectURL(file));
+    // Revoga o preview anterior para não vazar memória em trocas repetidas.
+    setMidiaPreview((prev) => {
+      if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
   };
 
   const clearMidia = () => {
+    setMidiaPreview((prev) => {
+      if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+      return '';
+    });
     setMidiaFile(null);
-    setMidiaPreview('');
     setMidiaTipo('');
   };
 
