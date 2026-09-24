@@ -17,6 +17,7 @@ import {
   TERMOS_GENERICOS_RESPONSAVEL,
 } from '@/lib/responsaveis';
 import { useLoja } from '@/contexts/LojaContext';
+import LojaSelector from '@/components/LojaSelector';
 
 interface JustificativaItem {
   id: string;
@@ -183,6 +184,29 @@ export default function VisaoGeralDiretorPage() {
       setModoTV(false);
     }
   };
+
+  // Sincroniza classe modo-tv-ativo no body para ocultar a barra de navegação principal
+  useEffect(() => {
+    if (modoTV) {
+      document.body.classList.add('modo-tv-ativo');
+    } else {
+      document.body.classList.remove('modo-tv-ativo');
+    }
+
+    const onFullscreenChange = () => {
+      const isFs = !!document.fullscreenElement;
+      if (!isFs && modoTV) {
+        setModoTV(false);
+        document.body.classList.remove('modo-tv-ativo');
+      }
+    };
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.body.classList.remove('modo-tv-ativo');
+    };
+  }, [modoTV]);
 
   const { selectedLoja, isProjectInSelectedLoja } = useLoja();
 
@@ -498,18 +522,49 @@ export default function VisaoGeralDiretorPage() {
         </div>
       )}
 
-      {/* Botão Sair do Modo TV (só aparece no modo TV) */}
+      {/* Barra de Topo Integrada do Modo TV (substitui a barra padrão com layout dedicado para telões, sem conflitos) */}
       {modoTV && (
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={toggleModoTV}
-            className="px-4 py-2 rounded-xl text-sm font-bold bg-rose-600 text-white border border-rose-400 shadow-lg hover:bg-rose-500 flex items-center gap-2 transition-all"
-            title="Sair do Modo TV"
-          >
-            <Tv className="w-4 h-4" />
-            <span>Sair do Modo TV</span>
-          </button>
-        </div>
+        <header className="sticky top-0 z-50 bg-[#0d1527]/95 backdrop-blur-md border-b border-[#1e293b] px-4 md:px-6 py-3 flex items-center justify-between shadow-xl mb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-indigo-400">
+                  PAINEL EXECUTIVO • MODO TV
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold">
+                  Ao vivo
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Transmissão em tempo real das obras
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* Seletor de Loja dedicado no Modo TV */}
+            <div className="flex items-center gap-1.5 bg-[#16203a] px-2.5 py-1 rounded-xl border border-[#1e293b]">
+              <span className="text-xs text-slate-400 font-medium">Filial:</span>
+              <LojaSelector />
+            </div>
+
+            {horaAtual && (
+              <div className="hidden sm:flex items-center px-3 py-1.5 rounded-xl bg-[#16203a] border border-[#1e293b] text-xs font-mono font-bold text-slate-200">
+                🕒 {horaAtual}
+              </div>
+            )}
+
+            <button
+              onClick={toggleModoTV}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-500 text-white border border-rose-400/40 shadow-lg shadow-rose-900/30 flex items-center gap-1.5 transition-all active:scale-95"
+              title="Sair do Modo TV (ou pressione ESC)"
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>Sair TV</span>
+            </button>
+          </div>
+        </header>
       )}
 
       {!modoTV && (

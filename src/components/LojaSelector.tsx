@@ -61,7 +61,7 @@ export default function LojaSelector() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 shadow-xl ring-1 ring-black/5 z-50 py-2 divide-y divide-slate-100 dark:divide-slate-800 focus:outline-none animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute right-0 mt-2 w-64 origin-top-right rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-slate-800 shadow-2xl ring-1 ring-black/5 z-[100] py-2 divide-y divide-slate-100 dark:divide-slate-800 focus:outline-none animate-in fade-in zoom-in-95 duration-100">
           <div className="px-3.5 py-2">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Visualização por Filial
@@ -134,7 +134,7 @@ export default function LojaSelector() {
             )}
           </div>
 
-          {isAdmin && (
+          {isAdmin && !isDiretor && (
             <div className="py-1.5 px-3">
               <Link
                 href="/admin/usuarios"

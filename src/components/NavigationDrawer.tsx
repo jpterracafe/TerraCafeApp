@@ -52,7 +52,7 @@ export default function NavigationDrawer() {
   return (
     <>
       {/* Top Bar Unificada */}
-      <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors">
+      <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors [.modo-tv-ativo_&]:hidden">
         <div className="flex items-center">
           <button 
             onClick={toggleDrawer}
