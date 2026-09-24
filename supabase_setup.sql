@@ -167,3 +167,18 @@ CREATE INDEX IF NOT EXISTS idx_diario_logs_projeto_cliente
 -- diario_logs: índice composto para a query mais comum (responsavel + data)
 CREATE INDEX IF NOT EXISTS idx_diario_logs_resp_data
   ON diario_logs(responsavel, data DESC);
+
+-- ============================================================
+-- GESTÃO DE LOJAS E FILIAIS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS lojas (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  nome TEXT NOT NULL UNIQUE,
+  ativo BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE lojas DISABLE ROW LEVEL SECURITY;
+
+-- Coluna loja para usuários (vínculo direto opcional)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS loja TEXT;
+
