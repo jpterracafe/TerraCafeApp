@@ -170,13 +170,43 @@ function isNonSerializableBody(body: RequestInit["body"]): boolean {
   return body != null && typeof body !== "string";
 }
 
+interface MemCacheEntry {
+  status: number;
+  body: string;
+  ts: number;
+}
+
+const memCache = new Map<string, MemCacheEntry>();
+const inFlightRequests = new Map<string, Promise<{ status: number; body: string; ok: boolean }>>();
+const MEM_CACHE_TTL_MS = 3500; // 3.5 segundos de resposta instantânea (0ms) entre navegações
+
+/** Invalida cache em memória imediatamente (ex: ao salvar dados) */
+export function invalidateOfflineCache(urlPrefix?: string) {
+  if (!urlPrefix) {
+    memCache.clear();
+  } else {
+    for (const key of memCache.keys()) {
+      if (key.startsWith(urlPrefix)) {
+        memCache.delete(key);
+      }
+    }
+  }
+}
+
 /**
- * Drop-in de `fetch` com persistência offline.
- * Comportamento online é idêntico ao `fetch` original.
+ * Drop-in de `fetch` com persistência offline e aceleração em memória.
+ * - Concorrência: unifica chamadas simultâneas à mesma URL num único request de rede.
+ * - Navegação rápida: cache em memória de curtíssimo prazo (3.5s) para transição instantânea de abas.
+ * - Mutações limpam o cache para manter dados frescos.
  */
 export async function offlineFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const method = (options.method || "GET").toUpperCase();
   const isMutation = method !== "GET" && method !== "HEAD";
+
+  if (isMutation) {
+    // Qualquer alteração limpa o cache em memória para garantir consistência
+    invalidateOfflineCache();
+  }
 
   if (!isOnline()) {
     if (isMutation) {
@@ -203,19 +233,68 @@ export async function offlineFetch(url: string, options: RequestInit = {}): Prom
     throw new Error("Offline e sem dados em cache para esta requisição.");
   }
 
-  try {
-    const res = await fetch(url, options);
-    if (!isMutation && res.ok) {
+  // 1. Cache em memória para requisições GET (resposta instantânea em 0ms)
+  if (!isMutation) {
+    const mem = memCache.get(url);
+    if (mem && Date.now() - mem.ts < MEM_CACHE_TTL_MS) {
       try {
-        const body = await res.clone().text();
+        return syntheticJsonResponse(mem.status, JSON.parse(mem.body), {
+          "X-Memory-Cache": "1",
+        });
+      } catch {
+        memCache.delete(url);
+      }
+    }
+  }
+
+  // 2. Desduplicação de chamadas simultâneas (evita disparos redundantes em paralelo)
+  if (!isMutation && inFlightRequests.has(url)) {
+    try {
+      const data = await inFlightRequests.get(url)!;
+      return syntheticJsonResponse(data.status, JSON.parse(data.body), {
+        "X-Dedup-InFlight": "1",
+      });
+    } catch {
+      // Se falhou no outro, tenta localmente
+    }
+  }
+
+  // Cria a promessa de execução da rede
+  const executeFetch = async (): Promise<{ status: number; body: string; ok: boolean }> => {
+    const res = await fetch(url, options);
+    const body = await res.text();
+    return { status: res.status, body, ok: res.ok };
+  };
+
+  let inFlightPromise: Promise<{ status: number; body: string; ok: boolean }> | null = null;
+  if (!isMutation) {
+    inFlightPromise = executeFetch();
+    inFlightRequests.set(url, inFlightPromise);
+  }
+
+  try {
+    const result = inFlightPromise ? await inFlightPromise : await executeFetch();
+
+    if (!isMutation && result.ok) {
+      try {
+        memCache.set(url, { status: result.status, body: result.body, ts: Date.now() });
+
         const cache = readCache();
-        cache[url] = { status: res.status, body, ts: Date.now() };
+        cache[url] = { status: result.status, body: result.body, ts: Date.now() };
         writeCache(cache);
       } catch {
         // Cache é best-effort
       }
     }
-    return res;
+
+    let parsedBody: any;
+    try {
+      parsedBody = JSON.parse(result.body);
+    } catch {
+      parsedBody = result.body;
+    }
+
+    return syntheticJsonResponse(result.status, parsedBody);
   } catch (networkError) {
     if (!isMutation) {
       const cached = readCache()[url];
@@ -239,6 +318,10 @@ export async function offlineFetch(url: string, options: RequestInit = {}): Prom
       { ok: true, offlineQueued: true },
       { "X-Offline-Queued": "1" }
     );
+  } finally {
+    if (!isMutation) {
+      inFlightRequests.delete(url);
+    }
   }
 }
 

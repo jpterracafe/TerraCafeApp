@@ -63,26 +63,31 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
 
   const db = getSupabase();
 
-  // Carrega mapa de criadores de configuracoes_sistema
   let mapCriadores: Record<string, CriadorInfo> = {};
-  try {
-    const { data: criadoresRow } = await db
-      .from("configuracoes_sistema")
-      .select("valor")
-      .eq("chave", "diario_projetos_criadores_v1")
-      .maybeSingle();
-    if (criadoresRow?.valor) {
-      mapCriadores = { ...(criadoresRow as CriadoresRow).valor };
-    }
-  } catch {
-    // silent
-  }
-
-  // Complementa com user_projetos se a tabela existir
   const userProjetosPermitidos = new Set<string>();
+
   try {
-    const { data: upRows } = await db.from("user_projetos").select("projeto_nome, user_email");
-    if (upRows) {
+    const [criadoresRes, upRes] = await Promise.all([
+      Promise.resolve(
+        db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "diario_projetos_criadores_v1")
+          .maybeSingle()
+      ).catch(() => ({ data: null })),
+      Promise.resolve(
+        db
+          .from("user_projetos")
+          .select("projeto_nome, user_email")
+      ).catch(() => ({ data: null })),
+    ]);
+
+    if (criadoresRes?.data?.valor) {
+      mapCriadores = { ...(criadoresRes.data as CriadoresRow).valor };
+    }
+
+    const upRows = upRes?.data;
+    if (upRows && Array.isArray(upRows)) {
       for (const up of upRows as UserProjetosRow[]) {
         const pNome = up.projeto_nome;
         const uEmail = up.user_email?.trim().toLowerCase();

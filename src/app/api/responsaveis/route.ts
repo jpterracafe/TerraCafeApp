@@ -58,93 +58,86 @@ export async function GET() {
     // cria um login (user_email passa a ser o e-mail novo, mas criado_por fica).
     let rows: any[] | null = null;
     const RESP_COLS = "id, nome, cargo, origem, user_email, user_id, criado_por_email, criado_por_nome, created_at";
+    // Executa busca de responsáveis, usuários e fases em paralelo
+    const [fetchedRows, usersRes, fasesRes] = await Promise.all([
+      (async () => {
+        if (!adminView && sessionEmail) {
+          const attempt = await db
+            .from("responsaveis")
+            .select(RESP_COLS)
+            .or(`criado_por_email.eq.${sessionEmail},user_email.eq.${sessionEmail}`)
+            .order("created_at", { ascending: true });
+          if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email") || attempt.error.message?.includes("criado_por"))) {
+            const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
+            if (fb.error) throw fb.error;
+            return fb.data ?? [];
+          } else {
+            if (attempt.error) throw attempt.error;
+            return attempt.data ?? [];
+          }
+        } else {
+          const { data, error } = await db.from("responsaveis").select(RESP_COLS).order("created_at", { ascending: true });
+          if (error) {
+            if (error.code === "PGRST204" || error.message?.includes("user_email") || error.message?.includes("user_id")) {
+              const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
+              if (fb.error) throw fb.error;
+              return fb.data ?? [];
+            } else {
+              throw error;
+            }
+          }
+          return data ?? [];
+        }
+      })(),
+      Promise.resolve(db.from("users").select("id, name, email, role")).catch(() => ({ data: [] })),
+      Promise.resolve(db.from("fases_acao").select("responsavel, projeto_cliente").eq("is_deleted", false).limit(5000)).catch(() => ({ data: [] })),
+    ]);
+
+    rows = fetchedRows;
     if (!adminView && sessionEmail) {
-      const attempt = await db
-        .from("responsaveis")
-        .select(RESP_COLS)
-        .or(`criado_por_email.eq.${sessionEmail},user_email.eq.${sessionEmail}`)
-        .order("created_at", { ascending: true });
-      if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("user_email") || attempt.error.message?.includes("criado_por"))) {
-        // Colunas ainda não existem: busca só as básicas e filtra em memória abaixo
-        const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
-        if (fb.error) throw fb.error;
-        rows = fb.data ?? [];
-      } else {
-        if (attempt.error) throw attempt.error;
-        rows = attempt.data ?? [];
-      }
-      // Rede de segurança em memória (vale p/ os dois caminhos acima):
-      // nunca entrega ao agricultor linhas de outros donos.
+      // Rede de segurança em memória: nunca entrega ao agricultor linhas de outros donos
       rows = (rows ?? []).filter((r) => {
         const dono = (r.criado_por_email ?? "").trim().toLowerCase();
         const vinculado = (r.user_email ?? "").trim().toLowerCase();
         if (dono) return dono === sessionEmail || vinculado === sessionEmail;
-        // Legado sem criado_por: dono = user_email (desde que não vinculado a login)
         if (r.user_id) return vinculado === sessionEmail;
         return vinculado === sessionEmail;
       });
-    } else {
-      const { data, error } = await db.from("responsaveis").select(RESP_COLS).order("created_at", { ascending: true });
-      if (error) {
-        // Fallback para bancos antigos sem as colunas novas
-        if (error.code === "PGRST204" || error.message?.includes("user_email") || error.message?.includes("user_id")) {
-          const fb = await db.from("responsaveis").select("id, nome, cargo, origem, created_at").order("created_at", { ascending: true });
-          if (fb.error) throw fb.error;
-          rows = fb.data ?? [];
-        } else {
-          throw error;
-        }
-      } else {
-        rows = data ?? [];
-      }
     }
 
     // Carrega users para marcar quem já tem login (match por id, email ou nome)
     const usersByEmail = new Map<string, { id: string; name: string | null; email: string | null; role: string }>();
     const usersByNormName = new Map<string, { id: string; name: string | null; email: string | null; role: string }>();
-    try {
-      const { data: users } = await db.from("users").select("id, name, email, role");
-      for (const u of (users ?? []) as { id: string; name: string | null; email: string | null; role: string }[]) {
-        if (u.email) usersByEmail.set(u.email.trim().toLowerCase(), u);
-        if (u.name) {
-          const k = normalizeName(u.name);
-          if (k && !usersByNormName.has(k)) usersByNormName.set(k, u);
-        }
+    const users = (usersRes as any)?.data;
+    for (const u of (users ?? []) as { id: string; name: string | null; email: string | null; role: string }[]) {
+      if (u.email) usersByEmail.set(u.email.trim().toLowerCase(), u);
+      if (u.name) {
+        const k = normalizeName(u.name);
+        if (k && !usersByNormName.has(k)) usersByNormName.set(k, u);
       }
-    } catch {
-      // silent — sem users, todos ficam temLogin=false
     }
 
     // Carrega fases para mapear projetos vinculados por responsável
-    // (match por nome normalizado OU por email dentro da lista separada por vírgula)
     const projetosPorResp = new Map<string, Set<string>>(); // normName -> projetos
     const projetosPorEmail = new Map<string, Set<string>>(); // email -> projetos
-    try {
-      const { data: fases } = await db
-        .from("fases_acao")
-        .select("responsavel, projeto_cliente")
-        .eq("is_deleted", false)
-        .limit(5000);
-      for (const f of (fases ?? []) as { responsavel: string | null; projeto_cliente: string | null }[]) {
-        const proj = (f.projeto_cliente || "").trim();
-        if (!proj) continue;
-        for (const parte of parseResponsavelEmails(f.responsavel || "")) {
-          const p = parte.trim();
-          if (!p) continue;
-          if (p.includes("@")) {
-            const k = p.toLowerCase();
-            if (!projetosPorEmail.has(k)) projetosPorEmail.set(k, new Set());
-            projetosPorEmail.get(k)!.add(proj);
-          } else {
-            const k = normalizeName(p);
-            if (!k) continue;
-            if (!projetosPorResp.has(k)) projetosPorResp.set(k, new Set());
-            projetosPorResp.get(k)!.add(proj);
-          }
+    const fases = (fasesRes as any)?.data;
+    for (const f of (fases ?? []) as { responsavel: string | null; projeto_cliente: string | null }[]) {
+      const proj = (f.projeto_cliente || "").trim();
+      if (!proj) continue;
+      for (const parte of parseResponsavelEmails(f.responsavel || "")) {
+        const p = parte.trim();
+        if (!p) continue;
+        if (p.includes("@")) {
+          const k = p.toLowerCase();
+          if (!projetosPorEmail.has(k)) projetosPorEmail.set(k, new Set());
+          projetosPorEmail.get(k)!.add(proj);
+        } else {
+          const k = normalizeName(p);
+          if (!k) continue;
+          if (!projetosPorResp.has(k)) projetosPorResp.set(k, new Set());
+          projetosPorResp.get(k)!.add(proj);
         }
       }
-    } catch {
-      // silent
     }
 
     const responsaveis = (rows ?? []).map((r) => {
@@ -221,7 +214,11 @@ export async function GET() {
       }
     }
 
-    return NextResponse.json({ responsaveis });
+    return NextResponse.json({ responsaveis }, {
+      headers: {
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=15",
+      },
+    });
   } catch (e) {
     console.error("[GET /api/responsaveis]", e);
     return NextResponse.json({ error: "Erro ao buscar responsáveis." }, { status: 500 });

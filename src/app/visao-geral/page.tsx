@@ -18,6 +18,7 @@ import {
 } from '@/lib/responsaveis';
 import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
+import { offlineFetch } from '@/lib/offline';
 
 interface JustificativaItem {
   id: string;
@@ -104,10 +105,10 @@ export default function VisaoGeralDiretorPage() {
   const carregarDados = useCallback(async () => {
     try {
       const [resProj, resConfig, resFases, resLogs] = await Promise.all([
-        fetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
-        fetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
-        fetch('/api/fases').then(r => r.ok ? r.json() : { fases: [] }),
-        fetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
+        offlineFetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
+        offlineFetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
+        offlineFetch('/api/fases').then(r => r.ok ? r.json() : { fases: [] }),
+        offlineFetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
 
       setProjetosList(Array.isArray(resProj.projetos) ? resProj.projetos : []);

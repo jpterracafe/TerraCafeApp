@@ -11,30 +11,60 @@ const CHAVE_LOJAS = "sistema_lojas_v1";
 const CHAVE_USUARIOS_LOJAS = "sistema_usuarios_lojas_v1";
 const CHAVE_PROJETOS_LOJAS = "sistema_projetos_lojas_v1";
 
+// Cache de servidor em memória para acelerar respostas de 800ms para <1ms
+interface ServerCacheEntry<T> {
+  data: T;
+  expiresAt: number;
+}
+const CACHE_TTL_MS = 25 * 1000; // 25 segundos
+
+let cacheLojas: ServerCacheEntry<Loja[]> | null = null;
+let cacheUserLojas: ServerCacheEntry<Record<string, string>> | null = null;
+let cacheProjectLojas: ServerCacheEntry<Record<string, string>> | null = null;
+let tableLojasAvailable: boolean | null = null;
+
+export function invalidateLojasCache() {
+  cacheLojas = null;
+  cacheUserLojas = null;
+  cacheProjectLojas = null;
+}
+
 /**
  * Retorna a lista de todas as lojas cadastradas no sistema.
  * Prioriza tabela `lojas` se existir, com fallback para `configuracoes_sistema`.
  */
 export async function getLojas(): Promise<Loja[]> {
+  if (cacheLojas && Date.now() < cacheLojas.expiresAt) {
+    return cacheLojas.data;
+  }
+
   const db = getSupabase();
 
-  // 1. Tenta buscar da tabela 'lojas'
-  try {
-    const { data, error } = await db
-      .from("lojas")
-      .select("id, nome, ativo, created_at")
-      .order("nome", { ascending: true });
+  // 1. Tenta buscar da tabela 'lojas' se ainda não determinamos que ela não existe
+  if (tableLojasAvailable !== false) {
+    try {
+      const { data, error } = await db
+        .from("lojas")
+        .select("id, nome, ativo, created_at")
+        .order("nome", { ascending: true });
 
-    if (!error && data && data.length > 0) {
-      return data.map((d: any) => ({
-        id: String(d.id),
-        nome: String(d.nome),
-        ativo: d.ativo !== false,
-        createdAt: d.created_at || new Date().toISOString(),
-      }));
+      if (!error && data && data.length > 0) {
+        tableLojasAvailable = true;
+        const mapped = data.map((d: any) => ({
+          id: String(d.id),
+          nome: String(d.nome),
+          ativo: d.ativo !== false,
+          createdAt: d.created_at || new Date().toISOString(),
+        }));
+        cacheLojas = { data: mapped, expiresAt: Date.now() + CACHE_TTL_MS };
+        return mapped;
+      }
+      if (error) {
+        tableLojasAvailable = false;
+      }
+    } catch {
+      tableLojasAvailable = false;
     }
-  } catch {
-    // Tabela pode não existir ainda
   }
 
   // 2. Fallback: configuracoes_sistema
@@ -46,7 +76,9 @@ export async function getLojas(): Promise<Loja[]> {
       .maybeSingle();
 
     if (configRow?.valor && Array.isArray(configRow.valor)) {
-      return configRow.valor as Loja[];
+      const mapped = configRow.valor as Loja[];
+      cacheLojas = { data: mapped, expiresAt: Date.now() + CACHE_TTL_MS };
+      return mapped;
     }
   } catch (err) {
     console.error("[getLojas] Erro ao buscar de configuracoes_sistema:", err);
@@ -59,6 +91,7 @@ export async function getLojas(): Promise<Loja[]> {
  * Salva a lista de lojas tanto em configuracoes_sistema quanto na tabela lojas (se existir).
  */
 export async function saveLojas(lojas: Loja[]): Promise<boolean> {
+  invalidateLojasCache();
   const db = getSupabase();
   try {
     const { error } = await db
@@ -85,6 +118,10 @@ export async function saveLojas(lojas: Loja[]): Promise<boolean> {
  * Chave: userId ou email (em minúsculas) -> Valor: nome da loja
  */
 export async function getUserLojasMap(): Promise<Record<string, string>> {
+  if (cacheUserLojas && Date.now() < cacheUserLojas.expiresAt) {
+    return cacheUserLojas.data;
+  }
+
   const db = getSupabase();
   try {
     const { data: configRow } = await db
@@ -94,7 +131,9 @@ export async function getUserLojasMap(): Promise<Record<string, string>> {
       .maybeSingle();
 
     if (configRow?.valor && typeof configRow.valor === "object") {
-      return configRow.valor as Record<string, string>;
+      const res = configRow.valor as Record<string, string>;
+      cacheUserLojas = { data: res, expiresAt: Date.now() + CACHE_TTL_MS };
+      return res;
     }
   } catch (err) {
     console.error("[getUserLojasMap] Erro:", err);
@@ -219,6 +258,7 @@ export async function propagateUserLojaToProjects(userIdentifier: string, lojaNo
  * para TODOS os projetos daquela pessoa.
  */
 export async function setUserLoja(userIdentifier: string, lojaNome: string): Promise<boolean> {
+  invalidateLojasCache();
   if (!userIdentifier) return false;
   const db = getSupabase();
   const idKey = userIdentifier.trim().toLowerCase();
@@ -302,6 +342,10 @@ export async function getUserAssignedLoja(user: { id?: string | null; email?: st
  * Chave: nome do projeto -> Valor: nome da loja
  */
 export async function getProjectLojasMap(): Promise<Record<string, string>> {
+  if (cacheProjectLojas && Date.now() < cacheProjectLojas.expiresAt) {
+    return cacheProjectLojas.data;
+  }
+
   const db = getSupabase();
   try {
     const { data: configRow } = await db
@@ -311,7 +355,9 @@ export async function getProjectLojasMap(): Promise<Record<string, string>> {
       .maybeSingle();
 
     if (configRow?.valor && typeof configRow.valor === "object") {
-      return configRow.valor as Record<string, string>;
+      const res = configRow.valor as Record<string, string>;
+      cacheProjectLojas = { data: res, expiresAt: Date.now() + CACHE_TTL_MS };
+      return res;
     }
   } catch (err) {
     console.error("[getProjectLojasMap] Erro:", err);
@@ -323,6 +369,7 @@ export async function getProjectLojasMap(): Promise<Record<string, string>> {
  * Atribui ou altera a loja de um projeto específico.
  */
 export async function setProjectLoja(projetoNome: string, lojaNome: string): Promise<boolean> {
+  invalidateLojasCache();
   if (!projetoNome) return false;
   const db = getSupabase();
   try {
@@ -356,6 +403,7 @@ export async function setProjectLoja(projetoNome: string, lojaNome: string): Pro
  * - Atualiza tabela lojas (best effort)
  */
 export async function renameLojaReferences(oldName: string, newName: string): Promise<void> {
+  invalidateLojasCache();
   if (!oldName || !newName || oldName.trim().toLowerCase() === newName.trim().toLowerCase()) return;
   const db = getSupabase();
   const oldLc = oldName.trim().toLowerCase();
@@ -418,6 +466,7 @@ export async function renameLojaReferences(oldName: string, newName: string): Pr
  * - Remove de tabela lojas (best effort)
  */
 export async function cleanupLojaReferences(lojaNome: string): Promise<void> {
+  invalidateLojasCache();
   if (!lojaNome) return;
   const db = getSupabase();
   const nomeLc = lojaNome.trim().toLowerCase();

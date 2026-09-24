@@ -33,55 +33,8 @@ export async function GET(req: Request) {
 
     const db = getSupabase();
 
-    // 1. Carrega mapa de criadores de configuracoes_sistema
-    let mapCriadores: Record<string, { email: string; nome?: string; id?: string; criadoEm?: string }> = {};
-    try {
-      const { data: criadoresRow } = await db
-        .from("configuracoes_sistema")
-        .select("valor")
-        .eq("chave", "diario_projetos_criadores_v1")
-        .maybeSingle();
-      if (criadoresRow?.valor) {
-        mapCriadores = { ...criadoresRow.valor };
-      }
-    } catch (_) {}
-
-    // 1b. Carrega status dos projetos (concluídos) de configuracoes_sistema
-    let mapStatus: Record<string, { status?: string; concluidoEm?: string }> = {};
-    try {
-      const { data: statusRow } = await db
-        .from("configuracoes_sistema")
-        .select("valor")
-        .eq("chave", "diario_projetos_status_v1")
-        .maybeSingle();
-      if (statusRow?.valor) {
-        mapStatus = { ...statusRow.valor };
-      }
-    } catch (_) {}
-    const ehConcluido = (nome: string): boolean => mapStatus[nome]?.status === "concluido";
-
-    // 2. Complementa com user_projetos se a tabela existir
-    const userProjetosPermitidos = new Set<string>();
-    try {
-      const { data: upRows } = await db.from("user_projetos").select("projeto_nome, user_email");
-      if (upRows) {
-        for (const up of upRows) {
-          const pNome = up.projeto_nome;
-          const uEmail = up.user_email?.trim().toLowerCase();
-          if (pNome && uEmail) {
-            if (!mapCriadores[pNome]) {
-              mapCriadores[pNome] = { email: uEmail };
-            }
-            if (uEmail === sessionEmail) {
-              userProjetosPermitidos.add(pNome);
-            }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 3. Consulta fases_acao
-    let query = db
+    // 1. Prepara a query de fases_acao
+    let queryFases = db
       .from("fases_acao")
       .select("projeto_cliente, prazo_limite, is_deleted, updated_at, responsavel")
       .eq("is_deleted", lixeira)
@@ -89,10 +42,45 @@ export async function GET(req: Request) {
       .neq("projeto_cliente", "");
 
     if (responsavel) {
-      query = query.eq("responsavel", responsavel);
+      queryFases = queryFases.eq("responsavel", responsavel);
     }
 
-    const { data, error } = await query;
+    // 2. Executa todas as consultas ao banco em paralelo (reduz latência drasticamente)
+    const [resCriadores, resStatus, resUserProjetos, resFases] = await Promise.all([
+      db.from("configuracoes_sistema").select("valor").eq("chave", "diario_projetos_criadores_v1").maybeSingle(),
+      db.from("configuracoes_sistema").select("valor").eq("chave", "diario_projetos_status_v1").maybeSingle(),
+      db.from("user_projetos").select("projeto_nome, user_email"),
+      queryFases,
+    ]);
+
+    let mapCriadores: Record<string, { email: string; nome?: string; id?: string; criadoEm?: string }> = {};
+    if (resCriadores?.data?.valor) {
+      mapCriadores = { ...resCriadores.data.valor };
+    }
+
+    let mapStatus: Record<string, { status?: string; concluidoEm?: string }> = {};
+    if (resStatus?.data?.valor) {
+      mapStatus = { ...resStatus.data.valor };
+    }
+    const ehConcluido = (nome: string): boolean => mapStatus[nome]?.status === "concluido";
+
+    const userProjetosPermitidos = new Set<string>();
+    if (resUserProjetos?.data && Array.isArray(resUserProjetos.data)) {
+      for (const up of resUserProjetos.data) {
+        const pNome = up.projeto_nome;
+        const uEmail = up.user_email?.trim().toLowerCase();
+        if (pNome && uEmail) {
+          if (!mapCriadores[pNome]) {
+            mapCriadores[pNome] = { email: uEmail };
+          }
+          if (uEmail === sessionEmail) {
+            userProjetosPermitidos.add(pNome);
+          }
+        }
+      }
+    }
+
+    const { data, error } = resFases;
     if (error) throw error;
 
     // Agrupa fases por projeto para checar responsáveis

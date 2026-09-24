@@ -30,9 +30,29 @@ const LojaContext = createContext<LojaContextType | undefined>(undefined);
 
 export function LojaProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
-  const [lojas, setLojas] = useState<LojaItem[]>([]);
-  const [projetosLojas, setProjetosLojas] = useState<Record<string, string>>({});
-  const [usuariosLojas, setUsuariosLojas] = useState<Record<string, string>>({});
+
+  // Inicialização instantânea do cache local para não travar a abertura das telas
+  const [lojas, setLojas] = useState<LojaItem[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = sessionStorage.getItem("terracafe_lojas_cache");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [projetosLojas, setProjetosLojas] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = sessionStorage.getItem("terracafe_projetos_lojas_cache");
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+  const [usuariosLojas, setUsuariosLojas] = useState<Record<string, string>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = sessionStorage.getItem("terracafe_usuarios_lojas_cache");
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
   const [selectedLoja, setSelectedLojaState] = useState<string>("TODAS");
 
   const userRole = (session?.user as any)?.role || "Colaborador";
@@ -48,27 +68,25 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const loadLojasData = useCallback(async () => {
     try {
-      const [lojasRes, rolesRes] = await Promise.all([
-        fetch("/api/lojas"),
-        fetch("/api/usuarios-roles"),
-      ]);
+      // Uma única requisição unificada e rápida
+      const res = await fetch("/api/lojas");
+      if (res.ok) {
+        const data = await res.json();
+        const listaLojas = data.lojas || [];
+        const mapProj = data.projetosLojas || {};
+        const mapUsers = data.usuariosLojas || {};
 
-      if (lojasRes.ok) {
-        const data = await lojasRes.json();
-        setLojas(data.lojas || []);
-        setProjetosLojas(data.projetosLojas || {});
-      }
-
-      if (rolesRes.ok) {
-        const rolesData = await rolesRes.json();
-        const mapUsers: Record<string, string> = {};
-        (rolesData.users || []).forEach((u: any) => {
-          if (u.loja) {
-            if (u.id) mapUsers[u.id.toLowerCase()] = u.loja;
-            if (u.email) mapUsers[u.email.toLowerCase().trim()] = u.loja;
-          }
-        });
+        setLojas(listaLojas);
+        setProjetosLojas(mapProj);
         setUsuariosLojas(mapUsers);
+
+        try {
+          sessionStorage.setItem("terracafe_lojas_cache", JSON.stringify(listaLojas));
+          sessionStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(mapProj));
+          sessionStorage.setItem("terracafe_usuarios_lojas_cache", JSON.stringify(mapUsers));
+        } catch {
+          // ignore
+        }
       }
     } catch (err) {
       console.error("[LojaProvider] Erro ao carregar lojas:", err);

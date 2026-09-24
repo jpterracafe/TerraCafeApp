@@ -25,22 +25,25 @@ export async function GET() {
 
     const db = getSupabase();
 
-    // Carrega mapa de criadores
-    let mapCriadores: Record<string, { email: string }> = {};
-    try {
-      const { data: criadoresRow } = await db
+    // Carrega mapa de criadores e fases em paralelo
+    const [criadoresRes, fasesRes] = await Promise.all([
+      db
         .from("configuracoes_sistema")
         .select("valor")
         .eq("chave", "diario_projetos_criadores_v1")
-        .maybeSingle();
-      if (criadoresRow?.valor) mapCriadores = criadoresRow.valor;
-    } catch (_) {}
+        .maybeSingle(),
+      db
+        .from("fases_acao")
+        .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
+        .order("created_at", { ascending: true }),
+    ]);
 
-    const { data, error } = await db
-      .from("fases_acao")
-      .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
-      .order("created_at", { ascending: true });
+    let mapCriadores: Record<string, { email: string }> = {};
+    if (criadoresRes?.data?.valor) {
+      mapCriadores = criadoresRes.data.valor;
+    }
 
+    const { data, error } = fasesRes;
     if (error) throw error;
 
     const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
@@ -88,7 +91,11 @@ export async function GET() {
         isDeleted: f.is_deleted ?? false,
       }));
 
-    return NextResponse.json({ fases });
+    return NextResponse.json({ fases }, {
+      headers: {
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=15",
+      },
+    });
   } catch (e) {
     console.error("[GET /api/fases]", e);
     return NextResponse.json({ error: "Erro ao buscar fases." }, { status: 500 });

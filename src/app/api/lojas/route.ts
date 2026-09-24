@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getLojas, getProjectLojasMap, setProjectLoja } from "@/lib/lojas";
+import { getLojas, getProjectLojasMap, getUserLojasMap, setProjectLoja } from "@/lib/lojas";
 
 export async function GET() {
   try {
@@ -10,13 +10,24 @@ export async function GET() {
       return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
     }
 
-    const lojas = await getLojas();
-    const projetosLojas = await getProjectLojasMap();
+    const [lojas, projetosLojas, usuariosLojas] = await Promise.all([
+      getLojas(),
+      getProjectLojasMap(),
+      getUserLojasMap(),
+    ]);
 
-    return NextResponse.json({
-      lojas: lojas.filter((l) => l.ativo !== false),
-      projetosLojas,
-    });
+    return NextResponse.json(
+      {
+        lojas: lojas.filter((l) => l.ativo !== false),
+        projetosLojas,
+        usuariosLojas,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=15, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error) {
     console.error("[GET /api/lojas]", error);
     return NextResponse.json({ error: "Erro ao carregar lojas." }, { status: 500 });

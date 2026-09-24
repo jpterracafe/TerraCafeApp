@@ -32,41 +32,39 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
-    // Obtém informações de acesso do usuário aos projetos
-    const access = await getUserProjectAccess();
+    const db = getSupabase();
+    const LOG_COLS = "id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, is_deleted, created_at";
+
+    // Executa busca de acesso, fases e logs em paralelo para performance máxima
+    const [access, fasesRes, attempt] = await Promise.all([
+      getUserProjectAccess(),
+      Promise.resolve(
+        db
+          .from("fases_acao")
+          .select("projeto_cliente, responsavel")
+          .eq("is_deleted", false)
+      ).catch(() => ({ data: null })),
+      db
+        .from("diario_logs")
+        .select(LOG_COLS)
+        .eq("is_deleted", false)
+        .order("data", { ascending: false })
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
 
     // Busca fases para verificar responsabilidades
     let fasesPorProjeto = new Map<string, any[]>();
-    try {
-      const db = getSupabase();
-      const { data: fasesData } = await db
-        .from("fases_acao")
-        .select("projeto_cliente, responsavel")
-        .eq("is_deleted", false);
-      
-      if (fasesData) {
-        for (const f of fasesData) {
-          const pNome = f.projeto_cliente;
-          if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
-          fasesPorProjeto.get(pNome)!.push(f);
-        }
+    const fasesData = (fasesRes as any)?.data;
+    if (fasesData && Array.isArray(fasesData)) {
+      for (const f of fasesData) {
+        const pNome = f.projeto_cliente;
+        if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
+        fasesPorProjeto.get(pNome)!.push(f);
       }
-    } catch (_) {}
+    }
 
-    const db = getSupabase();
-    // Colunas explícitas (menos bytes por resposta que select("*")).
-    const LOG_COLS = "id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, is_deleted, created_at";
-    // Exclui logs de projetos na lixeira (coluna criada na migration
-    // 20260922; fallback sem filtro em bancos ainda não migrados)
     let data: LogRow[] | null = null;
-    const attempt = await db
-      .from("diario_logs")
-      .select(LOG_COLS)
-      .eq("is_deleted", false)
-      .order("data", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(200);
-
     if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("is_deleted"))) {
       const fb = await db
         .from("diario_logs")
@@ -84,7 +82,11 @@ export async function GET() {
     // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas logs dos projetos permitidos
     const logsFiltrados = filterLogsByAccess(data ?? [], access, fasesPorProjeto);
 
-    return NextResponse.json({ logs: logsFiltrados.map(mapLog) });
+    return NextResponse.json({ logs: logsFiltrados.map(mapLog) }, {
+      headers: {
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=15",
+      },
+    });
   } catch (e) {
     console.error("[GET /api/diario-logs]", e);
     return NextResponse.json({ error: "Erro ao buscar logs." }, { status: 500 });

@@ -93,63 +93,64 @@ export async function GET() {
     const err = requireSession(session);
     if (err) return err;
 
-    // Obtém informações de acesso do usuário aos projetos
-    const access = await getUserProjectAccess();
+    const db = getSupabase();
+
+    // Executa busca de acesso, fases e configurações em paralelo para velocidade máxima
+    const [access, fasesRes, configRes] = await Promise.all([
+      getUserProjectAccess(),
+      Promise.resolve(
+        db
+          .from("fases_acao")
+          .select("projeto_cliente, responsavel")
+          .eq("is_deleted", false)
+      ).catch(() => ({ data: null })),
+      Promise.resolve(
+        db
+          .from("configuracoes_sistema")
+          .select("chave, valor")
+      ).catch(() => ({ data: null, error: true })),
+    ]);
 
     // Busca fases para verificar responsabilidades
     let fasesPorProjeto = new Map<string, any[]>();
-    try {
-      const db = getSupabase();
-      const { data: fasesData } = await db
-        .from("fases_acao")
-        .select("projeto_cliente, responsavel")
-        .eq("is_deleted", false);
-      
-      if (fasesData) {
-        for (const f of fasesData) {
-          const pNome = f.projeto_cliente;
-          if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
-          fasesPorProjeto.get(pNome)!.push(f);
-        }
+    const fasesData = (fasesRes as any)?.data;
+    if (fasesData && Array.isArray(fasesData)) {
+      for (const f of fasesData) {
+        const pNome = f.projeto_cliente;
+        if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
+        fasesPorProjeto.get(pNome)!.push(f);
       }
-    } catch (_) {}
+    }
 
     let config = getLocalConfig();
 
-    // Tenta ler do Supabase se a tabela existir
-    try {
-      const db = getSupabase();
-      const { data, error } = await db
-        .from("configuracoes_sistema")
-        .select("chave, valor");
+    const data = (configRes as any)?.data;
+    const error = (configRes as any)?.error;
 
-      if (!error && data && data.length > 0) {
-        data.forEach((row: { chave: string; valor: any }) => {
-          if (row.chave === "diario_etapas_config_v1" && row.valor) {
-            config.configEtapas = { ...config.configEtapas, ...row.valor };
-          }
-          if (row.chave === "diario_projeto_starts_v1" && row.valor) {
-            config.projetoStartDates = { ...config.projetoStartDates, ...row.valor };
-          }
-          if (row.chave === "diario_responsaveis_por_etapa_v1" && row.valor) {
-            config.responsaveisPorEtapa = { ...config.responsaveisPorEtapa, ...row.valor };
-          }
-          if (row.chave === "diario_projetos_prazo_final_v1" && row.valor) {
-            config.projetosPrazoFinal = { ...config.projetosPrazoFinal, ...row.valor };
-          }
-          if (row.chave === "diario_projeto_justificativas_v1" && row.valor) {
-            config.projetoJustificativas = { ...config.projetoJustificativas, ...row.valor };
-          }
-          if (row.chave === "diario_etapas_progresso_v1" && row.valor) {
-            config.etapasProgresso = { ...config.etapasProgresso, ...row.valor };
-          }
-          if (row.chave === "diario_etapas_status_v1" && row.valor) {
-            config.etapasStatus = { ...config.etapasStatus, ...row.valor };
-          }
-        });
-      }
-    } catch (dbErr) {
-      // Falha silenciosa de tabela não existente — usa arquivo local
+    if (!error && data && Array.isArray(data) && data.length > 0) {
+      data.forEach((row: { chave: string; valor: any }) => {
+        if (row.chave === "diario_etapas_config_v1" && row.valor) {
+          config.configEtapas = { ...config.configEtapas, ...row.valor };
+        }
+        if (row.chave === "diario_projeto_starts_v1" && row.valor) {
+          config.projetoStartDates = { ...config.projetoStartDates, ...row.valor };
+        }
+        if (row.chave === "diario_responsaveis_por_etapa_v1" && row.valor) {
+          config.responsaveisPorEtapa = { ...config.responsaveisPorEtapa, ...row.valor };
+        }
+        if (row.chave === "diario_projetos_prazo_final_v1" && row.valor) {
+          config.projetosPrazoFinal = { ...config.projetosPrazoFinal, ...row.valor };
+        }
+        if (row.chave === "diario_projeto_justificativas_v1" && row.valor) {
+          config.projetoJustificativas = { ...config.projetoJustificativas, ...row.valor };
+        }
+        if (row.chave === "diario_etapas_progresso_v1" && row.valor) {
+          config.etapasProgresso = { ...config.etapasProgresso, ...row.valor };
+        }
+        if (row.chave === "diario_etapas_status_v1" && row.valor) {
+          config.etapasStatus = { ...config.etapasStatus, ...row.valor };
+        }
+      });
     }
 
     // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas dados dos projetos permitidos
@@ -164,7 +165,11 @@ export async function GET() {
     // 🔒 SANITIZAÇÃO FINAL OBRIGATÓRIA antes de responder ao cliente
     config.configEtapas = sanitizeConfigEtapasServer(config.configEtapas);
 
-    return NextResponse.json(config);
+    return NextResponse.json(config, {
+      headers: {
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=15",
+      },
+    });
   } catch (e) {
     console.error("[GET /api/etapas-config]", e);
     return NextResponse.json({ error: "Erro ao buscar configurações." }, { status: 500 });
