@@ -5,6 +5,7 @@ import env from "@/lib/env";
 import bcrypt from "bcrypt";
 
 import { extractUsernameFromEmail } from "./auth-utils";
+import { getUserAssignedLoja } from "@/lib/lojas";
 export { extractUsernameFromEmail };
 
 export const authOptions: NextAuthOptions = {
@@ -91,12 +92,15 @@ export const authOptions: NextAuthOptions = {
             ? user.name 
             : extractUsernameFromEmail(emailNormalizado);
 
-          console.log("[auth] Login de usuário OK: role=" + user.role);
+          const loja = await getUserAssignedLoja({ id: user.id, email: user.email ?? emailNormalizado });
+
+          console.log("[auth] Login de usuário OK: role=" + user.role + (loja ? " loja=" + loja : ""));
           return {
             id: user.id,
             name: displayName,
             email: user.email ?? emailNormalizado,
             role: user.role,
+            loja: loja ?? null,
           };
         } catch (err) {
           console.error("[auth] Exceção ao autenticar:", err);
@@ -113,6 +117,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         token.name = user.name;
         token.email = user.email;
+        token.loja = user.loja ?? null;
       }
       return token;
     },
@@ -122,6 +127,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
         session.user.name = token.name;
         session.user.email = token.email;
+        session.user.loja = token.loja ?? null;
       }
       return session;
     },

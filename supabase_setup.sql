@@ -15,6 +15,19 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS senha_temp TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS loja TEXT;
+
+-- ============================================================
+-- TABELA: lojas / filiais
+-- ============================================================
+CREATE TABLE IF NOT EXISTS lojas (
+  id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  nome        TEXT NOT NULL UNIQUE,
+  ativo       BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE lojas DISABLE ROW LEVEL SECURITY;
 
 -- ============================================================
 -- TABELA: projetos de irrigação (importados via CSV)

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { requireSession } from "@/lib/api";
+import { getUserLojasMap } from "@/lib/lojas";
 
 export async function GET() {
   try {
@@ -21,12 +22,15 @@ export async function GET() {
       return NextResponse.json({ users: [], error: "Falha ao consultar usuários no banco." }, { status: 500 });
     }
 
+    const mapLojas = await getUserLojasMap();
+
     return NextResponse.json({
       users: (users ?? []).map((u) => ({
         id: u.id,
         name: u.name,
         email: u.email,
         role: u.role || "Agricultor",
+        loja: (u.id && mapLojas[u.id.toLowerCase()]) || (u.email && mapLojas[u.email.toLowerCase().trim()]) || null,
       })),
     });
   } catch (error) {

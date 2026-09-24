@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import { randomInt } from "crypto";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession, extractUsernameFromEmail } from "@/lib/auth";
+import { getUserLojasMap, setUserLoja } from "@/lib/lojas";
 
 export const ALLOWED_ROLES = [
   "Agricultor",
@@ -41,12 +42,15 @@ export async function GET() {
       usersList = fallback ?? [];
     }
 
+    const mapLojas = await getUserLojasMap();
+
     return NextResponse.json({
       users: usersList.map((u: any) => ({
         id: u.id,
         name: u.name,
         email: u.email,
         role: u.role,
+        loja: (u.id && mapLojas[u.id.toLowerCase()]) || (u.email && mapLojas[u.email.toLowerCase().trim()]) || null,
         senhaTemp: u.senha_temp ?? null,
         createdAt: u.created_at,
       })),
@@ -68,6 +72,7 @@ export async function POST(req: Request) {
     const email = String(body?.email ?? "").trim().toLowerCase();
     const cargoRaw = String(body?.cargo || body?.role || "").trim();
     const cargo = (cargoRaw || "Agricultor");
+    const loja = String(body?.loja ?? "").trim();
     let nome    = String(body?.nome  ?? "").trim();
 
     if (!email) {
@@ -147,12 +152,18 @@ export async function POST(req: Request) {
       senhaTemp    = senhaGerada;
     }
 
+    if (loja) {
+      await setUserLoja(email, loja);
+      if (userId) await setUserLoja(userId, loja);
+    }
+
     return NextResponse.json({
       user: {
         id: userId,
         name: userName,
         email,
         role: userRole,
+        loja: loja || null,
         senhaTemp: senhaTemp ?? senhaGerada, // sempre retorna para o modal
         createdAt: userCreatedAt,
       },

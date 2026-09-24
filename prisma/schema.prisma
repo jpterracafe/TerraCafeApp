@@ -18,10 +18,24 @@ model User {
   password  String
   senhaTemp String?  @map("senha_temp")
   role      String   @default("Colaborador")
+  loja      String?
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt      @map("updated_at")
 
   @@map("users")
+}
+
+// =====================================================================
+// TABELA: lojas / filiais
+// =====================================================================
+model Loja {
+  id        String   @id @default(cuid())
+  nome      String   @unique
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("lojas")
 }
 
 // =====================================================================

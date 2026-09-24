@@ -5,6 +5,7 @@ export interface UsuarioSistema {
   nome: string;
   email: string;
   cargo: RoleSistema;
+  loja?: string;
   status: 'Ativo' | 'Pendente' | 'Bloqueado';
   ultimoLogin?: string;
   avatar: string;

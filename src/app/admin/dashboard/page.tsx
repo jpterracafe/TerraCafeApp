@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
 import { hojeSP } from '@/lib/validators';
+import { useLoja } from '@/contexts/LojaContext';
 
 import { EtapaCampo } from '@/app/irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '@/app/irrigacao/execucao/page';
@@ -311,26 +312,43 @@ export default function DashboardPage() {
     };
   }, [status, loadData, loading]);
 
+  const { selectedLoja, isProjectInSelectedLoja } = useLoja();
+
+  // ── Filtro por Loja / Filial ───────────────────────────────────────────────
+  const projetosListFiltrados = useMemo(() => {
+    if (selectedLoja === 'TODAS') return projetosList;
+    return projetosList.filter((nome) => {
+      const criadorEmail = projetosCriadores[nome]?.email;
+      return isProjectInSelectedLoja(nome, criadorEmail);
+    });
+  }, [projetosList, selectedLoja, isProjectInSelectedLoja, projetosCriadores]);
+
+  const logsFiltradosLoja = useMemo(() => {
+    if (selectedLoja === 'TODAS') return logs;
+    const permitidos = new Set(projetosListFiltrados);
+    return logs.filter((l) => l.projetoCliente && permitidos.has(l.projetoCliente.trim()));
+  }, [logs, selectedLoja, projetosListFiltrados]);
+
   // ── Filtro por Período de Logs ──────────────────────────────────────────────
   const logsFiltradosPeriodo = useMemo(() => {
-    if (periodoFilter === 'tudo') return logs;
+    if (periodoFilter === 'tudo') return logsFiltradosLoja;
     const dias = periodoFilter === '7d' ? 7 : periodoFilter === '15d' ? 15 : 30;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - dias);
     cutoff.setHours(0, 0, 0, 0);
 
-    return logs.filter(l => {
+    return logsFiltradosLoja.filter(l => {
       const d = new Date(`${l.data}T00:00:00`);
       return d >= cutoff;
     });
-  }, [logs, periodoFilter]);
+  }, [logsFiltradosLoja, periodoFilter]);
 
   // ── Construção do Mapa das Obras de Campo ────────────────────────────────────
   const obrasCampo = useMemo((): ObraCampoResumo[] => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    return projetosList.map(nomeProjeto => {
+    return projetosListFiltrados.map(nomeProjeto => {
       const logsProjeto = logs.filter(l => (l.projetoCliente || '').trim() === nomeProjeto.trim());
       
       // Data de Start do Projeto
@@ -481,7 +499,7 @@ export default function DashboardPage() {
         historicoRendimento: rend,
       };
     });
-  }, [projetosList, logs, fases, projetoStartDates, configEtapas, responsaveisPorEtapa]);
+  }, [projetosListFiltrados, logs, fases, projetoStartDates, configEtapas, responsaveisPorEtapa]);
 
   // Obra selecionada (se houver filtro específico)
   const obraSelecionada = useMemo(() => {
@@ -713,7 +731,7 @@ export default function DashboardPage() {
       let noPrazo = 0;
       let naoIniciadas = 0;
 
-      projetosList.forEach(projNome => {
+      projetosListFiltrados.forEach(projNome => {
         const chave = `${projNome}::${etp.key}`;
         const cfg = (configEtapas as any)[chave];
         const hasStarted = cfg?.hasStarted === true;
@@ -753,12 +771,12 @@ export default function DashboardPage() {
         ativas: noPrazo,
         atrasadas,
         naoIniciadas,
-        total: projetosList.length,
+        total: projetosListFiltrados.length,
       };
     });
 
     // Visão consolidada por obra
-    const obrasDetalhadas = projetosList.map(projNome => {
+    const obrasDetalhadas = projetosListFiltrados.map(projNome => {
       const prazoTotal = projetosPrazoFinal[projNome];
       let diasRestantesTotal = 0;
       let atrasadoTotal = false;
@@ -835,7 +853,7 @@ export default function DashboardPage() {
       };
     });
 
-    const totalFasesGeral = projetosList.length * 6;
+    const totalFasesGeral = projetosListFiltrados.length * 6;
     const totalConcluidasGeral = obrasDetalhadas.reduce((acc, o) => acc + o.fasesConcluidasCount, 0);
     const taxaGeral = totalFasesGeral > 0 ? Math.round((totalConcluidasGeral / totalFasesGeral) * 100) : 0;
     const obrasComAtraso = obrasDetalhadas.filter(o => o.atrasadoTotal || o.fasesAtrasadasCount > 0).length;
@@ -845,11 +863,11 @@ export default function DashboardPage() {
       obrasDetalhadas,
       taxaGeral,
       obrasComAtraso,
-      totalObras: projetosList.length,
+      totalObras: projetosListFiltrados.length,
       totalConcluidas: totalConcluidasGeral,
       totalFases: totalFasesGeral,
     };
-  }, [projetosList, configEtapas, logs, projetosPrazoFinal]);
+  }, [projetosListFiltrados, configEtapas, logs, projetosPrazoFinal]);
 
   if (status === 'loading' || loading || !podeVerDiretor) {
     return <DashboardSkeleton />;

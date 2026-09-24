@@ -21,6 +21,9 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Store,
+  Building2,
+  Briefcase,
 } from 'lucide-react';
 import { UsuarioSistema, RoleSistema } from './mockUsuariosSistema';
 import { isMasterDevSession } from '@/lib/client-roles';
@@ -34,6 +37,7 @@ function mapDbUser(u: {
   name: string | null;
   email: string | null;
   role: string;
+  loja?: string | null;
   senhaTemp?: string | null;
   createdAt?: string;
 }): UsuarioSistema {
@@ -44,6 +48,7 @@ function mapDbUser(u: {
     nome,
     email: u.email || '',
     cargo: (u.role as RoleSistema) || 'Colaborador',
+    loja: u.loja ?? undefined,
     status: 'Ativo',
     avatar: initials || 'U',
     senhaGerada: u.senhaTemp ?? undefined,
@@ -177,6 +182,158 @@ export default function AdminUsuariosPage() {
 
   const isMaster = isMasterDevSession(session);
 
+  // Estados de Gestão de Lojas & Atribuição de Projetos
+  const [lojas, setLojas] = useState<{ id: string; nome: string; ativo: boolean }[]>([]);
+  const [isLojasModalOpen, setIsLojasModalOpen] = useState(false);
+  const [activeLojasTab, setActiveLojasTab] = useState<'lojas' | 'projetos'>('lojas');
+  const [novoNomeLoja, setNovoNomeLoja] = useState('');
+  const [lojasLoading, setLojasLoading] = useState(false);
+  const [lojaError, setLojaError] = useState('');
+  const [deletingLojaId, setDeletingLojaId] = useState<string | null>(null);
+
+  // Controle de edição rápida de loja do usuário
+  const [updatingLojaId, setUpdatingLojaId] = useState<string | null>(null);
+  const [savedLojaId, setSavedLojaId] = useState<string | null>(null);
+
+  // Controle de atribuição de projetos a lojas
+  const [projetosList, setProjetosList] = useState<string[]>([]);
+  const [projetosLojasMap, setProjetosLojasMap] = useState<Record<string, string>>({});
+  const [loadingProjetosAdmin, setLoadingProjetosAdmin] = useState(false);
+  const [updatingProjetoNome, setUpdatingProjetoNome] = useState<string | null>(null);
+  const [savedProjetoNome, setSavedProjetoNome] = useState<string | null>(null);
+
+  const loadLojas = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/lojas');
+      if (res.ok) {
+        const data = await res.json();
+        setLojas(data.lojas || []);
+      }
+    } catch (e) {
+      console.error('[loadLojas] Erro ao carregar lojas:', e);
+    }
+  }, []);
+
+  const loadProjetosAdmin = useCallback(async () => {
+    setLoadingProjetosAdmin(true);
+    try {
+      const [resProj, resLojas] = await Promise.all([
+        fetch('/api/projetos'),
+        fetch('/api/lojas'),
+      ]);
+      if (resProj.ok) {
+        const d = await resProj.json();
+        setProjetosList(Array.isArray(d.projetos) ? d.projetos : []);
+      }
+      if (resLojas.ok) {
+        const d = await resLojas.json();
+        setProjetosLojasMap(d.projetosLojas || {});
+      }
+    } catch (e) {
+      console.error('[loadProjetosAdmin] Erro:', e);
+    } finally {
+      setLoadingProjetosAdmin(false);
+    }
+  }, []);
+
+  const handleUpdateProjetoLoja = async (projetoNome: string, lojaNome: string) => {
+    setUpdatingProjetoNome(projetoNome);
+    try {
+      const res = await fetch('/api/lojas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projetoNome, lojaNome }),
+      });
+      if (res.ok) {
+        setProjetosLojasMap((prev) => {
+          const next = { ...prev };
+          if (lojaNome) {
+            next[projetoNome] = lojaNome;
+          } else {
+            delete next[projetoNome];
+          }
+          return next;
+        });
+        setSavedProjetoNome(projetoNome);
+        setTimeout(() => setSavedProjetoNome(null), 2500);
+      } else {
+        alert('Erro ao atribuir loja ao projeto.');
+      }
+    } catch {
+      alert('Erro de conexão ao atribuir loja ao projeto.');
+    } finally {
+      setUpdatingProjetoNome(null);
+    }
+  };
+
+  const handleCreateLoja = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!novoNomeLoja.trim()) return;
+    setLojasLoading(true);
+    setLojaError('');
+    try {
+      const res = await fetch('/api/admin/lojas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: novoNomeLoja.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLojaError(data.error || 'Erro ao criar loja.');
+        return;
+      }
+      setLojas((prev) => [...prev, data.loja]);
+      setNovoNomeLoja('');
+    } catch {
+      setLojaError('Erro de conexão ao criar loja.');
+    } finally {
+      setLojasLoading(false);
+    }
+  };
+
+  const handleDeleteLoja = async (id: string) => {
+    if (!confirm('Deseja realmente remover esta loja?')) return;
+    setDeletingLojaId(id);
+    try {
+      const res = await fetch(`/api/admin/lojas?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        setLojas((prev) => prev.filter((l) => l.id !== id));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Erro ao excluir loja.');
+      }
+    } catch {
+      alert('Erro de conexão ao excluir loja.');
+    } finally {
+      setDeletingLojaId(null);
+    }
+  };
+
+  const handleUpdateLoja = async (id: string, newLoja: string) => {
+    setUpdatingLojaId(id);
+    try {
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loja: newLoja }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Erro ao atribuir loja.');
+        return;
+      }
+      setUsuarios((prev) =>
+        prev.map((usr) => (usr.id === id ? { ...usr, loja: newLoja || undefined } : usr))
+      );
+      setSavedLojaId(id);
+      setTimeout(() => setSavedLojaId(null), 2500);
+    } catch {
+      alert('Erro de conexão ao atribuir loja.');
+    } finally {
+      setUpdatingLojaId(null);
+    }
+  };
+
   useEffect(() => {
     if (status === 'loading') return;
     if (status !== 'authenticated' || !isMaster) {
@@ -186,13 +343,15 @@ export default function AdminUsuariosPage() {
       return;
     }
     loadUsers();
-  }, [status, isMaster, router, loadUsers]);
+    loadLojas();
+  }, [status, isMaster, router, loadUsers, loadLojas]);
 
   // Modal States
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
   const [novoCargo, setNovoCargo] = useState<RoleSistema>('Agricultor');
+  const [novaLoja, setNovaLoja] = useState('');
   const [novaSenhaManual, setNovaSenhaManual] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [copied, setCopied] = useState(false);
@@ -254,6 +413,7 @@ export default function AdminUsuariosPage() {
           nome: novoNome.trim(),
           email: novoEmail.trim(),
           cargo: novoCargo,
+          loja: novaLoja.trim() || undefined,
           senha: novaSenhaManual.trim() || undefined,
         }),
       });
@@ -305,6 +465,7 @@ export default function AdminUsuariosPage() {
     setNovoEmail('');
     setNovoNome('');
     setNovoCargo('Agricultor');
+    setNovaLoja('');
     setNovaSenhaManual('');
     setInviteError('');
     setInviteLoading(false);
@@ -364,6 +525,19 @@ export default function AdminUsuariosPage() {
           </Link>
 
           <button 
+            type="button"
+            onClick={() => {
+              setIsLojasModalOpen(true);
+              loadProjetosAdmin();
+            }}
+            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg transition-all shadow-md shadow-amber-900/20"
+            title="Adicionar lojas ou atribuir projetos a filiais"
+          >
+            <Store className="w-4 h-4" />
+            Lojas & Projetos ({lojas.length})
+          </button>
+
+          <button 
             onClick={() => setIsInviteModalOpen(true)}
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-slate-900 dark:text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20"
           >
@@ -401,6 +575,7 @@ export default function AdminUsuariosPage() {
               <tr>
                 <th className="px-6 py-4 font-medium">Usuário</th>
                 <th className="px-6 py-4 font-medium">Nível de Acesso (Cargo)</th>
+                <th className="px-6 py-4 font-medium">Loja / Filial</th>
                 <th className="px-6 py-4 font-medium">Status da Conta</th>
                 <th className="px-6 py-4 font-medium">
                   <div className="flex items-center gap-2">
@@ -434,14 +609,14 @@ export default function AdminUsuariosPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-[#1e293b]">
               {loadingList && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     Carregando usuários do banco...
                   </td>
                 </tr>
               )}
               {!loadingList && listError && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-rose-400 text-sm">
+                  <td colSpan={7} className="px-6 py-4 text-center text-rose-400 text-sm">
                     {listError}
                   </td>
                 </tr>
@@ -486,6 +661,36 @@ export default function AdminUsuariosPage() {
                             <span className="w-3.5 h-3.5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
                           )}
                           {savedRoleId === u.id && (
+                            <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-0.5 animate-pulse">
+                              ✓ Salvo!
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {u.cargo === 'Desenvolvedor' ? (
+                        <span className="text-xs text-slate-400 italic">Todas as Lojas</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={u.loja || ''}
+                            disabled={updatingLojaId === u.id}
+                            onChange={(e) => handleUpdateLoja(u.id, e.target.value)}
+                            className="bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-amber-500 transition-colors cursor-pointer disabled:opacity-60 max-w-[150px]"
+                            title="Clique para atribuir ou alterar a loja deste usuário"
+                          >
+                            <option value="">— Sem Loja —</option>
+                            {lojas.map((l) => (
+                              <option key={l.id} value={l.nome}>
+                                🏬 {l.nome}
+                              </option>
+                            ))}
+                          </select>
+                          {updatingLojaId === u.id && (
+                            <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                          )}
+                          {savedLojaId === u.id && (
                             <span className="text-[11px] text-emerald-500 font-bold flex items-center gap-0.5 animate-pulse">
                               ✓ Salvo!
                             </span>
@@ -651,6 +856,27 @@ export default function AdminUsuariosPage() {
                       <option value="Admin">🛡️ Admin (Administrador da Plataforma)</option>
                       <option value="Diretor">👔 Diretor (Acompanhamento Executivo)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
+                      Loja / Filial
+                    </label>
+                    <select 
+                      value={novaLoja}
+                      onChange={(e) => setNovaLoja(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+                    >
+                      <option value="">— Sem loja definida (Atribuir depois) —</option>
+                      {lojas.map((l) => (
+                        <option key={l.id} value={l.nome}>
+                          🏬 {l.nome}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Você também poderá atribuir ou alterar a loja a qualquer momento pela tabela.
+                    </p>
                   </div>
 
                   <div>
@@ -841,6 +1067,229 @@ export default function AdminUsuariosPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: GERENCIAR LOJAS & ATRIBUIR PROJETOS */}
+      {isLojasModalOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-6 border-b border-slate-200 dark:border-[#1e293b] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl">
+                  <Store className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Gerenciar Lojas & Filiais</h2>
+                  <p className="text-xs text-slate-400">Cadastre filiais e atribua projetos a cada uma</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setIsLojasModalOpen(false);
+                  setLojaError('');
+                }}
+                className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* ABAS DO MODAL */}
+            <div className="flex border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] px-6">
+              <button
+                type="button"
+                onClick={() => setActiveLojasTab('lojas')}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                  activeLojasTab === 'lojas'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <Store className="w-4 h-4" />
+                <span>Filiais / Lojas ({lojas.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveLojasTab('projetos');
+                  loadProjetosAdmin();
+                }}
+                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                  activeLojasTab === 'projetos'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <Briefcase className="w-4 h-4" />
+                <span>Atribuir Projetos às Lojas ({projetosList.length})</span>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {activeLojasTab === 'lojas' ? (
+                <>
+                  {/* Formulário de Adicionar Nova Loja (Apenas o nome) */}
+                  <form onSubmit={handleCreateLoja} className="space-y-3">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Nova Filial / Loja (Apenas o Nome)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Matriz, Patrocínio, Araxá..."
+                        value={novoNomeLoja}
+                        onChange={(e) => setNovoNomeLoja(e.target.value)}
+                        className="flex-1 bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg px-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-amber-500 transition-colors"
+                      />
+                      <button
+                        type="submit"
+                        disabled={lojasLoading || !novoNomeLoja.trim()}
+                        className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-900 font-semibold px-4 py-2.5 rounded-lg text-sm transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                      >
+                        {lojasLoading ? (
+                          <span className="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin" />
+                        ) : (
+                          <Plus className="w-4 h-4" />
+                        )}
+                        Adicionar
+                      </button>
+                    </div>
+                    {lojaError && (
+                      <p className="text-xs text-rose-500 font-medium">{lojaError}</p>
+                    )}
+                  </form>
+
+                  {/* Lista de Lojas Cadastradas */}
+                  <div className="pt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Lojas Cadastradas ({lojas.length})
+                      </span>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                      {lojas.length === 0 ? (
+                        <div className="text-center py-8 text-sm text-slate-400 bg-slate-50 dark:bg-[#070c18] rounded-xl border border-dashed border-slate-200 dark:border-[#1e293b]">
+                          Nenhuma loja cadastrada ainda. Adicione a primeira acima!
+                        </div>
+                      ) : (
+                        lojas.map((loja) => (
+                          <div
+                            key={loja.id}
+                            className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b]"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Building2 className="w-4 h-4 text-amber-500" />
+                              <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                {loja.nome}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLoja(loja.id)}
+                              disabled={deletingLojaId === loja.id}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                              title="Excluir loja"
+                            >
+                              {deletingLojaId === loja.id ? (
+                                <span className="w-3.5 h-3.5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ABA DE ATRIBUIÇÃO DE PROJETOS A LOJAS */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        Vínculo de Projetos às Lojas
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Defina a qual filial cada projeto pertence. Projetos sem loja ficam visíveis em "Todas as Lojas".
+                      </p>
+                    </div>
+                    {loadingProjetosAdmin && (
+                      <span className="text-xs text-amber-500 animate-pulse font-medium">Carregando...</span>
+                    )}
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                    {projetosList.length === 0 ? (
+                      <div className="text-center py-8 text-sm text-slate-400 bg-slate-50 dark:bg-[#070c18] rounded-xl border border-dashed border-slate-200 dark:border-[#1e293b]">
+                        Nenhum projeto cadastrado no sistema ainda.
+                      </div>
+                    ) : (
+                      projetosList.map((proj) => {
+                        const lojaAtual = projetosLojasMap[proj] || '';
+                        const isUpdating = updatingProjetoNome === proj;
+                        const isSaved = savedProjetoNome === proj;
+
+                        return (
+                          <div
+                            key={proj}
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b]"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                {proj}
+                              </p>
+                              <span className="text-[11px] text-slate-400">
+                                {lojaAtual ? `Vinculado a: ${lojaAtual}` : 'Sem loja atribuída (Geral)'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <select
+                                value={lojaAtual}
+                                disabled={isUpdating}
+                                onChange={(e) => handleUpdateProjetoLoja(proj, e.target.value)}
+                                className="text-xs font-medium bg-white dark:bg-[#111a30] border border-slate-300 dark:border-[#1e293b] rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-amber-500 cursor-pointer disabled:opacity-50"
+                              >
+                                <option value="">(Sem loja atribuída)</option>
+                                {lojas.map((l) => (
+                                  <option key={l.id} value={l.nome}>
+                                    {l.nome}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {isUpdating && (
+                                <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                              )}
+                              {isSaved && (
+                                <span className="text-xs text-emerald-500 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Salvo!
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsLojasModalOpen(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

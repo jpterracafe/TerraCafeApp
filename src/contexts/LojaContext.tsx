@@ -1,0 +1,199 @@
+"use client";
+
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { isMasterDevSession } from "@/lib/client-roles";
+
+export interface LojaItem {
+  id: string;
+  nome: string;
+  ativo: boolean;
+  createdAt: string;
+}
+
+interface LojaContextType {
+  lojas: LojaItem[];
+  selectedLoja: string; // "TODAS" ou nome da loja
+  setSelectedLoja: (loja: string) => void;
+  userAssignedLoja: string | null;
+  canSwitchLoja: boolean;
+  isDiretor: boolean;
+  isAdmin: boolean;
+  projetosLojas: Record<string, string>;
+  usuariosLojas: Record<string, string>;
+  refreshLojas: () => Promise<void>;
+  atribuirProjetoLoja: (projetoNome: string, lojaNome: string) => Promise<boolean>;
+  isProjectInSelectedLoja: (projetoNome: string, criadorEmail?: string) => boolean;
+}
+
+const LojaContext = createContext<LojaContextType | undefined>(undefined);
+
+export function LojaProvider({ children }: { children: React.ReactNode }) {
+  const { data: session } = useSession();
+  const [lojas, setLojas] = useState<LojaItem[]>([]);
+  const [projetosLojas, setProjetosLojas] = useState<Record<string, string>>({});
+  const [usuariosLojas, setUsuariosLojas] = useState<Record<string, string>>({});
+  const [selectedLoja, setSelectedLojaState] = useState<string>("TODAS");
+
+  const userRole = (session?.user as any)?.role || "Colaborador";
+  const isMasterDev = isMasterDevSession(session);
+  const isDiretor = userRole === "Diretor";
+  const isAdmin = userRole === "Admin" || isMasterDev;
+  const canSwitchLoja = isDiretor || isAdmin;
+
+  // Loja atribuída ao usuário na sessão ou no banco
+  const userAssignedLoja = useMemo(() => {
+    return (session?.user as any)?.loja || null;
+  }, [session]);
+
+  const loadLojasData = useCallback(async () => {
+    try {
+      const [lojasRes, rolesRes] = await Promise.all([
+        fetch("/api/lojas"),
+        fetch("/api/usuarios-roles"),
+      ]);
+
+      if (lojasRes.ok) {
+        const data = await lojasRes.json();
+        setLojas(data.lojas || []);
+        setProjetosLojas(data.projetosLojas || {});
+      }
+
+      if (rolesRes.ok) {
+        const rolesData = await rolesRes.json();
+        const mapUsers: Record<string, string> = {};
+        (rolesData.users || []).forEach((u: any) => {
+          if (u.loja) {
+            if (u.id) mapUsers[u.id.toLowerCase()] = u.loja;
+            if (u.email) mapUsers[u.email.toLowerCase().trim()] = u.loja;
+          }
+        });
+        setUsuariosLojas(mapUsers);
+      }
+    } catch (err) {
+      console.error("[LojaProvider] Erro ao carregar lojas:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadLojasData();
+  }, [loadLojasData]);
+
+  // Inicializa a loja selecionada de acordo com o perfil
+  useEffect(() => {
+    if (!session?.user) return;
+
+    const saved = localStorage.getItem("terracafe_selected_loja");
+
+    if (isDiretor) {
+      // Diretor: por padrão começa com a sua loja atribuída (se houver)
+      const userLoja = (session.user as any)?.loja;
+      if (saved && saved !== "TODAS") {
+        setSelectedLojaState(saved);
+      } else if (userLoja) {
+        setSelectedLojaState(userLoja);
+      } else {
+        setSelectedLojaState("TODAS");
+      }
+    } else if (isAdmin) {
+      // Admin/Master: pode ver todas por padrão ou usar a salva
+      if (saved) {
+        setSelectedLojaState(saved);
+      } else {
+        setSelectedLojaState("TODAS");
+      }
+    } else {
+      // Agricultor/Colaborador: fixado na sua loja se tiver, ou TODAS
+      const userLoja = (session.user as any)?.loja;
+      if (userLoja) {
+        setSelectedLojaState(userLoja);
+      } else {
+        setSelectedLojaState("TODAS");
+      }
+    }
+  }, [session, isDiretor, isAdmin]);
+
+  const setSelectedLoja = useCallback((loja: string) => {
+    setSelectedLojaState(loja);
+    try {
+      localStorage.setItem("terracafe_selected_loja", loja);
+    } catch {
+      // fallback
+    }
+  }, []);
+
+  const atribuirProjetoLoja = useCallback(async (projetoNome: string, lojaNome: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/lojas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projetoNome, lojaNome }),
+      });
+      if (res.ok) {
+        setProjetosLojas((prev) => ({ ...prev, [projetoNome]: lojaNome }));
+        return true;
+      }
+    } catch (e) {
+      console.error("[atribuirProjetoLoja] Erro:", e);
+    }
+    return false;
+  }, []);
+
+  /**
+   * Verifica se um projeto pertence à loja atualmente selecionada.
+   */
+  const isProjectInSelectedLoja = useCallback(
+    (projetoNome: string, criadorEmail?: string): boolean => {
+      if (selectedLoja === "TODAS") return true;
+
+      // 1. Vínculo direto projeto -> loja
+      const lojaDireta = projetosLojas[projetoNome];
+      if (lojaDireta) {
+        return lojaDireta.toLowerCase() === selectedLoja.toLowerCase();
+      }
+
+      // 2. Vínculo herdado do criador do projeto
+      if (criadorEmail) {
+        const emailLc = criadorEmail.toLowerCase().trim();
+        const lojaCriador = usuariosLojas[emailLc];
+        if (lojaCriador) {
+          return lojaCriador.toLowerCase() === selectedLoja.toLowerCase();
+        }
+      }
+
+      // 3. Projetos ainda sem atribuição aparecem se o usuário estiver vendo "TODAS",
+      // mas se estiver vendo uma loja específica, ficam ocultos daquela loja
+      return false;
+    },
+    [selectedLoja, projetosLojas, usuariosLojas]
+  );
+
+  return (
+    <LojaContext.Provider
+      value={{
+        lojas,
+        selectedLoja,
+        setSelectedLoja,
+        userAssignedLoja,
+        canSwitchLoja,
+        isDiretor,
+        isAdmin,
+        projetosLojas,
+        usuariosLojas,
+        refreshLojas: loadLojasData,
+        atribuirProjetoLoja,
+        isProjectInSelectedLoja,
+      }}
+    >
+      {children}
+    </LojaContext.Provider>
+  );
+}
+
+export function useLoja() {
+  const context = useContext(LojaContext);
+  if (!context) {
+    throw new Error("useLoja deve ser usado dentro de um LojaProvider");
+  }
+  return context;
+}

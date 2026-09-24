@@ -13,11 +13,12 @@ import {
   CheckCircle2, AlertCircle, CloudRain, Wrench, Search, Trash2, Filter,
   Paperclip, X, Video, Loader2, TrendingUp, TrendingDown, Settings2,
   Users, Check, Droplets, Layers, ChevronDown, PlayCircle, Flag,
-  FileText, Printer, Copy, CheckSquare, Square, Share2, Info
+  FileText, Printer, Copy, CheckSquare, Square, Share2, Info, Building2
 } from 'lucide-react';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
 import { offlineFetch, isOnline } from '@/lib/offline';
+import { useLoja } from '@/contexts/LojaContext';
 
 interface DiarioUser { 
   id: string; 
@@ -137,7 +138,19 @@ export default function DiarioCampoTimelinePage() {
   const [registros, setRegistros] = useState<RegistroDiarioCampo[]>([]);
   const [users, setUsers] = useState<DiarioUser[]>([]);
   const [projetos, setProjetos] = useState<string[]>([]);
+  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
   const [projetosDeletados, setProjetosDeletados] = useState<Set<string>>(new Set());
+
+  const { 
+    selectedLoja, 
+    setSelectedLoja, 
+    userAssignedLoja, 
+    isProjectInSelectedLoja, 
+    atribuirProjetoLoja, 
+    lojas, 
+    projetosLojas, 
+    canSwitchLoja 
+  } = useLoja();
 
   // Seleções do usuário
   const [selectedProjeto, setSelectedProjeto] = useState<string>('');
@@ -418,6 +431,9 @@ export default function DiarioCampoTimelinePage() {
         const dataProj = await resProjetos.json();
         const pSupabase = dataProj?.projetos;
         listaProjetos = Array.isArray(pSupabase) ? pSupabase : [];
+        if (dataProj?.criadores) {
+          setProjetosCriadores(dataProj.criadores);
+        }
       }
 
       if (resFases.ok) {
@@ -1103,6 +1119,13 @@ export default function DiarioCampoTimelinePage() {
       const novoStartObj = { ...projetoStartDates, [nomeLimpo]: hoje };
       saveProjectStartsToStorage(novoStartObj);
 
+      // Atribui loja ao novo projeto se houver loja selecionada ou atribuída ao usuário
+      if (selectedLoja && selectedLoja !== 'TODAS') {
+        atribuirProjetoLoja(nomeLimpo, selectedLoja);
+      } else if (userAssignedLoja) {
+        atribuirProjetoLoja(nomeLimpo, userAssignedLoja);
+      }
+
       await loadProjetos();
       setSelectedProjeto(nomeLimpo);
       setIsNewProjectModalOpen(false);
@@ -1603,9 +1626,27 @@ export default function DiarioCampoTimelinePage() {
   };
 
   const filteredProjetosList = useMemo(() => {
-    if (!searchProjeto.trim()) return projetos;
-    return projetos.filter(p => p.toLowerCase().includes(searchProjeto.toLowerCase()));
-  }, [projetos, searchProjeto]);
+    let list = projetos;
+    if (selectedLoja !== 'TODAS') {
+      list = list.filter(p => {
+        const criadorEmail = projetosCriadores[p]?.email;
+        return isProjectInSelectedLoja(p, criadorEmail);
+      });
+    }
+    if (!searchProjeto.trim()) return list;
+    return list.filter(p => p.toLowerCase().includes(searchProjeto.toLowerCase()));
+  }, [projetos, selectedLoja, isProjectInSelectedLoja, projetosCriadores, searchProjeto]);
+
+  // Sincroniza projeto selecionado com a lista filtrada por filial
+  useEffect(() => {
+    if (filteredProjetosList.length > 0) {
+      if (!selectedProjeto || !filteredProjetosList.includes(selectedProjeto)) {
+        setSelectedProjeto(filteredProjetosList[0]);
+      }
+    } else {
+      setSelectedProjeto('');
+    }
+  }, [filteredProjetosList, selectedProjeto]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans flex flex-col">
@@ -1691,16 +1732,34 @@ export default function DiarioCampoTimelinePage() {
             )}
 
             {!loadingProjetos && filteredProjetosList.length === 0 && (
-              <div className="text-center py-8 text-slate-400 text-xs px-2">
-                <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-30 text-slate-400" />
-                <p>Nenhum projeto encontrado.</p>
-                <p className="text-[11px] mt-1 text-slate-500">Crie fases com projetos no Painel Operacional para que eles apareçam aqui.</p>
+              <div className="text-center py-8 text-slate-400 text-xs px-2 space-y-2">
+                <Briefcase className="w-8 h-8 mx-auto opacity-30 text-slate-400" />
+                <p className="font-semibold text-slate-600 dark:text-slate-300">
+                  {selectedLoja !== 'TODAS'
+                    ? `Nenhum projeto encontrado para "${selectedLoja}".`
+                    : 'Nenhum projeto encontrado.'}
+                </p>
+                {selectedLoja !== 'TODAS' && canSwitchLoja && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedLoja('TODAS')}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-md shadow-blue-900/20 transition-all active:scale-95"
+                  >
+                    Ver Todas as Lojas
+                  </button>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  {selectedLoja !== 'TODAS'
+                    ? 'Você pode atribuir os projetos existentes a esta loja quando desejar.'
+                    : 'Crie fases com projetos no Painel Operacional para que eles apareçam aqui.'}
+                </p>
               </div>
             )}
 
             {!loadingProjetos && filteredProjetosList.map(proj => {
               const isSelected = selectedProjeto === proj;
               const totalLogs = logsCountByProjeto[proj] || 0;
+              const lojaDoProj = projetosLojas[proj];
 
               return (
                 <button 
@@ -1726,9 +1785,21 @@ export default function DiarioCampoTimelinePage() {
                         {getProjectVersion(proj)}
                       </span>
                     </div>
-                    <p className={`text-xs mt-1 truncate ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                      {totalLogs} registro{totalLogs !== 1 ? 's' : ''} no diário
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <p className={`text-xs truncate ${isSelected ? 'text-blue-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                        {totalLogs} registro{totalLogs !== 1 ? 's' : ''} no diário
+                      </p>
+                      {lojaDoProj && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium truncate flex items-center gap-1 border ${
+                          isSelected
+                            ? 'bg-white/20 text-white border-white/30'
+                            : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                        }`}>
+                          <Building2 className="w-2.5 h-2.5" />
+                          {lojaDoProj}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'rotate-90 text-white' : 'text-slate-400'}`} />
                 </button>
@@ -1765,6 +1836,39 @@ export default function DiarioCampoTimelinePage() {
                       }`}>
                         {getProjectVersion(selectedProjeto)}
                       </span>
+                    </div>
+
+                    {/* Seletor / Indicador de Loja do Projeto */}
+                    <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        <Building2 className="w-3.5 h-3.5 text-blue-500" />
+                        <span>Loja/Filial:</span>
+                      </div>
+                      {canSwitchLoja ? (
+                        <select
+                          value={projetosLojas[selectedProjeto] || ''}
+                          onChange={async (e) => {
+                            const novaLoja = e.target.value;
+                            const ok = await atribuirProjetoLoja(selectedProjeto, novaLoja);
+                            if (ok) {
+                              success(novaLoja ? `Projeto vinculado à "${novaLoja}"!` : 'Projeto desvinculado da loja.');
+                            } else {
+                              toastError('Erro ao salvar loja do projeto.');
+                            }
+                          }}
+                          className="text-xs font-semibold bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#192440] border border-slate-300 dark:border-[#1e293b] rounded-lg px-2.5 py-1 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer transition-colors"
+                          title="Clique para atribuir este projeto a uma filial específica"
+                        >
+                          <option value="">(Sem loja atribuída / Geral)</option>
+                          {lojas.filter(l => l.ativo !== false).map(l => (
+                            <option key={l.id} value={l.nome}>{l.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {projetosLojas[selectedProjeto] || 'Sem loja atribuída'}
+                        </span>
+                      )}
                     </div>
                   </div>
 

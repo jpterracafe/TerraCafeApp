@@ -16,6 +16,7 @@ import {
   normalizeName,
   TERMOS_GENERICOS_RESPONSAVEL,
 } from '@/lib/responsaveis';
+import { useLoja } from '@/contexts/LojaContext';
 
 interface JustificativaItem {
   id: string;
@@ -69,6 +70,7 @@ export default function VisaoGeralDiretorPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [projetosList, setProjetosList] = useState<string[]>([]);
+  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
   const [config, setConfig] = useState<SystemConfigResponse>({
     configEtapas: {},
     projetoStartDates: {},
@@ -108,6 +110,9 @@ export default function VisaoGeralDiretorPage() {
       ]);
 
       setProjetosList(Array.isArray(resProj.projetos) ? resProj.projetos : []);
+      if (resProj.criadores) {
+        setProjetosCriadores(resProj.criadores);
+      }
       if (resConfig) {
         setConfig(resConfig);
       }
@@ -179,12 +184,22 @@ export default function VisaoGeralDiretorPage() {
     }
   };
 
+  const { selectedLoja, isProjectInSelectedLoja } = useLoja();
+
+  const projetosListFiltrados = useMemo(() => {
+    if (selectedLoja === 'TODAS') return projetosList;
+    return projetosList.filter(nome => {
+      const criadorEmail = projetosCriadores[nome]?.email;
+      return isProjectInSelectedLoja(nome, criadorEmail);
+    });
+  }, [projetosList, selectedLoja, isProjectInSelectedLoja, projetosCriadores]);
+
   // Processa dados de cada projeto para a tela executiva da Diretoria
   const projetosProcessados = useMemo(() => {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    return projetosList.map(nomeProjeto => {
+    return projetosListFiltrados.map(nomeProjeto => {
       const prazoFinal = config.projetosPrazoFinal[nomeProjeto] || '';
       const dataInicio = config.projetoStartDates[nomeProjeto] || '';
       const justificativas = config.projetoJustificativas[nomeProjeto] || [];

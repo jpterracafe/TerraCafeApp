@@ -9,6 +9,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
+import LojaSelector from '@/components/LojaSelector';
 import { isMasterDevSession } from '@/lib/client-roles';
 
 export default function NavigationDrawer() {
@@ -66,7 +67,8 @@ export default function NavigationDrawer() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 md:gap-3">
+          <LojaSelector />
           <ThemeToggle />
           <LogoutButton />
         </div>

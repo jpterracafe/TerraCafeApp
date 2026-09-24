@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession } from "@/lib/auth";
 import env from "@/lib/env";
 import { ALLOWED_ROLES } from "../route";
+import { setUserLoja } from "@/lib/lojas";
 
 export async function DELETE(
   _req: Request,
@@ -145,7 +146,18 @@ export async function PATCH(
       return NextResponse.json({ ok: true, role: novoCargo, cargo: novoCargo });
     }
 
-    // 2. Reset de senha aleatória ou definição manual de senha
+    // 2. Atualização de Loja / Filial
+    if (body.loja !== undefined) {
+      const novaLoja = String(body.loja || "").trim();
+      const { data: user } = await db.from("users").select("id, email").eq("id", id).maybeSingle();
+      await setUserLoja(id, novaLoja);
+      if (user?.email) {
+        await setUserLoja(user.email, novaLoja);
+      }
+      return NextResponse.json({ ok: true, loja: novaLoja });
+    }
+
+    // 3. Reset de senha aleatória ou definição manual de senha
     let novaSenha = "";
     if (body.novaSenha || body.senha || body.password) {
       novaSenha = String(body.novaSenha || body.senha || body.password).trim();
