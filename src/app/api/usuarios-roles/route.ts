@@ -32,6 +32,10 @@ export async function GET() {
         role: u.role || "Agricultor",
         loja: (u.id && mapLojas[u.id.toLowerCase()]) || (u.email && mapLojas[u.email.toLowerCase().trim()]) || null,
       })),
+    }, {
+      headers: {
+        "Cache-Control": "private, max-age=15, stale-while-revalidate=30",
+      },
     });
   } catch (error) {
     console.error("[GET /api/usuarios-roles]", error);

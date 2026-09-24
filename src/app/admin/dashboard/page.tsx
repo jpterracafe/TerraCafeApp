@@ -24,6 +24,8 @@ import {
 import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
 import { hojeSP } from '@/lib/validators';
 import { useLoja } from '@/contexts/LojaContext';
+import LojaSelector from '@/components/LojaSelector';
+import { offlineFetch } from '@/lib/offline';
 
 import { EtapaCampo } from '@/app/irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '@/app/irrigacao/execucao/page';
@@ -33,6 +35,22 @@ import {
   normalizeName,
   TERMOS_GENERICOS_RESPONSAVEL as TERMOS_GENERICOS_RESP,
 } from '@/lib/responsaveis';
+
+const CACHE_KEY_DASHBOARD = "admin_dashboard_cache_v1";
+
+interface DashboardCacheData {
+  fases: FaseAcaoItem[];
+  logs: DiarioLog[];
+  projetosList: string[];
+  configEtapas: Record<string, EtapaConfig>;
+  projetoStartDates: Record<string, string>;
+  responsaveisPorEtapa: Record<string, string[]>;
+  projetosPrazoFinal: Record<string, string>;
+  usuariosRoles: Record<string, string>;
+  usuariosSistema: { nome: string; email: string; role: string }[];
+  projetosCriadores: Record<string, { email: string; nome?: string; id?: string }>;
+  ts: number;
+}
 
 // ── Helper para extrair nome do usuário do email @terracafe.com ────────────────
 function extractUserName(emailOrName: string | undefined): string {
@@ -116,8 +134,19 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  // Carrega cache de sessão síncrono para eliminar piscadas (0ms first paint)
+  const [cachedData] = useState<DashboardCacheData | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY_DASHBOARD);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => !cachedData);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(() => (cachedData ? new Date(cachedData.ts) : null));
   // Extrai o nome do usuário logado do email @terracafe.com
   const currentUser = useMemo(() => {
     if (session?.user?.email) return extractUserName(session.user.email);
@@ -126,19 +155,19 @@ export default function DashboardPage() {
   }, [session]);
 
   // Dados brutos
-  const [fases, setFases] = useState<FaseAcaoItem[]>([]);
-  const [logs, setLogs] = useState<DiarioLog[]>([]);
-  const [projetosList, setProjetosList] = useState<string[]>([]);
+  const [fases, setFases] = useState<FaseAcaoItem[]>(() => cachedData?.fases || []);
+  const [logs, setLogs] = useState<DiarioLog[]>(() => cachedData?.logs || []);
+  const [projetosList, setProjetosList] = useState<string[]>(() => cachedData?.projetosList || []);
 
   // Configurações salvas do Diário
-  const [configEtapas, setConfigEtapas] = useState<Record<string, EtapaConfig>>({});
-  const [projetoStartDates, setProjetoStartDates] = useState<Record<string, string>>({});
-  const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
-  const [projetosPrazoFinal, setProjetosPrazoFinal] = useState<Record<string, string>>({});
-  const [usuariosRoles, setUsuariosRoles] = useState<Record<string, string>>({});
+  const [configEtapas, setConfigEtapas] = useState<Record<string, EtapaConfig>>(() => cachedData?.configEtapas || {});
+  const [projetoStartDates, setProjetoStartDates] = useState<Record<string, string>>(() => cachedData?.projetoStartDates || {});
+  const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>(() => cachedData?.responsaveisPorEtapa || {});
+  const [projetosPrazoFinal, setProjetosPrazoFinal] = useState<Record<string, string>>(() => cachedData?.projetosPrazoFinal || {});
+  const [usuariosRoles, setUsuariosRoles] = useState<Record<string, string>>(() => cachedData?.usuariosRoles || {});
   // Logins que existem de verdade (para ocultar perfis já excluídos).
-  const [usuariosSistema, setUsuariosSistema] = useState<{ nome: string; email: string; role: string }[]>([]);
-  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
+  const [usuariosSistema, setUsuariosSistema] = useState<{ nome: string; email: string; role: string }[]>(() => cachedData?.usuariosSistema || []);
+  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>(() => cachedData?.projetosCriadores || {});
 
   // Controles de Visualização
   const [activeTab, setActiveTab] = useState<'campo' | 'cronograma'>('campo');
@@ -162,12 +191,12 @@ export default function DashboardPage() {
     else if (!podeVerDiretor) router.push('/irrigacao/diario-campo');
   }, [status, router, podeVerDiretor]);
 
-  // Carrega dados das APIs e localStorage.
-  // silent=true (polling/foco) atualiza sem piscar o skeleton cheio.
+  // Carrega dados das APIs com offlineFetch e salva em sessionStorage
+  // silent=true (polling/foco/com cache) atualiza sem piscar o skeleton
   const loadData = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    if (!silent && !cachedData) setLoading(true);
     try {
-      // Ler localStorage
+      // Ler localStorage como suporte
       try {
         const savedConfig = localStorage.getItem('diario_etapas_config_v1');
         if (savedConfig) setConfigEtapas(JSON.parse(savedConfig));
@@ -185,11 +214,11 @@ export default function DashboardPage() {
       }
 
       const [fasesRes, logsRes, projRes, configRes, rolesRes] = await Promise.all([
-        fetch('/api/fases'),
-        fetch('/api/diario-logs'),
-        fetch('/api/projetos'),
-        fetch('/api/etapas-config'),
-        fetch('/api/usuarios-roles'),
+        offlineFetch('/api/fases'),
+        offlineFetch('/api/diario-logs'),
+        offlineFetch('/api/projetos'),
+        offlineFetch('/api/etapas-config'),
+        offlineFetch('/api/usuarios-roles'),
       ]);
 
       const fasesJson  = fasesRes.ok  ? await fasesRes.json()  : { fases: [] };
@@ -198,14 +227,32 @@ export default function DashboardPage() {
       const configJson = configRes.ok ? await configRes.json() : null;
       const rolesJson  = rolesRes.ok  ? await rolesRes.json()  : { users: [] };
 
+      let nextConfigEtapas = configEtapas;
+      let nextProjetoStartDates = projetoStartDates;
+      let nextResponsaveisPorEtapa = responsaveisPorEtapa;
+      let nextProjetosPrazoFinal = projetosPrazoFinal;
+
       if (configJson) {
-        if (configJson.configEtapas) setConfigEtapas(configJson.configEtapas);
-        if (configJson.projetoStartDates) setProjetoStartDates(configJson.projetoStartDates);
-        if (configJson.responsaveisPorEtapa) setResponsaveisPorEtapa(configJson.responsaveisPorEtapa);
-        if (configJson.projetosPrazoFinal) setProjetosPrazoFinal(configJson.projetosPrazoFinal);
+        if (configJson.configEtapas) {
+          nextConfigEtapas = configJson.configEtapas;
+          setConfigEtapas(configJson.configEtapas);
+        }
+        if (configJson.projetoStartDates) {
+          nextProjetoStartDates = configJson.projetoStartDates;
+          setProjetoStartDates(configJson.projetoStartDates);
+        }
+        if (configJson.responsaveisPorEtapa) {
+          nextResponsaveisPorEtapa = configJson.responsaveisPorEtapa;
+          setResponsaveisPorEtapa(configJson.responsaveisPorEtapa);
+        }
+        if (configJson.projetosPrazoFinal) {
+          nextProjetosPrazoFinal = configJson.projetosPrazoFinal;
+          setProjetosPrazoFinal(configJson.projetosPrazoFinal);
+        }
       }
 
       // Captura criadores dos projetos (do /api/projetos)
+      const nextCriadores = projJson.criadores || {};
       if (projJson.criadores) {
         setProjetosCriadores(projJson.criadores);
       }
@@ -248,25 +295,47 @@ export default function DashboardPage() {
         new Set([...projetosFases, ...projetosDiario, ...fromApiProj].filter(p => !deletados.has(p)))
       ).sort();
 
-      setFases(allFases.filter(f => !f.isDeleted));
+      const filteredFases = allFases.filter(f => !f.isDeleted);
+      setFases(filteredFases);
       setLogs(allLogs);
       setProjetosList(unicos);
-      setLastUpdate(new Date());
+      const agora = new Date();
+      setLastUpdate(agora);
+
+      // Salva em cache de sessão para visitas subsequentes instantâneas (sem piscar a tela)
+      try {
+        const toCache: DashboardCacheData = {
+          fases: filteredFases,
+          logs: allLogs,
+          projetosList: unicos,
+          configEtapas: nextConfigEtapas,
+          projetoStartDates: nextProjetoStartDates,
+          responsaveisPorEtapa: nextResponsaveisPorEtapa,
+          projetosPrazoFinal: nextProjetosPrazoFinal,
+          usuariosRoles: roleMap,
+          usuariosSistema: ativos,
+          projetosCriadores: nextCriadores,
+          ts: agora.getTime(),
+        };
+        sessionStorage.setItem(CACHE_KEY_DASHBOARD, JSON.stringify(toCache));
+      } catch {
+        // quota ignore
+      }
     } catch (err) {
       console.error('[dashboard] Erro ao carregar dados:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [cachedData, configEtapas, projetoStartDates, responsaveisPorEtapa, projetosPrazoFinal]);
 
   useEffect(() => {
     if (status === 'authenticated') {
       const timer = setTimeout(() => {
-        void loadData();
+        void loadData(Boolean(cachedData));
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [status, loadData]);
+  }, [status, loadData, cachedData]);
 
   // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
   useEffect(() => {
@@ -322,6 +391,12 @@ export default function DashboardPage() {
       return isProjectInSelectedLoja(nome, criadorEmail);
     });
   }, [projetosList, selectedLoja, isProjectInSelectedLoja, projetosCriadores]);
+
+  useEffect(() => {
+    if (selectedProjetoFilter !== '__todos__' && !projetosListFiltrados.includes(selectedProjetoFilter)) {
+      setSelectedProjetoFilter('__todos__');
+    }
+  }, [projetosListFiltrados, selectedProjetoFilter]);
 
   const logsFiltradosLoja = useMemo(() => {
     if (selectedLoja === 'TODAS') return logs;
@@ -869,8 +944,16 @@ export default function DashboardPage() {
     };
   }, [projetosListFiltrados, configEtapas, logs, projetosPrazoFinal]);
 
-  if (status === 'loading' || loading || !podeVerDiretor) {
+  if ((status === 'loading' || loading) && !cachedData) {
     return <DashboardSkeleton />;
+  }
+
+  if (status === 'authenticated' && !podeVerDiretor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-[#070c18] text-slate-500">
+        <p className="text-sm font-semibold">Acesso restrito à Diretoria e Administradores.</p>
+      </div>
+    );
   }
 
   return (
@@ -892,7 +975,7 @@ export default function DashboardPage() {
                <BarChart2 className="w-5 h-5" />
              </div>
              <div>
-               <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 flex-wrap">
+               <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2 flex-wrap">
                  Visão do Diretor · Irrigação e Obras
                  <span className="px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider rounded-full bg-blue-500/10 text-blue-500 dark:text-blue-400 border border-blue-500/20">
                    Ao Vivo
@@ -965,6 +1048,12 @@ export default function DashboardPage() {
       {/* ── FILTROS E SELETOR DE CONTEXTO DO DIRETOR ──────────────────────────── */}
       <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4 mb-6 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         
+        {/* Seletor de Loja / Filial */}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] self-start md:self-auto shrink-0">
+          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Filial:</span>
+          <LojaSelector />
+        </div>
+
         {/* Seletor de Fazenda / Projeto */}
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 dark:text-blue-400 shrink-0">
@@ -981,7 +1070,7 @@ export default function DashboardPage() {
                 className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
               >
                 <option value="__todos__">🏢 Todas as Obras (Visão Consolidada da Diretoria)</option>
-                {projetosList.map(proj => (
+                {projetosListFiltrados.map(proj => (
                   <option key={proj} value={proj}>🚜 {proj}</option>
                 ))}
               </select>

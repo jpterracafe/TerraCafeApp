@@ -48,6 +48,17 @@ const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: str
   { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
 
+const CACHE_KEY_VISAO = "visao_geral_cache_v1";
+
+interface VisaoGeralCacheData {
+  projetosList: string[];
+  projetosCriadores: Record<string, { email: string; nome?: string; id?: string }>;
+  config: SystemConfigResponse;
+  fases: any[];
+  diarioLogs: RegistroDiarioCampo[];
+  ts: number;
+}
+
 export default function VisaoGeralDiretorPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -61,7 +72,18 @@ export default function VisaoGeralDiretorPage() {
     }
   }, [sessionStatus, router]);
 
-  const [loading, setLoading] = useState(true);
+  // Carrega cache de sessão inicial síncrono para eliminação total de piscadas (0ms first paint)
+  const [initialCache] = useState<VisaoGeralCacheData | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY_VISAO);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [loading, setLoading] = useState<boolean>(() => !initialCache);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [horaAtual, setHoraAtual] = useState<string>('');
@@ -71,9 +93,9 @@ export default function VisaoGeralDiretorPage() {
   const [autoScroll, setAutoScroll] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const [projetosList, setProjetosList] = useState<string[]>([]);
-  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>({});
-  const [config, setConfig] = useState<SystemConfigResponse>({
+  const [projetosList, setProjetosList] = useState<string[]>(() => initialCache?.projetosList || []);
+  const [projetosCriadores, setProjetosCriadores] = useState<Record<string, { email: string; nome?: string; id?: string }>>(() => initialCache?.projetosCriadores || {});
+  const [config, setConfig] = useState<SystemConfigResponse>(() => initialCache?.config || {
     configEtapas: {},
     projetoStartDates: {},
     responsaveisPorEtapa: {},
@@ -83,8 +105,8 @@ export default function VisaoGeralDiretorPage() {
     etapasStatus: {},
   });
 
-  const [fases, setFases] = useState<any[]>([]);
-  const [diarioLogs, setDiarioLogs] = useState<RegistroDiarioCampo[]>([]);
+  const [fases, setFases] = useState<any[]>(() => initialCache?.fases || []);
+  const [diarioLogs, setDiarioLogs] = useState<RegistroDiarioCampo[]>(() => initialCache?.diarioLogs || []);
 
   // Filtros
   const [search, setSearch] = useState('');
@@ -111,16 +133,41 @@ export default function VisaoGeralDiretorPage() {
         offlineFetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
 
-      setProjetosList(Array.isArray(resProj.projetos) ? resProj.projetos : []);
-      if (resProj.criadores) {
-        setProjetosCriadores(resProj.criadores);
-      }
-      if (resConfig) {
-        setConfig(resConfig);
-      }
-      setFases(Array.isArray(resFases.fases) ? resFases.fases : []);
-      setDiarioLogs(Array.isArray(resLogs.logs) ? resLogs.logs : []);
+      const lista = Array.isArray(resProj.projetos) ? resProj.projetos : [];
+      const criadores = resProj.criadores || {};
+      const cfg = resConfig || {
+        configEtapas: {},
+        projetoStartDates: {},
+        responsaveisPorEtapa: {},
+        projetosPrazoFinal: {},
+        projetoJustificativas: {},
+        etapasProgresso: {},
+        etapasStatus: {},
+      };
+      const fList = Array.isArray(resFases.fases) ? resFases.fases : [];
+      const dLogs = Array.isArray(resLogs.logs) ? resLogs.logs : [];
+
+      setProjetosList(lista);
+      setProjetosCriadores(criadores);
+      if (resConfig) setConfig(cfg);
+      setFases(fList);
+      setDiarioLogs(dLogs);
       setLastUpdate(new Date());
+
+      // Salva em cache de sessão para visitas subsequentes instantâneas sem piscar
+      try {
+        const toCache: VisaoGeralCacheData = {
+          projetosList: lista,
+          projetosCriadores: criadores,
+          config: cfg,
+          fases: fList,
+          diarioLogs: dLogs,
+          ts: Date.now(),
+        };
+        sessionStorage.setItem(CACHE_KEY_VISAO, JSON.stringify(toCache));
+      } catch {
+        // quota ignore
+      }
     } catch (err) {
       console.error('[visao-geral] Erro ao carregar dados:', err);
       toastError('Falha ao carregar painel executivo. Verifique a conexão e tente novamente.');
@@ -509,6 +556,14 @@ export default function VisaoGeralDiretorPage() {
     });
   };
 
+  if (sessionStatus === 'loading' && !initialCache) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#f8fafc] dark:bg-[#070c18]">
+        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div
       ref={scrollContainerRef}
@@ -516,13 +571,6 @@ export default function VisaoGeralDiretorPage() {
         modoTV ? 'overflow-y-auto' : 'p-4 md:p-8'
       }`}
     >
-      {/* Guard de sessão — não renderiza enquanto verifica */}
-      {sessionStatus === 'loading' && (
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-        </div>
-      )}
-
       {/* Barra de Topo Integrada do Modo TV (substitui a barra padrão com layout dedicado para telões, sem conflitos) */}
       {modoTV && (
         <header className="sticky top-0 z-50 bg-[#0d1527]/95 backdrop-blur-md border-b border-[#1e293b] px-4 md:px-6 py-3 flex items-center justify-between shadow-xl mb-4">
