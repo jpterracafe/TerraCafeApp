@@ -100,6 +100,14 @@ export async function DELETE(
       // silent — tabela opcional
     }
 
+    // Limpeza de vínculo com loja
+    try {
+      if (id) await setUserLoja(id, "");
+      if (user?.email) await setUserLoja(user.email, "");
+    } catch {
+      // silent
+    }
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[DELETE /api/admin/users/[id]]", error);

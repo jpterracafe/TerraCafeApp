@@ -8,9 +8,12 @@ import { useToast } from '@/components/Toast';
 import { AlertTriangle, ChevronRight, RefreshCcw, Trash2, Inbox, Briefcase, ChevronDown, ChevronUp } from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
 import { offlineFetch } from '@/lib/offline';
+import { useLoja } from '@/contexts/LojaContext';
+import LojaSelector from '@/components/LojaSelector';
 
 export default function LixeiraPage() {
   const { success, error: toastError } = useToast();
+  const { isProjectInSelectedLoja, projetosLojas } = useLoja();
   const [deletedFases, setDeletedFases] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -77,16 +80,17 @@ export default function LixeiraPage() {
     };
   }, [loadDeleted, loading]);
 
-  // Agrupa fases por projeto/cliente
+  // Agrupa fases por projeto/cliente filtrados pela loja selecionada
   const projetosAgrupados = useMemo(() => {
     const mapa: Record<string, FaseAcao[]> = {};
     deletedFases.forEach(f => {
       const key = f.projetoCliente?.trim() || '(Sem projeto)';
+      if (!isProjectInSelectedLoja(key, (f as any).criadoPorEmail || (f as any).criado_por_email)) return;
       if (!mapa[key]) mapa[key] = [];
       mapa[key].push(f);
     });
     return Object.entries(mapa).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [deletedFases]);
+  }, [deletedFases, isProjectInSelectedLoja]);
 
   const toggleExpand = (nome: string) => {
     setExpandedProjects(prev => {
@@ -186,6 +190,7 @@ export default function LixeiraPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <LojaSelector />
           <ThemeToggle /><LogoutButton />
           <button
             onClick={handleEmptyTrash}
@@ -226,7 +231,14 @@ export default function LixeiraPage() {
                   <Briefcase className="w-5 h-5 text-rose-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                    {projetosLojas[nomeProjeto] && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                        🏪 {projetosLojas[nomeProjeto]}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400 mt-0.5">
                     {fasesDoProjeto.length} fase{fasesDoProjeto.length !== 1 ? 's' : ''} removida{fasesDoProjeto.length !== 1 ? 's' : ''}
                   </p>

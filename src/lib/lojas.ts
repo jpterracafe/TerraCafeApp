@@ -347,3 +347,127 @@ export async function setProjectLoja(projetoNome: string, lojaNome: string): Pro
     return false;
   }
 }
+
+/**
+ * Renomeia referências de uma loja quando o nome for alterado:
+ * - Atualiza CHAVE_USUARIOS_LOJAS
+ * - Atualiza CHAVE_PROJETOS_LOJAS
+ * - Atualiza users.loja (best effort)
+ * - Atualiza tabela lojas (best effort)
+ */
+export async function renameLojaReferences(oldName: string, newName: string): Promise<void> {
+  if (!oldName || !newName || oldName.trim().toLowerCase() === newName.trim().toLowerCase()) return;
+  const db = getSupabase();
+  const oldLc = oldName.trim().toLowerCase();
+  const cleanNew = newName.trim();
+
+  try {
+    // 1. Atualizar usuários
+    const userMap = await getUserLojasMap();
+    let userChanged = false;
+    for (const [key, val] of Object.entries(userMap)) {
+      if (val && String(val).trim().toLowerCase() === oldLc) {
+        userMap[key] = cleanNew;
+        userChanged = true;
+      }
+    }
+    if (userChanged) {
+      await db.from("configuracoes_sistema").upsert({
+        chave: CHAVE_USUARIOS_LOJAS,
+        valor: userMap,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 2. Atualizar projetos
+    const projMap = await getProjectLojasMap();
+    let projChanged = false;
+    for (const [key, val] of Object.entries(projMap)) {
+      if (val && String(val).trim().toLowerCase() === oldLc) {
+        projMap[key] = cleanNew;
+        projChanged = true;
+      }
+    }
+    if (projChanged) {
+      await db.from("configuracoes_sistema").upsert({
+        chave: CHAVE_PROJETOS_LOJAS,
+        valor: projMap,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 3. Tabela users (best-effort)
+    try {
+      await db.from("users").update({ loja: cleanNew }).ilike("loja", oldName.trim());
+    } catch (_) {}
+
+    // 4. Tabela lojas (best-effort)
+    try {
+      await db.from("lojas").update({ nome: cleanNew }).ilike("nome", oldName.trim());
+    } catch (_) {}
+  } catch (err) {
+    console.error("[renameLojaReferences] Erro ao renomear referências:", err);
+  }
+}
+
+/**
+ * Remove referências de uma loja quando a loja for excluída:
+ * - Remove de CHAVE_USUARIOS_LOJAS
+ * - Remove de CHAVE_PROJETOS_LOJAS
+ * - Limpa users.loja (best effort)
+ * - Remove de tabela lojas (best effort)
+ */
+export async function cleanupLojaReferences(lojaNome: string): Promise<void> {
+  if (!lojaNome) return;
+  const db = getSupabase();
+  const nomeLc = lojaNome.trim().toLowerCase();
+
+  try {
+    // 1. Remover de usuários
+    const userMap = await getUserLojasMap();
+    let userChanged = false;
+    for (const [key, val] of Object.entries(userMap)) {
+      if (val && String(val).trim().toLowerCase() === nomeLc) {
+        delete userMap[key];
+        userChanged = true;
+      }
+    }
+    if (userChanged) {
+      await db.from("configuracoes_sistema").upsert({
+        chave: CHAVE_USUARIOS_LOJAS,
+        valor: userMap,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 2. Remover de projetos
+    const projMap = await getProjectLojasMap();
+    let projChanged = false;
+    for (const [key, val] of Object.entries(projMap)) {
+      if (val && String(val).trim().toLowerCase() === nomeLc) {
+        delete projMap[key];
+        projChanged = true;
+      }
+    }
+    if (projChanged) {
+      await db.from("configuracoes_sistema").upsert({
+        chave: CHAVE_PROJETOS_LOJAS,
+        valor: projMap,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    // 3. Tabela users (best-effort)
+    try {
+      await db.from("users").update({ loja: null }).ilike("loja", lojaNome.trim());
+    } catch (_) {}
+
+    // 4. Tabela lojas (best-effort)
+    try {
+      await db.from("lojas").delete().ilike("nome", lojaNome.trim());
+    } catch (_) {}
+  } catch (err) {
+    console.error("[cleanupLojaReferences] Erro ao limpar referências:", err);
+  }
+}
+

@@ -413,6 +413,7 @@ export async function DELETE(req: Request) {
         });
 
         await db.from("user_projetos").delete().eq("projeto_nome", nome);
+        await setProjectLoja(nome, "");
       } catch (_) { /* ignora falha de limpeza em configuracoes_sistema */ }
 
       return NextResponse.json({ ok: true, hardDeleted: true });

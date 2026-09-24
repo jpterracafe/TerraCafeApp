@@ -55,6 +55,7 @@ function RelatorioContent() {
 
   const [fases, setFases]   = useState<FaseAcaoItem[]>([]);
   const [logs, setLogs]     = useState<DiarioLogItem[]>([]);
+  const [nomeLoja, setNomeLoja] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
@@ -67,9 +68,10 @@ function RelatorioContent() {
   const load = useCallback(async () => {
     setLoadError('');
     try {
-      const [resFases, resLogs] = await Promise.all([
+      const [resFases, resLogs, resLojas] = await Promise.all([
         fetch('/api/fases'),
         fetch('/api/diario-logs'),
+        fetch('/api/lojas'),
       ]);
 
       if (!resFases.ok || !resLogs.ok) {
@@ -91,6 +93,14 @@ function RelatorioContent() {
           ? (allLogs ?? [])
           : (allLogs ?? []).filter((l: DiarioLogItem) => (l.projetoCliente ?? '').trim() === projeto.trim());
         setLogs(filtradosLogs);
+      }
+
+      if (resLojas.ok) {
+        const dataLojas = await resLojas.json();
+        const mapProjLojas = dataLojas?.projetosLojas || {};
+        if (projeto && mapProjLojas[projeto]) {
+          setNomeLoja(mapProjLojas[projeto]);
+        }
       }
     } catch {
       setLoadError('Erro de conexão ao carregar o relatório. Tente recarregar a página.');
@@ -190,8 +200,13 @@ function RelatorioContent() {
         {/* CABEÇALHO */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12, marginBottom: 20, paddingBottom: 14, borderBottom: '2.5px solid #2563eb' }}>
           <div>
-            <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2 }}>
-              TerraCafé Irrigação · Relatório Executivo de Diretoria
+            <div style={{ fontSize: 9.5, color: '#64748b', fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>TerraCafé Irrigação · Relatório Executivo de Diretoria</span>
+              {nomeLoja && (
+                <span style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', borderRadius: 4, padding: '1px 6px', fontSize: 9, fontWeight: 700 }}>
+                  🏪 Filial: {nomeLoja}
+                </span>
+              )}
             </div>
             <h1>{nomeProjeto}</h1>
             <div style={{ fontSize: 10, color: '#64748b', marginTop: 3 }}>

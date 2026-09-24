@@ -8,6 +8,8 @@ import { useToast } from '@/components/Toast';
 import { ChevronRight, RefreshCcw, Trash2, Archive, Briefcase, ChevronDown, ChevronUp, CalendarCheck } from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
 import { offlineFetch } from '@/lib/offline';
+import { useLoja } from '@/contexts/LojaContext';
+import LojaSelector from '@/components/LojaSelector';
 
 interface ProjetoConcluido {
   nome: string;
@@ -32,6 +34,7 @@ function formatConcluidoEm(value?: string | null): string {
 
 export default function ProjetosConcluidosPage() {
   const { success, error: toastError } = useToast();
+  const { isProjectInSelectedLoja, projetosLojas } = useLoja();
   const [projetosInfo, setProjetosInfo] = useState<ProjetoConcluido[]>([]);
   const [fasesConcluidas, setFasesConcluidas] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +193,10 @@ export default function ProjetosConcluidosPage() {
     }
   };
 
+  const projetosFiltrados = useMemo(() => {
+    return projetosInfo.filter(p => isProjectInSelectedLoja(p.nome, p.criador?.email));
+  }, [projetosInfo, isProjectInSelectedLoja]);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans">
 
@@ -209,6 +216,7 @@ export default function ProjetosConcluidosPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <LojaSelector />
           <ThemeToggle /><LogoutButton />
         </div>
       </div>
@@ -221,7 +229,7 @@ export default function ProjetosConcluidosPage() {
           </div>
         )}
 
-        {!loading && projetosInfo.length === 0 && (
+        {!loading && projetosFiltrados.length === 0 && (
           <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-16 text-center text-slate-500 dark:text-slate-400">
             <Archive className="w-16 h-16 mx-auto mb-4 opacity-20" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Nenhum projeto concluído</h3>
@@ -229,7 +237,7 @@ export default function ProjetosConcluidosPage() {
           </div>
         )}
 
-        {!loading && projetosInfo.map(projeto => {
+        {!loading && projetosFiltrados.map(projeto => {
           const nomeProjeto = projeto.nome;
           const isExpanded = expandedProjects.has(nomeProjeto);
           const fasesDoProjeto = fasesPorProjeto[nomeProjeto] || [];
@@ -244,7 +252,14 @@ export default function ProjetosConcluidosPage() {
                   <Briefcase className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                    {projetosLojas[nomeProjeto] && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                        🏪 {projetosLojas[nomeProjeto]}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
                     <span className="inline-flex items-center gap-1">
                       <CalendarCheck className="w-3 h-3" />

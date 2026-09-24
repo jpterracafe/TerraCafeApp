@@ -36,6 +36,8 @@ import {
   normalizeName,
   TERMOS_GENERICOS_RESPONSAVEL,
 } from '@/lib/responsaveis';
+import { useLoja } from '@/contexts/LojaContext';
+import LojaSelector from '@/components/LojaSelector';
 
 // ── Helpers para controle de versões de projetos (mantidos para compatibilidade) ──
 export function extractProjectBaseName(name: string): string {
@@ -94,8 +96,11 @@ export default function PainelOperacionalObrasPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
+  const { selectedLoja, isProjectInSelectedLoja, projetosLojas } = useLoja();
+
   // Dados do sistema
   const [projetosList, setProjetosList] = useState<string[]>([]);
+  const [criadoresProjetos, setCriadoresProjetos] = useState<Record<string, string>>({});
   const [config, setConfig] = useState<SystemConfigResponse>({
     configEtapas: {},
     projetoStartDates: {},
@@ -116,12 +121,27 @@ export default function PainelOperacionalObrasPage() {
   const loadData = useCallback(async () => {
     try {
       const [resProj, resConfig, resLogs] = await Promise.all([
-        offlineFetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
+        offlineFetch('/api/projetos?detalhado=true').then(r => r.ok ? r.json() : { projetos: [] }),
         offlineFetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
         offlineFetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
       ]);
 
-      setProjetosList(resProj.projetos ?? []);
+      const lista = resProj.projetos ?? [];
+      const nomes: string[] = [];
+      const mapCriadores: Record<string, string> = {};
+      lista.forEach((p: any) => {
+        const nome = typeof p === 'string' ? p : p?.nome;
+        if (nome) {
+          nomes.push(nome);
+          if (p?.criador?.email) {
+            mapCriadores[nome] = p.criador.email;
+          }
+        }
+      });
+
+      setProjetosList(nomes);
+      setCriadoresProjetos(mapCriadores);
+
       if (resConfig) {
         setConfig(resConfig);
       }
@@ -310,41 +330,49 @@ export default function PainelOperacionalObrasPage() {
         qtdFasesEmAndamento,
         qtdFasesAtrasadas,
         qtdFasesConcluidas,
+        criadorEmail: criadoresProjetos[nomeProjeto] || '',
         fases,
       };
     });
-  }, [projetosList, config, diarioLogs]);
+  }, [projetosList, config, diarioLogs, criadoresProjetos]);
 
-  // Estatísticas e KPIs Operacionais
+  // Filtra projetos pertencentes à loja selecionada
+  const projetosDaLoja = useMemo(() => {
+    return projetosProcessados.filter(p => isProjectInSelectedLoja(p.nome, p.criadorEmail));
+  }, [projetosProcessados, isProjectInSelectedLoja]);
+
+  // Estatísticas e KPIs Operacionais (calculados sobre os projetos visíveis da loja)
   const kpis = useMemo(() => {
     const hojeStr = new Date().toISOString().split('T')[0];
-    const totalLogsHoje = diarioLogs.filter(l => l.data === hojeStr).length;
+    const nomesDaLoja = new Set(projetosDaLoja.map(p => p.nome));
+    const totalLogsHoje = diarioLogs.filter(l => l.data === hojeStr && (!l.projetoCliente || nomesDaLoja.has(l.projetoCliente))).length;
+    const totalLogsGeral = diarioLogs.filter(l => !l.projetoCliente || nomesDaLoja.has(l.projetoCliente)).length;
 
     let totalFasesAndamento = 0;
     let totalFasesAtrasadas = 0;
     let totalFasesConcluidas = 0;
 
-    projetosProcessados.forEach(p => {
+    projetosDaLoja.forEach(p => {
       totalFasesAndamento += p.qtdFasesEmAndamento;
       totalFasesAtrasadas += p.qtdFasesAtrasadas;
       totalFasesConcluidas += p.qtdFasesConcluidas;
     });
 
     return {
-      totalProjetos: projetosProcessados.length,
+      totalProjetos: projetosDaLoja.length,
       totalFasesAndamento,
       totalFasesAtrasadas,
       totalFasesConcluidas,
       totalLogsHoje,
-      totalLogsGeral: diarioLogs.length,
+      totalLogsGeral,
     };
-  }, [projetosProcessados, diarioLogs]);
+  }, [projetosDaLoja, diarioLogs]);
 
   // Filtro inteligente de projetos e etapas
   const projetosFiltrados = useMemo(() => {
     const q = search.toLowerCase().trim();
 
-    return projetosProcessados
+    return projetosDaLoja
       .filter(p => {
         if (filtroProjeto !== 'todos' && p.nome !== filtroProjeto) {
           return false;
@@ -376,7 +404,7 @@ export default function PainelOperacionalObrasPage() {
         }
         return p;
       });
-  }, [projetosProcessados, search, filtroProjeto, filtroEtapa, filtroSituacao]);
+  }, [projetosDaLoja, search, filtroProjeto, filtroEtapa, filtroSituacao]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 p-4 md:p-8 font-sans transition-colors">
@@ -403,6 +431,8 @@ export default function PainelOperacionalObrasPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <LojaSelector />
+
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -521,9 +551,9 @@ export default function PainelOperacionalObrasPage() {
               onChange={(e) => setFiltroProjeto(e.target.value)}
               className="px-3 py-2 bg-slate-50 dark:bg-[#16203a] border border-slate-200 dark:border-[#1e293b] rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-200 focus:outline-none"
             >
-              <option value="todos">Todos os Projetos ({projetosList.length})</option>
-              {projetosList.map(p => (
-                <option key={p} value={p}>{p}</option>
+              <option value="todos">Todos os Projetos ({projetosDaLoja.length})</option>
+              {projetosDaLoja.map(p => (
+                <option key={p.nome} value={p.nome}>{p.nome}</option>
               ))}
             </select>
 
@@ -585,6 +615,11 @@ export default function PainelOperacionalObrasPage() {
                       <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
                         {projeto.baseName}
                       </h2>
+                      {projetosLojas[projeto.nome] && (
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
+                          🏪 {projetosLojas[projeto.nome]}
+                        </span>
+                      )}
                       {projeto.atrasadoTotal && (
                         <span className="px-2 py-0.5 rounded-md text-xs font-black bg-rose-600 text-white animate-pulse shadow-sm">
                           🚨 Obra em Atraso ({Math.abs(projeto.diasRestantesTotal)}d)

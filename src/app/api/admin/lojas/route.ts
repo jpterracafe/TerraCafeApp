@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions, isAdminSession } from "@/lib/auth";
-import { getLojas, saveLojas, Loja } from "@/lib/lojas";
+import { getLojas, saveLojas, Loja, renameLojaReferences, cleanupLojaReferences } from "@/lib/lojas";
 import { randomUUID } from "crypto";
 
 export async function GET() {
@@ -82,13 +82,17 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Loja não encontrada." }, { status: 404 });
     }
 
+    const oldNome = lojas[index].nome;
+    let nomeAlterado = false;
+
     // Se estiver mudando o nome, checa duplicidade
-    if (novoNome && novoNome.toLowerCase() !== lojas[index].nome.toLowerCase()) {
+    if (novoNome && novoNome.toLowerCase() !== oldNome.toLowerCase()) {
       const duplicada = lojas.some((l) => l.id !== id && l.nome.toLowerCase() === novoNome.toLowerCase());
       if (duplicada) {
         return NextResponse.json({ error: "Já existe outra loja com este nome." }, { status: 409 });
       }
       lojas[index].nome = novoNome;
+      nomeAlterado = true;
     }
 
     if (ativo !== undefined) {
@@ -98,6 +102,11 @@ export async function PATCH(req: Request) {
     const sucesso = await saveLojas(lojas);
     if (!sucesso) {
       return NextResponse.json({ error: "Erro ao atualizar a loja." }, { status: 500 });
+    }
+
+    // Se o nome foi alterado, renomeia referências em projetos e usuários
+    if (nomeAlterado && novoNome) {
+      await renameLojaReferences(oldNome, novoNome);
     }
 
     return NextResponse.json({ ok: true, loja: lojas[index] });
@@ -122,6 +131,7 @@ export async function DELETE(req: Request) {
     }
 
     const lojas = await getLojas();
+    const lojaExcluida = lojas.find((l) => l.id === id);
     const filtradas = lojas.filter((l) => l.id !== id);
 
     if (filtradas.length === lojas.length) {
@@ -131,6 +141,11 @@ export async function DELETE(req: Request) {
     const sucesso = await saveLojas(filtradas);
     if (!sucesso) {
       return NextResponse.json({ error: "Erro ao excluir loja." }, { status: 500 });
+    }
+
+    // Limpa referências da loja excluída em usuários e projetos
+    if (lojaExcluida) {
+      await cleanupLojaReferences(lojaExcluida.nome);
     }
 
     return NextResponse.json({ ok: true });
