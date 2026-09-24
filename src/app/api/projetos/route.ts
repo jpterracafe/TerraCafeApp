@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
+import { getUserAssignedLoja, setProjectLoja } from "@/lib/lojas";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -323,6 +324,12 @@ export async function POST(req: Request) {
           valor: mapStarts,
           updated_at: new Date().toISOString(),
         });
+      }
+
+      // Atribui loja ao novo projeto: prioriza loja informada no body ou herda a loja vinculada ao criador
+      const lojaAtribuida = body?.lojaNome || await getUserAssignedLoja({ id: userId, email: userEmail });
+      if (lojaAtribuida) {
+        await setProjectLoja(nome, lojaAtribuida);
       }
     } catch (cfgErr) {
       console.warn("[POST /api/projetos] Erro ao sincronizar metadados no configuracoes_sistema:", cfgErr);

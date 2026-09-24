@@ -1098,6 +1098,7 @@ export default function DiarioCampoTimelinePage() {
           nome: nomeLimpo,
           prazoFinal: newProjectDeadline,
           dataInicio: hoje,
+          lojaNome: (selectedLoja && selectedLoja !== 'TODAS') ? selectedLoja : (userAssignedLoja || undefined),
         }),
       });
 

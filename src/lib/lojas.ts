@@ -103,7 +103,120 @@ export async function getUserLojasMap(): Promise<Record<string, string>> {
 }
 
 /**
- * Salva o vínculo de um usuário com uma loja.
+ * Propaga a loja de um usuário para todos os projetos criados por ele ou vinculados a ele.
+ * Fontes checadas:
+ * 1. configuracoes_sistema (diario_projetos_criadores_v1)
+ * 2. tabela user_projetos
+ * 3. tabela fases_acao (criado_por_email)
+ */
+export async function propagateUserLojaToProjects(userIdentifier: string, lojaNome: string): Promise<string[]> {
+  if (!userIdentifier) return [];
+  const db = getSupabase();
+  const idOrEmail = userIdentifier.trim().toLowerCase();
+
+  try {
+    let userEmail = idOrEmail.includes("@") ? idOrEmail : "";
+    let userId = !idOrEmail.includes("@") ? idOrEmail : "";
+
+    // Se só temos um dos dois, tenta buscar o outro no banco
+    if (!userEmail || !userId) {
+      try {
+        const { data: userRow } = userEmail
+          ? await db.from("users").select("id, email").eq("email", userEmail).maybeSingle()
+          : await db.from("users").select("id, email").eq("id", userId).maybeSingle();
+
+        if (userRow) {
+          if (userRow.email) userEmail = userRow.email.trim().toLowerCase();
+          if (userRow.id) userId = String(userRow.id).trim();
+        }
+      } catch (_) {}
+    }
+
+    const projetosDoUsuario = new Set<string>();
+
+    // 1. Checa configuracoes_sistema (diario_projetos_criadores_v1)
+    try {
+      const { data: criadoresRow } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_criadores_v1")
+        .maybeSingle();
+
+      if (criadoresRow?.valor && typeof criadoresRow.valor === "object") {
+        for (const [projNome, criadorInfo] of Object.entries(criadoresRow.valor as Record<string, any>)) {
+          const cEmail = String(criadorInfo?.email || "").trim().toLowerCase();
+          const cId = String(criadorInfo?.id || "").trim();
+          if ((userEmail && cEmail === userEmail) || (userId && cId === userId)) {
+            projetosDoUsuario.add(projNome);
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 2. Checa tabela user_projetos se existir
+    try {
+      let queryUp = db.from("user_projetos").select("projeto_nome, user_email, user_id");
+      if (userEmail && userId) {
+        queryUp = queryUp.or(`user_email.eq.${userEmail},user_id.eq.${userId}`);
+      } else if (userEmail) {
+        queryUp = queryUp.eq("user_email", userEmail);
+      } else if (userId) {
+        queryUp = queryUp.eq("user_id", userId);
+      }
+      const { data: upRows } = await queryUp;
+      if (upRows && Array.isArray(upRows)) {
+        for (const r of upRows) {
+          if (r.projeto_nome) projetosDoUsuario.add(r.projeto_nome);
+        }
+      }
+    } catch (_) {}
+
+    // 3. Checa tabela fases_acao por criado_por_email
+    if (userEmail) {
+      try {
+        const { data: fasesRows } = await db
+          .from("fases_acao")
+          .select("projeto_cliente")
+          .eq("criado_por_email", userEmail)
+          .not("projeto_cliente", "is", null);
+
+        if (fasesRows && Array.isArray(fasesRows)) {
+          for (const f of fasesRows) {
+            if (f.projeto_cliente) projetosDoUsuario.add(f.projeto_cliente);
+          }
+        }
+      } catch (_) {}
+    }
+
+    const listaProjetos = Array.from(projetosDoUsuario);
+    if (listaProjetos.length === 0) return [];
+
+    // Atualiza o mapa de projetos no banco
+    const currentProjetosLojas = await getProjectLojasMap();
+    for (const proj of listaProjetos) {
+      if (lojaNome) {
+        currentProjetosLojas[proj] = lojaNome.trim();
+      } else {
+        delete currentProjetosLojas[proj];
+      }
+    }
+
+    await db.from("configuracoes_sistema").upsert({
+      chave: CHAVE_PROJETOS_LOJAS,
+      valor: currentProjetosLojas,
+      updated_at: new Date().toISOString(),
+    });
+
+    return listaProjetos;
+  } catch (err) {
+    console.error("[propagateUserLojaToProjects] Erro ao propagar loja para projetos:", err);
+    return [];
+  }
+}
+
+/**
+ * Salva o vínculo de um usuário com uma loja e propaga automaticamente
+ * para TODOS os projetos daquela pessoa.
  */
 export async function setUserLoja(userIdentifier: string, lojaNome: string): Promise<boolean> {
   if (!userIdentifier) return false;
@@ -112,10 +225,32 @@ export async function setUserLoja(userIdentifier: string, lojaNome: string): Pro
 
   try {
     const currentMap = await getUserLojasMap();
-    if (lojaNome) {
-      currentMap[idKey] = lojaNome.trim();
+    
+    // Tenta resolver tanto ID quanto Email para gravar de forma idêntica
+    let userEmail = idKey.includes("@") ? idKey : "";
+    let userId = !idKey.includes("@") ? idKey : "";
+
+    try {
+      const { data: uRow } = userEmail
+        ? await db.from("users").select("id, email").eq("email", userEmail).maybeSingle()
+        : await db.from("users").select("id, email").eq("id", userId).maybeSingle();
+
+      if (uRow) {
+        if (uRow.email) userEmail = uRow.email.trim().toLowerCase();
+        if (uRow.id) userId = String(uRow.id).trim();
+      }
+    } catch (_) {}
+
+    const cleanLoja = lojaNome ? lojaNome.trim() : "";
+
+    if (cleanLoja) {
+      currentMap[idKey] = cleanLoja;
+      if (userEmail) currentMap[userEmail] = cleanLoja;
+      if (userId) currentMap[userId] = cleanLoja;
     } else {
       delete currentMap[idKey];
+      if (userEmail) delete currentMap[userEmail];
+      if (userId) delete currentMap[userId];
     }
 
     const { error } = await db
@@ -128,14 +263,18 @@ export async function setUserLoja(userIdentifier: string, lojaNome: string): Pro
 
     // Best-effort: se a coluna users.loja existir, atualiza lá também
     try {
-      if (idKey.includes("@")) {
-        await db.from("users").update({ loja: lojaNome || null }).eq("email", idKey);
-      } else {
-        await db.from("users").update({ loja: lojaNome || null }).eq("id", idKey);
+      if (userEmail) {
+        await db.from("users").update({ loja: cleanLoja || null }).eq("email", userEmail);
+      }
+      if (userId) {
+        await db.from("users").update({ loja: cleanLoja || null }).eq("id", userId);
       }
     } catch {
       // Coluna pode não existir
     }
+
+    // ⚡ PROPAGAÇÃO AUTOMÁTICA: Todos os projetos deste usuário agora vão para esta loja!
+    await propagateUserLojaToProjects(userIdentifier, cleanLoja);
 
     return !error;
   } catch (err) {

@@ -327,6 +327,7 @@ export default function AdminUsuariosPage() {
       );
       setSavedLojaId(id);
       setTimeout(() => setSavedLojaId(null), 2500);
+      loadProjetosAdmin();
     } catch {
       alert('Erro de conexão ao atribuir loja.');
     } finally {
