@@ -949,7 +949,8 @@ export default function DashboardPage() {
         <div>
           <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400 mb-2">
             <BackButton />
-            <span>TerraCafé Irrigação</span>
+            <img src="/logo-terra-cafe.png" alt="TerraCafé" className="h-4.5 w-auto object-contain dark:hidden" />
+            <img src="/logo-terra-cafe-white.png" alt="TerraCafé" className="h-4.5 w-auto object-contain hidden dark:block" />
             <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-slate-900 dark:text-white font-medium">Painel Executivo</span>
           </nav>

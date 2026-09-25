@@ -311,29 +311,21 @@ function RelatorioContent() {
           <div className="flex items-start justify-between gap-4">
             
             {/* Logo e Identificação */}
-            <div className="flex items-center gap-3.5">
-              {/* Ícone Agrícola Vetorial embutido para nitidez garantida na impressão */}
-              <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center p-2 shrink-0">
-                <svg viewBox="0 0 64 64" className="w-full h-full">
-                  <path d="M12 50 C24 45 40 45 52 50" stroke="#ca8a04" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                  <path d="M16 56 C26 52 38 52 48 56" stroke="#92400e" strokeWidth="3" strokeLinecap="round" fill="none" />
-                  <path d="M32 48 Q32 30 32 20" stroke="#22c55e" strokeWidth="4" strokeLinecap="round" fill="none" />
-                  <path d="M32 34 C20 34 16 22 23 16 C30 16 32 26 32 34 Z" fill="#4ade80" />
-                  <path d="M32 26 C44 26 48 14 41 8 C34 8 32 18 32 26 Z" fill="#22c55e" />
-                  <circle cx="35" cy="38" r="4.5" fill="#ef4444" />
-                </svg>
-              </div>
+            <div className="flex items-center gap-4">
+              <img
+                src="/logo-terra-cafe.png"
+                alt="TerraCafé Irrigação"
+                className="h-12 w-auto object-contain shrink-0"
+              />
+              <div className="h-10 w-px bg-slate-300" />
 
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                    TerraCafé Irrigação
-                  </span>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
                     Relatório Técnico Executivo
                   </span>
                   {nomeLoja && (
-                    <span className="text-[10px] px-2 py-0.2 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
                       <Building2 className="w-3 h-3" />
                       Filial: {nomeLoja}
                     </span>

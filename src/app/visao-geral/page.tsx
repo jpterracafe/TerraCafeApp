@@ -600,19 +600,27 @@ export default function VisaoGeralDiretorPage() {
       {modoTV && (
         <header className="sticky top-0 z-50 bg-[#0d1527]/95 backdrop-blur-md border-b border-[#1e293b] px-4 md:px-6 py-3 flex items-center justify-between shadow-xl mb-4">
           <div className="flex items-center gap-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-indigo-400">
-                  PAINEL EXECUTIVO • MODO TV
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold">
-                  Ao vivo
-                </span>
+            <img
+              src="/logo-terra-cafe-white.png"
+              alt="TerraCafé Irrigação"
+              className="h-8 md:h-9 w-auto object-contain shrink-0"
+            />
+            <div className="h-6 w-px bg-slate-700/60 hidden sm:block" />
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-indigo-400">
+                    PAINEL EXECUTIVO • MODO TV
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 font-semibold">
+                    Ao vivo
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 hidden sm:block">
+                  Transmissão em tempo real das obras
+                </p>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Transmissão em tempo real das obras
-              </p>
             </div>
           </div>
 

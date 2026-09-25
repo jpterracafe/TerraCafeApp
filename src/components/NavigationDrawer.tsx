@@ -64,10 +64,18 @@ export default function NavigationDrawer() {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <span className="ml-2 sm:ml-3 font-bold text-sm sm:text-base md:text-lg text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2 truncate">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-            <span className="truncate">TerraCafé</span> <span className="text-xs font-normal text-slate-400 hidden sm:inline">Irrigação</span>
-          </span>
+          <div className="ml-2 sm:ml-3 flex items-center min-w-0">
+            <img
+              src="/logo-terra-cafe.png"
+              alt="TerraCafé Irrigação"
+              className="h-6 sm:h-7 md:h-8 w-auto max-w-[140px] sm:max-w-[180px] object-contain dark:hidden shrink-0"
+            />
+            <img
+              src="/logo-terra-cafe-white.png"
+              alt="TerraCafé Irrigação"
+              className="h-6 sm:h-7 md:h-8 w-auto max-w-[140px] sm:max-w-[180px] object-contain hidden dark:block shrink-0"
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
@@ -93,8 +101,17 @@ export default function NavigationDrawer() {
       >
         <div className="p-4 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">TerraCafé</h2>
-            <p className="text-xs text-slate-400">Sistema Integrado de Irrigação</p>
+            <img
+              src="/logo-terra-cafe.png"
+              alt="TerraCafé Irrigação"
+              className="h-7 w-auto object-contain dark:hidden"
+            />
+            <img
+              src="/logo-terra-cafe-white.png"
+              alt="TerraCafé Irrigação"
+              className="h-7 w-auto object-contain hidden dark:block"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">Sistema Integrado de Irrigação</p>
           </div>
           <button 
             onClick={toggleDrawer}

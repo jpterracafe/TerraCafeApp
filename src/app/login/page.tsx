@@ -116,32 +116,23 @@ export default function LoginPage() {
         {/* Cabeçalho da Marca TerraCafé */}
         <div className="flex flex-col items-center mb-8 text-center">
           
+          {/* Logo Oficial TerraCafé Irrigação */}
+          <div className="relative mb-5 flex items-center justify-center">
+            <img
+              src="/logo-terra-cafe-white.png"
+              alt="TerraCafé Irrigação"
+              className="h-12 sm:h-14 w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]"
+            />
+          </div>
+
           {/* Badge de Tecnologia Agrícola */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] font-bold uppercase tracking-wider mb-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] font-bold uppercase tracking-wider mb-2">
             <Sprout className="w-3.5 h-3.5" />
-            <span>Gestão Agrícola & Irrigação</span>
+            <span>Sistema Integrado de Obras & Irrigação</span>
           </div>
-
-          {/* Ícone com Identidade Terra + Café + Água */}
-          <div className="relative mb-3.5 group">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-900/40 via-[#18261e] to-amber-950/40 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-950/50 relative">
-              <Leaf className="w-7 h-7 text-emerald-400 -rotate-12 transition-transform group-hover:scale-110" />
-              <Droplets className="w-3.5 h-3.5 text-cyan-400 absolute bottom-2 right-2 drop-shadow" />
-            </div>
-            {/* Ponto de semente âmbar */}
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-amber-300 absolute -top-1 -right-1 shadow-sm" />
-          </div>
-
-          {/* Nome da Marca com Estilo de Café & Lavoura */}
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-1.5 justify-center">
-            <span>Terra</span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-300 to-emerald-400">
-              Café
-            </span>
-          </h1>
 
           <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5 justify-center">
-            <span>Tecnologia & Precisão no Cultivo</span>
+            <span>Tecnologia & Gestão Operacional</span>
             <span className="text-emerald-500">•</span>
             <span>Acesso Restrito</span>
           </p>

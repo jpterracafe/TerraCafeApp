@@ -3514,27 +3514,28 @@ export default function DiarioCampoTimelinePage() {
                 {/* Cabeçalho do Relatório */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-[#1e293b] pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl bg-slate-900 flex items-center justify-center p-2 shrink-0 border border-slate-800">
-                      <svg viewBox="0 0 64 64" className="w-full h-full">
-                        <path d="M12 50 C24 45 40 45 52 50" stroke="#ca8a04" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                        <path d="M16 56 C26 52 38 52 48 56" stroke="#92400e" strokeWidth="3" strokeLinecap="round" fill="none" />
-                        <path d="M32 48 Q32 30 32 20" stroke="#22c55e" strokeWidth="4" strokeLinecap="round" fill="none" />
-                        <path d="M32 34 C20 34 16 22 23 16 C30 16 32 26 32 34 Z" fill="#4ade80" />
-                        <path d="M32 26 C44 26 48 14 41 8 C34 8 32 18 32 26 Z" fill="#22c55e" />
-                        <circle cx="35" cy="38" r="4.5" fill="#ef4444" />
-                      </svg>
-                    </div>
+                    <img
+                      src="/logo-terra-cafe.png"
+                      alt="TerraCafé Irrigação"
+                      className="h-9 sm:h-10 w-auto object-contain dark:hidden shrink-0"
+                    />
+                    <img
+                      src="/logo-terra-cafe-white.png"
+                      alt="TerraCafé Irrigação"
+                      className="h-9 sm:h-10 w-auto object-contain hidden dark:block shrink-0"
+                    />
+                    <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block" />
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                          TerraCafé Irrigação • Relatório de Campo
+                          Relatório de Campo
                         </span>
                         <span className="text-xs text-slate-400">
                           Emitido em {new Date().toLocaleDateString('pt-BR')}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <h4 className="text-xl font-extrabold text-slate-900 dark:text-white">
+                        <h4 className="text-lg sm:text-xl font-extrabold text-slate-900 dark:text-white">
                           {extractProjectBaseName(selectedProjeto)}
                         </h4>
                         <span className="px-2 py-0.5 rounded text-xs font-extrabold border bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30">
