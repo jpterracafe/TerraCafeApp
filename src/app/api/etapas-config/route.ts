@@ -50,6 +50,18 @@ function sanitizeConfigEtapasServer(
 }
 
 function getLocalConfig(): SystemConfig {
+  // Em ambientes serverless (Vercel, AWS Lambda), o sistema de arquivos local é read-only
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return {
+      configEtapas: {},
+      projetoStartDates: {},
+      responsaveisPorEtapa: {},
+      projetosPrazoFinal: {},
+      projetoJustificativas: {},
+      etapasProgresso: {},
+      etapasStatus: {},
+    };
+  }
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
@@ -64,8 +76,8 @@ function getLocalConfig(): SystemConfig {
         etapasStatus: parsed.etapasStatus || {},
       };
     }
-  } catch (e) {
-    console.error("[etapas-config] Erro ao ler arquivo local:", e);
+  } catch {
+    // Ignora em caso de indisponibilidade de arquivo local
   }
   return {
     configEtapas: {},
@@ -79,10 +91,15 @@ function getLocalConfig(): SystemConfig {
 }
 
 function saveLocalConfig(cfg: SystemConfig) {
+  // Em ambientes serverless (Vercel, AWS Lambda), o sistema de arquivos é read-only (/var/task)
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) return;
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), "utf-8");
-  } catch (e) {
-    console.error("[etapas-config] Erro ao salvar arquivo local:", e);
+  } catch (e: any) {
+    // Silencia EROFS se ocorrer em algum outro container restrito
+    if (e?.code !== "EROFS") {
+      console.warn("[etapas-config] Aviso arquivo local:", e?.message || e);
+    }
   }
 }
 
@@ -188,7 +205,53 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Corpo da requisição inválido." }, { status: 400 });
     }
 
+    const db = getSupabase();
     const currentConfig = getLocalConfig();
+
+    // 🔒 Carrega o estado atual existente no Supabase para garantir merge consistente
+    try {
+      const { data: dbRows } = await db
+        .from("configuracoes_sistema")
+        .select("chave, valor")
+        .in("chave", [
+          "diario_etapas_config_v1",
+          "diario_projeto_starts_v1",
+          "diario_responsaveis_por_etapa_v1",
+          "diario_projetos_prazo_final_v1",
+          "diario_projeto_justificativas_v1",
+          "diario_etapas_progresso_v1",
+          "diario_etapas_status_v1",
+        ]);
+
+      if (dbRows && Array.isArray(dbRows)) {
+        dbRows.forEach((row: { chave: string; valor: any }) => {
+          if (row.chave === "diario_etapas_config_v1" && row.valor) {
+            currentConfig.configEtapas = { ...currentConfig.configEtapas, ...row.valor };
+          }
+          if (row.chave === "diario_projeto_starts_v1" && row.valor) {
+            currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...row.valor };
+          }
+          if (row.chave === "diario_responsaveis_por_etapa_v1" && row.valor) {
+            currentConfig.responsaveisPorEtapa = { ...currentConfig.responsaveisPorEtapa, ...row.valor };
+          }
+          if (row.chave === "diario_projetos_prazo_final_v1" && row.valor) {
+            currentConfig.projetosPrazoFinal = { ...currentConfig.projetosPrazoFinal, ...row.valor };
+          }
+          if (row.chave === "diario_projeto_justificativas_v1" && row.valor) {
+            currentConfig.projetoJustificativas = { ...currentConfig.projetoJustificativas, ...row.valor };
+          }
+          if (row.chave === "diario_etapas_progresso_v1" && row.valor) {
+            currentConfig.etapasProgresso = { ...currentConfig.etapasProgresso, ...row.valor };
+          }
+          if (row.chave === "diario_etapas_status_v1" && row.valor) {
+            currentConfig.etapasStatus = { ...currentConfig.etapasStatus, ...row.valor };
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("[POST /api/etapas-config] Aviso ao carregar estado do Supabase:", e);
+    }
+
     const dbUpdates: Array<{ chave: string; valor: any }> = [];
 
     // Formato 1: { tipo, dados }
@@ -279,7 +342,6 @@ export async function POST(req: Request) {
     // Salva no Supabase se houver tabela configuracoes_sistema
     if (dbUpdates.length > 0) {
       try {
-        const db = getSupabase();
         for (const item of dbUpdates) {
           await db.from("configuracoes_sistema").upsert({
             chave: item.chave,
