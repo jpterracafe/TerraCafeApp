@@ -31,9 +31,8 @@ export default function NavigationDrawer() {
   const userRole = (session?.user as { role?: string } | undefined)?.role;
   const canSeeDiretor = isMasterDev || userRole === 'Admin' || userRole === 'Diretor';
 
-  // Página /irrigacao/execucao OCULTA por decisão de produto (arquivo mantido
-  // em src/app/irrigacao/execucao/page.tsx — para reexibir, descomente abaixo).
-  const SHOW_EXECUCAO = false;
+  // Página /irrigacao/execucao habilitada para gestores (Diretor, Admin e Desenvolvedor)
+  const SHOW_EXECUCAO = canSeeDiretor;
 
   const navLinks = [
     { href: '/visao-geral', label: 'Resumo Geral Executivo (Diretor)', icon: LayoutDashboard, color: 'text-blue-500' },

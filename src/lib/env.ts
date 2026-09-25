@@ -30,6 +30,7 @@ const NEXTAUTH_SECRET_DEFAULT = "terracafe_dev_secret_key_987654321_fixed";
 if (
   typeof window === "undefined" &&
   raw.NODE_ENV === "production" &&
+  process.env.NEXT_PHASE !== "phase-production-build" &&
   (!raw.NEXTAUTH_SECRET || !raw.NEXTAUTH_SECRET.trim())
 ) {
   console.warn(

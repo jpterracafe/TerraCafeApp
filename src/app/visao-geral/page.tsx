@@ -255,6 +255,31 @@ export default function VisaoGeralDiretorPage() {
     };
   }, [modoTV]);
 
+  // Screen Wake Lock API: impede que a TV ou monitor durma/apague durante o Modo TV
+  useEffect(() => {
+    let wakeLock: any = null;
+    const requestWakeLock = async () => {
+      try {
+        if ('wakeLock' in navigator && (navigator as any).wakeLock) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.debug('[Modo TV] WakeLock não suportado ou bloqueado pelo dispositivo:', err);
+      }
+    };
+
+    if (modoTV) {
+      requestWakeLock();
+    }
+
+    return () => {
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    };
+  }, [modoTV]);
+
   const { selectedLoja, isProjectInSelectedLoja } = useLoja();
 
   const projetosListFiltrados = useMemo(() => {
