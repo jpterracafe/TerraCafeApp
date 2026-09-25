@@ -1131,11 +1131,10 @@ export default function DiarioCampoTimelinePage() {
       const novoStartObj = { ...projetoStartDates, [nomeLimpo]: hoje };
       saveProjectStartsToStorage(novoStartObj);
 
-      // Atribui loja ao novo projeto se houver loja selecionada ou atribuída ao usuário
-      if (selectedLoja && selectedLoja !== 'TODAS') {
-        atribuirProjetoLoja(nomeLimpo, selectedLoja);
-      } else if (userAssignedLoja) {
-        atribuirProjetoLoja(nomeLimpo, userAssignedLoja);
+      // Atribui obrigatoriamente a loja do usuário ao novo projeto
+      const lojaParaAtribuir = userAssignedLoja || (selectedLoja && selectedLoja !== 'TODAS' ? selectedLoja : '');
+      if (lojaParaAtribuir) {
+        atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
       }
 
       await loadProjetos();
@@ -1867,39 +1866,6 @@ export default function DiarioCampoTimelinePage() {
                       }`}>
                         {getProjectVersion(selectedProjeto)}
                       </span>
-                    </div>
-
-                    {/* Seletor / Indicador de Loja do Projeto */}
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-                        <Building2 className="w-3.5 h-3.5 text-blue-500" />
-                        <span>Loja/Filial:</span>
-                      </div>
-                      {canSwitchLoja ? (
-                        <select
-                          value={projetosLojas[selectedProjeto] || ''}
-                          onChange={async (e) => {
-                            const novaLoja = e.target.value;
-                            const ok = await atribuirProjetoLoja(selectedProjeto, novaLoja);
-                            if (ok) {
-                              success(novaLoja ? `Projeto vinculado à "${novaLoja}"!` : 'Projeto desvinculado da loja.');
-                            } else {
-                              toastError('Erro ao salvar loja do projeto.');
-                            }
-                          }}
-                          className="text-xs font-semibold bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#192440] border border-slate-300 dark:border-[#1e293b] rounded-lg px-2.5 py-1 text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer transition-colors"
-                          title="Clique para atribuir este projeto a uma filial específica"
-                        >
-                          <option value="">(Sem loja atribuída / Geral)</option>
-                          {lojas.filter(l => l.ativo !== false).map(l => (
-                            <option key={l.id} value={l.nome}>{l.nome}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                          {projetosLojas[selectedProjeto] || 'Sem loja atribuída'}
-                        </span>
-                      )}
                     </div>
                   </div>
 
