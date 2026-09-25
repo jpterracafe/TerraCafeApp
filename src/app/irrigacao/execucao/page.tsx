@@ -3,8 +3,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { 
@@ -458,9 +456,6 @@ export default function PainelOperacionalObrasPage() {
               <Activity className="w-3.5 h-3.5" />
               <span>Aba Diretor</span>
             </Link>
-
-            <ThemeToggle />
-            <LogoutButton />
           </div>
         </div>
 

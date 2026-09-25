@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useSession } from 'next-auth/react';
 import { 
@@ -260,7 +258,6 @@ export default function ResponsaveisPage() {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <ThemeToggle /><LogoutButton />
           <button onClick={loadResponsaveis} className="flex items-center justify-center gap-2 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-blue-500 text-slate-900 dark:text-white px-4 py-2 rounded-lg font-medium transition-all" title="Recarregar do banco">
             <RefreshCw className="w-4 h-4" />Sincronizar Banco
           </button>

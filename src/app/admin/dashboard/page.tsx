@@ -8,8 +8,6 @@ import Link from 'next/link';
 import { extractUsernameFromEmail } from '@/lib/auth-utils';
 import { isMasterDevSession } from '@/lib/client-roles';
 import Image from 'next/image';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip,
@@ -984,9 +982,6 @@ export default function DashboardPage() {
 
         {/* Barra de Ações Rápidas */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <ThemeToggle />
-          <LogoutButton />
-
           <button
             onClick={() => void loadData()}
             title="Atualizar dados do servidor"

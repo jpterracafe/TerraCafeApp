@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { ChevronRight, RefreshCcw, Trash2, Archive, Briefcase, ChevronDown, ChevronUp, CalendarCheck } from 'lucide-react';
@@ -217,7 +215,6 @@ export default function ProjetosConcluidosPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <LojaSelector />
-          <ThemeToggle /><LogoutButton />
         </div>
       </div>
 

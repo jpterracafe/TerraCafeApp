@@ -4,8 +4,6 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { 
@@ -1672,10 +1670,6 @@ export default function DiarioCampoTimelinePage() {
               <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o start da obra, etapas operacionais e atribua responsáveis por atividade</p>
             </div>
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <LogoutButton />
         </div>
       </div>
 

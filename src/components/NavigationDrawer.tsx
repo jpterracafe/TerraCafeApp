@@ -18,6 +18,9 @@ export default function NavigationDrawer() {
   const router = useRouter();
   const { data: session } = useSession();
 
+  const isAuthRoute = ['/login', '/esqueci-minha-senha', '/redefinir-senha', '/convite'].includes(pathname || '');
+  if (isAuthRoute) return null;
+
   const toggleDrawer = () => setIsOpen(!isOpen);
 
   // Mesma regra da página /admin/usuarios: só Desenvolvedor/master vê o link

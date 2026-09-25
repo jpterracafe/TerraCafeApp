@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { useSession } from 'next-auth/react';
 import { 
@@ -202,9 +200,6 @@ export default function AdminImportarCSVPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <ThemeToggle />
-          <LogoutButton />
-          
           <Link 
             href="/irrigacao/diario-campo"
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20 text-sm"

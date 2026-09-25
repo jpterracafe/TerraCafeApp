@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import ThemeToggle from '@/components/ThemeToggle';
-import LogoutButton from '@/components/LogoutButton';
 import BackButton from '@/components/BackButton';
 import { 
   ChevronRight, 
@@ -506,9 +504,6 @@ export default function AdminUsuariosPage() {
         </div>
         
         <div className="flex flex-wrap items-center gap-3">
-          <ThemeToggle />
-          <LogoutButton />
-          
           <Link 
             href="/admin/importar"
             className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-emerald-900/20"
