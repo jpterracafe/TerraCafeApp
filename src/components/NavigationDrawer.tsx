@@ -55,22 +55,22 @@ export default function NavigationDrawer() {
   return (
     <>
       {/* Top Bar Unificada */}
-      <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors [.modo-tv-ativo_&]:hidden">
-        <div className="flex items-center">
+      <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-3 sm:px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors [.modo-tv-ativo_&]:hidden">
+        <div className="flex items-center min-w-0">
           <button 
             onClick={toggleDrawer}
-            className="p-2 -ml-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="p-2 -ml-1 sm:-ml-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
             aria-label="Abrir menu lateral"
           >
             <Menu className="w-6 h-6" />
           </button>
-          <span className="ml-3 font-bold text-base md:text-lg text-slate-900 dark:text-white flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-            TerraCafé <span className="text-xs font-normal text-slate-400">Irrigação</span>
+          <span className="ml-2 sm:ml-3 font-bold text-sm sm:text-base md:text-lg text-slate-900 dark:text-white flex items-center gap-1.5 sm:gap-2 truncate">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+            <span className="truncate">TerraCafé</span> <span className="text-xs font-normal text-slate-400 hidden sm:inline">Irrigação</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
           <LojaSelector />
           <ThemeToggle />
           <LogoutButton />

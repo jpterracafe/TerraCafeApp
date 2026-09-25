@@ -48,16 +48,16 @@ export default function LojaSelector() {
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-all shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 transition-all shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
         title="Filtrar dados por Loja/Filial"
       >
         {selectedLoja === "TODAS" ? (
-          <Globe className="w-3.5 h-3.5 text-blue-500" />
+          <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
         ) : (
-          <Building2 className="w-3.5 h-3.5 text-blue-500" />
+          <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
         )}
-        <span className="truncate max-w-[110px] md:max-w-[170px]">{labelAtual}</span>
-        <ChevronDown className={`w-3.5 h-3.5 text-blue-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        <span className="truncate max-w-[80px] sm:max-w-[120px] md:max-w-[170px]">{labelAtual}</span>
+        <ChevronDown className={`w-3.5 h-3.5 text-blue-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (

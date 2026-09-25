@@ -157,6 +157,7 @@ export default function DiarioCampoTimelinePage() {
   // Seleções do usuário
   const [selectedProjeto, setSelectedProjeto] = useState<string>('');
   const [selectedEtapa, setSelectedEtapa] = useState<EtapaCampo>('Valetas');
+  const [isMobileProjectSelectorOpen, setIsMobileProjectSelectorOpen] = useState(false);
 
   // Responsáveis mapeados por Etapa: { [projeto::etapa]: string[] }
   const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
@@ -1684,41 +1685,172 @@ export default function DiarioCampoTimelinePage() {
   }, [filteredProjetosList, selectedProjeto]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-3 sm:p-5 md:p-6 lg:p-8 font-sans flex flex-col pb-20">
       
       {/* ── HEADER SUPERIOR ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <div>
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400 mb-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3 pb-2 border-b border-slate-200/80 dark:border-[#1e293b]">
+        <div className="min-w-0">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1.5">
             <BackButton />
             <span>Portal</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
             <span>Irrigação</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-blue-600 dark:text-blue-400 font-medium">Diário de Campo</span>
           </nav>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
               <Droplets className="w-5 h-5" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Diário de Campo & Acompanhamento de Etapas</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o start da obra, etapas operacionais e atribua responsáveis por atividade</p>
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 dark:text-white truncate">Diário de Campo & Etapas</h1>
+              <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">Acompanhe o start da obra, etapas operacionais e responsáveis</p>
             </div>
           </div>
         </div>
 
         {/* Botão Instalar App Estratégico no topo do Diário */}
-        <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           <InstallAppButton />
         </div>
       </div>
 
-      {/* ── CORPO PRINCIPAL: SIDEBAR DE PROJETOS + PAINEL DO PROJETO ── */}
+      {/* ── SELETOR COMPACTO DE PROJETO NO CELULAR (lg:hidden) ── */}
+      <div className="lg:hidden bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-3.5 shadow-md mb-4">
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setIsMobileProjectSelectorOpen(prev => !prev)}
+            className="flex items-center gap-2.5 min-w-0 flex-1 text-left active:opacity-75 transition-opacity"
+          >
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
+              <Briefcase className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Obra Atual</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-blue-500 transition-transform duration-200 ${isMobileProjectSelectorOpen ? 'rotate-180' : ''}`} />
+              </div>
+              <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                {selectedProjeto ? extractProjectBaseName(selectedProjeto) : 'Selecione uma obra'}
+              </p>
+            </div>
+          </button>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {selectedProjeto && (
+              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                getProjectVersion(selectedProjeto) === 'V0'
+                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30'
+              }`}>
+                {getProjectVersion(selectedProjeto)}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setNewProjectName('');
+                setNewProjectDeadline('');
+                setIsNewProjectModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-1 shadow-sm active:scale-95"
+              title="Criar nova obra"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Novo</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Alerta Preventivo de Prazo no Card Mobile se houver */}
+        {selectedProjeto && (() => {
+          const prazoStr = projetosPrazoFinal[selectedProjeto];
+          if (!prazoStr) return null;
+          const hoje = new Date();
+          hoje.setHours(0, 0, 0, 0);
+          const prazo = new Date(`${prazoStr.slice(0, 10)}T00:00:00`);
+          if (isNaN(prazo.getTime())) return null;
+          const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDias < 0) {
+            return (
+              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-[#1e293b] flex items-center justify-between text-[11px]">
+                <span className="text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Prazo final estourado ({Math.abs(diffDias)}d)
+                </span>
+                <span className="text-slate-400">{prazo.toLocaleDateString('pt-BR')}</span>
+              </div>
+            );
+          }
+          if (diffDias <= 7) {
+            return (
+              <div className="mt-2 pt-2 border-t border-slate-100 dark:border-[#1e293b] flex items-center justify-between text-[11px]">
+                <span className="text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1 animate-pulse">
+                  <Clock className="w-3 h-3" /> {diffDias === 0 ? 'Prazo vence hoje!' : `Faltam ${diffDias} dias para o prazo`}
+                </span>
+                <span className="text-slate-400">{prazo.toLocaleDateString('pt-BR')}</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
+        {/* Dropdown com a lista quando aberto no celular */}
+        {isMobileProjectSelectorOpen && (
+          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-[#1e293b] space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input 
+                type="text" 
+                placeholder="Buscar obra..." 
+                value={searchProjeto} 
+                onChange={(e) => setSearchProjeto(e.target.value)} 
+                className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500" 
+              />
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+              {filteredProjetosList.map(proj => {
+                const isSelected = selectedProjeto === proj;
+                const totalLogs = logsCountByProjeto[proj] || 0;
+                return (
+                  <button
+                    key={proj}
+                    type="button"
+                    onClick={() => {
+                      setSelectedProjeto(proj);
+                      setIsMobileProjectSelectorOpen(false);
+                    }}
+                    className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 border text-xs ${
+                      isSelected
+                        ? 'bg-blue-600 border-blue-500 text-white font-bold shadow-md'
+                        : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 active:bg-slate-100 dark:active:bg-[#111a30]'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
+                        <span className="truncate font-semibold">{extractProjectBaseName(proj)}</span>
+                        <span className="text-[10px] opacity-75">[{getProjectVersion(proj)}]</span>
+                      </div>
+                      <span className={`text-[10px] block mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                        {totalLogs} registro{totalLogs !== 1 ? 's' : ''} no diário
+                      </span>
+                    </div>
+                    {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── CORPO PRINCIPAL: SIDEBAR DE PROJETOS (DESKTOP) + PAINEL DO PROJETO ── */}
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
 
-        {/* ── COLUNA ESQUERDA: LISTA DE PROJETOS ── */}
-        <div className="w-full lg:w-80 flex flex-col gap-4 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-xl shrink-0">
+        {/* ── COLUNA ESQUERDA: LISTA DE PROJETOS (DESKTOP) ── */}
+        <div className="hidden lg:flex lg:w-80 flex-col gap-4 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-xl shrink-0">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-slate-900 dark:text-white flex items-center gap-2">
               <Briefcase className="w-4 h-4 text-blue-500" />
@@ -1936,7 +2068,7 @@ export default function DiarioCampoTimelinePage() {
                       })()}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">
+                      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate">
                         {extractProjectBaseName(selectedProjeto)}
                       </h2>
                       <span className={`px-2 py-0.5 rounded text-xs font-extrabold border shrink-0 ${
@@ -1949,8 +2081,8 @@ export default function DiarioCampoTimelinePage() {
                     </div>
                   </div>
 
-                  {/* Barra Unificada de Ações (Todos rigorosamente na mesma linha com design premium) */}
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto no-scrollbar shrink-0">
+                  {/* Barra Unificada de Ações (Sempre em linha única com scroll suave por toque) */}
+                  <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-1 px-1 touch-pan-x shrink-0">
                     {/* Badge destacado: Dia X do Projeto */}
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-600 dark:text-blue-400 font-bold text-xs whitespace-nowrap shadow-xs shrink-0">
                       <Flag className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -2072,8 +2204,8 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── NAVEGAÇÃO DAS 6 ETAPAS DO DIÁRIO DE CAMPO (ORDEM FIXA) ── */}
-              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-2 shadow-xl overflow-x-auto">
-                <div className="flex items-center gap-2 min-w-max p-1">
+              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-1.5 sm:p-2 shadow-xl overflow-x-auto no-scrollbar touch-pan-x">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-max p-0.5">
                   {ETAPAS_CAMPO.map((etapa, idx) => {
                     const isActive = selectedEtapa === etapa.key;
                     const count = logsCountByEtapa[etapa.key] || 0;
@@ -2097,7 +2229,7 @@ export default function DiarioCampoTimelinePage() {
                         key={etapa.key}
                         type="button"
                         onClick={() => setSelectedEtapa(etapa.key)}
-                        className={`flex items-center gap-2.5 px-4 py-3 rounded-xl font-medium text-sm transition-all border relative ${
+                        className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium text-xs sm:text-sm transition-all border relative ${
                           isActive
                             ? etapaFaseConcluida
                               ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/30'
@@ -2154,7 +2286,7 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── CARD DE CONTADOR INDEPENDENTE DA ETAPA ATIVA ── */}
-              <div className={`bg-gradient-to-br p-5 md:p-6 rounded-2xl border shadow-xl relative overflow-hidden transition-all duration-300 ${
+              <div className={`bg-gradient-to-br p-4 sm:p-5 md:p-6 rounded-2xl border shadow-xl relative overflow-hidden transition-all duration-300 ${
                 isFaseConcluida
                   ? 'from-emerald-50 via-emerald-100/50 to-emerald-50 dark:from-emerald-950/30 dark:via-emerald-900/20 dark:to-emerald-950/20 border-emerald-500/50 dark:border-emerald-500/30'
                   : 'from-white via-slate-50 to-blue-50/40 dark:from-[#0d1527] dark:via-[#0c1426] dark:to-[#111c36] border-slate-200 dark:border-[#1e293b]'
@@ -2178,7 +2310,7 @@ export default function DiarioCampoTimelinePage() {
                       </span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
-                      <span className={`text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight leading-tight ${
+                      <span className={`text-xl sm:text-2xl md:text-4xl font-extrabold tracking-tight leading-tight ${
                         isFaseConcluida 
                           ? 'text-emerald-600 dark:text-emerald-400' 
                           : statsContador.hasStarted
@@ -2231,12 +2363,12 @@ export default function DiarioCampoTimelinePage() {
                   </div>
 
                 {/* ── Barra de Ações da Etapa (Definir Início · Justificativa · Concluir) ── */}
-                <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10 flex flex-col sm:flex-row flex-wrap gap-2.5">
+                <div className="mt-4 pt-3 border-t border-slate-200/60 dark:border-[#1e293b]/60 relative z-10 flex flex-col sm:flex-row gap-2 sm:gap-2.5">
                   <button
                     type="button"
                     onClick={handleOpenIniciarEtapaModal}
                     disabled={isFaseConcluida}
-                    className={`flex-1 min-w-[180px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all ${
+                    className={`w-full sm:flex-1 min-h-[42px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] ${
                       isFaseConcluida
                         ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
                         : statsContador.hasStarted
@@ -2271,7 +2403,7 @@ export default function DiarioCampoTimelinePage() {
                       }
                     }}
                     disabled={isFaseConcluida}
-                    className={`flex-1 min-w-[180px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all ${
+                    className={`w-full sm:flex-1 min-h-[42px] px-3.5 py-2.5 rounded-xl text-xs font-bold border flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-[0.98] ${
                       isFaseConcluida
                         ? 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-400 cursor-not-allowed'
                         : 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
@@ -2294,7 +2426,7 @@ export default function DiarioCampoTimelinePage() {
                         setObservacaoConclusao('');
                         setIsConcluirFaseModalOpen(true);
                       }}
-                      className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all hover:scale-105 active:scale-95 border-2 border-emerald-400/50"
+                      className="w-full sm:flex-1 min-h-[42px] px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition-all hover:scale-[1.02] active:scale-[0.98] border-2 border-emerald-400/50"
                       title="Marcar esta fase como 100% concluída"
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -2302,7 +2434,7 @@ export default function DiarioCampoTimelinePage() {
                       <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">100%</span>
                     </button>
                   ) : (
-                    <div className="flex-1 min-w-[180px] px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2">
+                    <div className="w-full sm:flex-1 min-h-[42px] px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       <span>✅ Fase Concluída</span>
                     </div>
@@ -2448,7 +2580,7 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── BOTOEIRA RÁPIDA DE STATUS CLICÁVEL & FORMULÁRIO ── */}
-              <form onSubmit={handleSalvarDiario} className={`rounded-2xl p-5 md:p-6 shadow-xl space-y-5 transition-all ${
+              <form onSubmit={handleSalvarDiario} className={`rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl space-y-4 sm:space-y-5 transition-all ${
                 isFaseConcluida
                   ? 'bg-slate-100 dark:bg-slate-900/20 border-2 border-slate-300 dark:border-slate-700 opacity-60'
                   : 'bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b]'
@@ -2473,43 +2605,46 @@ export default function DiarioCampoTimelinePage() {
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1e293b] pb-3">
                   <div className="flex items-center gap-2">
                     <Plus className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-blue-500'}`} />
-                    <h3 className={`text-base font-bold ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
-                      Registrar Andamento em <span className={`capitalize ${isFaseConcluida ? 'text-slate-500' : 'text-blue-500'}`}>{selectedEtapa}</span>
+                    <h3 className={`text-sm sm:text-base font-bold ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                      Registrar em <span className={`capitalize ${isFaseConcluida ? 'text-slate-500' : 'text-blue-500'}`}>{selectedEtapa}</span>
                       {isFaseConcluida && <span className="ml-2 text-xs font-normal">(bloqueado)</span>}
                     </h3>
                   </div>
                   <span className="text-xs text-slate-400 hidden sm:inline">
-                    {isFaseConcluida ? 'Fase concluída' : 'Não precisa digitar sempre: clique no status do dia!'}
+                    {isFaseConcluida ? 'Fase concluída' : '1 toque para registrar o status do dia'}
                   </span>
                 </div>
 
                 {/* Botoeira com 3 opções principais de 1 clique */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2.5">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2 sm:mb-2.5">
                     1. Como está o andamento desta etapa hoje?
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
                     {/* Botão: Dentro do programado */}
                     <button
                       type="button"
                       onClick={() => !isFaseConcluida && setStatusRapido('Dentro do programado')}
                       disabled={isFaseConcluida}
-                      className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
+                      className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
                           ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
                           : statusRapido === 'Dentro do programado'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 shadow-lg shadow-emerald-900/10 ring-2 ring-emerald-500/20'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-950 dark:text-emerald-100 shadow-md shadow-emerald-900/10 ring-2 ring-emerald-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-emerald-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                           Programado
                         </span>
-                        <CheckCircle2 className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Dentro do programado' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                        <CheckCircle2 className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Dentro do programado' ? 'text-emerald-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Dentro do programado</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Ritmo normal de obra e sem gargalos</p>
+                      <p className={`font-bold text-xs sm:text-base leading-tight ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                        <span className="sm:hidden">Dentro</span>
+                        <span className="hidden sm:inline">Dentro do programado</span>
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">Ritmo normal de obra e sem gargalos</p>
                     </button>
 
                     {/* Botão: Acima */}
@@ -2517,22 +2652,25 @@ export default function DiarioCampoTimelinePage() {
                       type="button"
                       onClick={() => !isFaseConcluida && setStatusRapido('Acima')}
                       disabled={isFaseConcluida}
-                      className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
+                      className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
                           ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
                           : statusRapido === 'Acima'
-                          ? 'border-blue-500 bg-blue-500/10 text-blue-950 dark:text-blue-100 shadow-lg shadow-blue-900/10 ring-2 ring-blue-500/20'
+                          ? 'border-blue-500 bg-blue-500/10 text-blue-950 dark:text-blue-100 shadow-md shadow-blue-900/10 ring-2 ring-blue-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-blue-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-blue-600 dark:text-blue-400'}`}>
                           Adiantado
                         </span>
-                        <TrendingUp className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Acima' ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <TrendingUp className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Acima' ? 'text-blue-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Acima do previsto</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Rendimento alto e avanço adiantado</p>
+                      <p className={`font-bold text-xs sm:text-base leading-tight ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                        <span className="sm:hidden">Acima</span>
+                        <span className="hidden sm:inline">Acima do previsto</span>
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">Rendimento alto e avanço adiantado</p>
                     </button>
 
                     {/* Botão: Abaixo */}
@@ -2540,29 +2678,32 @@ export default function DiarioCampoTimelinePage() {
                       type="button"
                       onClick={() => !isFaseConcluida && setStatusRapido('Abaixo')}
                       disabled={isFaseConcluida}
-                      className={`p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-2 ${
+                      className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
                           ? 'border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/20 opacity-50 cursor-not-allowed'
                           : statusRapido === 'Abaixo'
-                          ? 'border-rose-500 bg-rose-500/10 text-rose-950 dark:text-rose-100 shadow-lg shadow-rose-900/10 ring-2 ring-rose-500/20'
+                          ? 'border-rose-500 bg-rose-500/10 text-rose-950 dark:text-rose-100 shadow-md shadow-rose-900/10 ring-2 ring-rose-500/20'
                           : 'border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] hover:border-rose-500/50 text-slate-700 dark:text-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        <span className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider ${isFaseConcluida ? 'text-slate-400' : 'text-rose-600 dark:text-rose-400'}`}>
                           Atrasado
                         </span>
-                        <TrendingDown className={`w-5 h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Abaixo' ? 'text-rose-500' : 'text-slate-400'}`} />
+                        <TrendingDown className={`w-3.5 h-3.5 sm:w-5 sm:h-5 ${isFaseConcluida ? 'text-slate-400' : statusRapido === 'Abaixo' ? 'text-rose-500' : 'text-slate-400'}`} />
                       </div>
-                      <p className={`font-bold text-base ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>Abaixo do previsto</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">Ritmo lento, clima ou aguardo de insumos</p>
+                      <p className={`font-bold text-xs sm:text-base leading-tight ${isFaseConcluida ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                        <span className="sm:hidden">Abaixo</span>
+                        <span className="hidden sm:inline">Abaixo do previsto</span>
+                      </p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 hidden sm:block">Ritmo lento, clima ou aguardo de insumos</p>
                     </button>
                   </div>
                 </div>
 
                 {/* Caixa de Observação opcional */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
                     2. Observações adicionais (opcional)
                   </label>
                   <textarea
@@ -2580,12 +2721,12 @@ export default function DiarioCampoTimelinePage() {
                 </div>
 
                 {/* Anexo de Foto/Vídeo e Botão Salvar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                  <div className="flex items-center gap-3">
-                    <label className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <label className={`flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border w-full sm:w-auto min-h-[42px] ${
                       isFaseConcluida
                         ? 'bg-slate-100 dark:bg-slate-900/20 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed'
-                        : 'bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] cursor-pointer'
+                        : 'bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] cursor-pointer active:scale-95'
                     }`}>
                       <Paperclip className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-blue-500'}`} />
                       <span>{isFaseConcluida ? 'Anexo Bloqueado' : 'Anexar Foto / Vídeo'}</span>
@@ -2612,7 +2753,7 @@ export default function DiarioCampoTimelinePage() {
                   <button
                     type="submit"
                     disabled={saving || uploadingMidia || isFaseConcluida}
-                    className={`px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 ${
+                    className={`w-full sm:w-auto min-h-[44px] px-6 py-3 rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.98] ${
                       isFaseConcluida
                         ? 'bg-slate-400 dark:bg-slate-700 text-slate-200 dark:text-slate-400 cursor-not-allowed opacity-50'
                         : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-900/25 disabled:opacity-60'
@@ -2639,11 +2780,11 @@ export default function DiarioCampoTimelinePage() {
               </form>
 
               {/* ── HISTÓRICO / TIMELINE DE ATIVIDADES DESTA ETAPA ── */}
-              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-xl space-y-4">
+              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 sm:p-5 md:p-6 shadow-xl space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1e293b] pb-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-blue-500" />
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-500" />
                       Histórico Registrado
                     </h3>
                     <p className="text-xs text-slate-400">
@@ -2659,7 +2800,7 @@ export default function DiarioCampoTimelinePage() {
                       <button
                         type="button"
                         onClick={() => setFiltroModoHistorico('etapa')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all ${
                           filtroModoHistorico === 'etapa'
                             ? 'bg-blue-600 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -2670,7 +2811,7 @@ export default function DiarioCampoTimelinePage() {
                       <button
                         type="button"
                         onClick={() => setFiltroModoHistorico('todos')}
-                        className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
+                        className={`px-2.5 sm:px-3 py-1.5 rounded-lg font-medium transition-all ${
                           filtroModoHistorico === 'todos'
                             ? 'bg-blue-600 text-white shadow-sm'
                             : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -2732,7 +2873,7 @@ export default function DiarioCampoTimelinePage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="relative border-l-2 border-slate-200 dark:border-[#1e293b] ml-4 space-y-6 pt-2 pb-4">
+                  <div className="relative border-l-2 border-slate-200 dark:border-[#1e293b] ml-2.5 sm:ml-4 space-y-5 sm:space-y-6 pt-2 pb-4">
                     {filteredLogs.map((log) => {
                       const conf = getStatusConfig(log.status);
                       const Icon = conf.icon;
@@ -2746,17 +2887,17 @@ export default function DiarioCampoTimelinePage() {
                       const diaDoProjetoLabel = getDiaDoProjetoTexto(log.data);
 
                       return (
-                        <div key={log.id} className="relative pl-7 md:pl-8 group">
+                        <div key={log.id} className="relative pl-6 sm:pl-8 group">
                           {/* Marcador na linha do tempo */}
-                          <div className={`absolute -left-[17px] top-1.5 w-8 h-8 rounded-full border-4 flex items-center justify-center shadow-md ${
+                          <div className={`absolute -left-[14px] sm:-left-[17px] top-1.5 w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 sm:border-4 flex items-center justify-center shadow-md ${
                             isConfigUpdate
                               ? 'border-violet-200 dark:border-violet-900 bg-violet-100 dark:bg-violet-950'
                               : 'border-white dark:border-[#0d1527] bg-slate-100 dark:bg-[#111a30]'
                           }`}>
-                            <Icon className={`w-4 h-4 ${conf.color.split(' ')[0]}`} />
+                            <Icon className={`w-3 h-3 sm:w-4 sm:h-4 ${conf.color.split(' ')[0]}`} />
                           </div>
 
-                          <div className={`border rounded-xl p-4.5 hover:border-blue-500/40 transition-colors shadow-sm relative space-y-2.5 ${
+                          <div className={`border rounded-xl p-3.5 sm:p-4.5 hover:border-blue-500/40 transition-colors shadow-sm relative space-y-2.5 ${
                             isConfigUpdate
                               ? 'bg-violet-50 dark:bg-violet-950/20 border-violet-300 dark:border-violet-800/50'
                               : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b]'
@@ -2860,9 +3001,9 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: AJUSTAR DATA DE START DO PROJETO ── */}
       {isProjectStartModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2">
                 <Flag className="w-5 h-5 text-blue-500" />
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -2874,7 +3015,7 @@ export default function DiarioCampoTimelinePage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Essa data define o <strong>Dia 1 do Projeto</strong> para cálculo de todos os dias decorridos da obra e rótulos no histórico.
               </p>
@@ -2915,9 +3056,9 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: NOVO PROJETO (CRIADO DIRETAMENTE NO DIÁRIO DE CAMPO) ── */}
       {isNewProjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
                   <Plus className="w-4 h-4" />
@@ -2940,7 +3081,7 @@ export default function DiarioCampoTimelinePage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateNewProject} className="p-5 space-y-4">
+            <form onSubmit={handleCreateNewProject} className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   1. Nome do Projeto / Fazenda: *
@@ -3008,9 +3149,9 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: REGISTRAR JUSTIFICATIVA OFICIAL DE CAMPO (SUBSTITUI AJUSTE DE META) ── */}
       {isJustificativaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
                   <CloudRain className="w-4 h-4" />
@@ -3033,7 +3174,7 @@ export default function DiarioCampoTimelinePage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-[#111a30] border border-slate-200 dark:border-[#1e293b] flex items-center justify-between text-xs">
                 <span className="text-slate-500 dark:text-slate-400">Regra de Prazo:</span>
                 <span className="font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
@@ -3045,7 +3186,7 @@ export default function DiarioCampoTimelinePage() {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Motivo Principal da Ocorrência:
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   {[
                     { id: 'Chuva no dia', label: '🌧️ Chuva no dia' },
                     { id: 'Problema Técnico / Máquina', label: '⚠️ Problema Técnico' },
@@ -3111,9 +3252,9 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: DEFINIR INÍCIO E PRAZO DA FASE ESPECÍFICA ── */}
       {isIniciarEtapaModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
                   <Calendar className="w-4 h-4" />
@@ -3136,7 +3277,7 @@ export default function DiarioCampoTimelinePage() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 flex-1 overflow-y-auto">
               {projetosPrazoFinal[selectedProjeto] && (
                 <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-700 dark:text-purple-300 text-xs">
                   <span className="font-bold block">Prazo Final Total da Obra:</span>
@@ -3722,10 +3863,10 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: CONFIRMAR EXCLUSÃO DE PROJETO (→ LIXEIRA) ──────────── */}
       {isDeleteProjectModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-[#1e293b] bg-rose-50 dark:bg-rose-950/20">
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-rose-50 dark:bg-rose-950/20 shrink-0">
               <div className="p-2 rounded-xl bg-rose-500/15 shrink-0">
                 <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               </div>
@@ -3743,7 +3884,7 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 Tem certeza que deseja excluir o projeto{' '}
                 <strong className="text-slate-900 dark:text-white">
@@ -3765,24 +3906,24 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-between gap-3">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setIsDeleteProjectModalOpen(false);
                   window.location.href = '/irrigacao/lixeira';
                 }}
-                className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1.5 transition-colors"
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1"
               >
                 <Layers className="w-3.5 h-3.5" />
                 Ver Lixeira de Projetos
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setIsDeleteProjectModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors text-center"
                 >
                   Cancelar
                 </button>
@@ -3790,7 +3931,7 @@ export default function DiarioCampoTimelinePage() {
                   type="button"
                   onClick={handleExcluirProjeto}
                   disabled={excluindoProjeto}
-                  className="px-5 py-2.5 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center gap-2 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {excluindoProjeto ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /><span>Excluindo...</span></>
@@ -3806,10 +3947,10 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: CONFIRMAR CONCLUSÃO DE PROJETO (→ PROJETOS CONCLUÍDOS) ── */}
       {isConcluirProjetoModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center gap-3 p-5 border-b border-slate-200 dark:border-[#1e293b] bg-emerald-50 dark:bg-emerald-950/20">
+            <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-emerald-50 dark:bg-emerald-950/20 shrink-0">
               <div className="p-2 rounded-xl bg-emerald-500/15 shrink-0">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
@@ -3827,7 +3968,7 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                 Tem certeza que deseja concluir o projeto{' '}
                 <strong className="text-slate-900 dark:text-white">
@@ -3873,24 +4014,24 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-between gap-3">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setIsConcluirProjetoModalOpen(false);
                   window.location.href = '/irrigacao/concluidos';
                 }}
-                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1.5 transition-colors"
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1"
               >
                 <Layers className="w-3.5 h-3.5" />
                 Ver Projetos Concluídos
               </button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setIsConcluirProjetoModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors text-center"
                 >
                   Cancelar
                 </button>
@@ -3898,7 +4039,7 @@ export default function DiarioCampoTimelinePage() {
                   type="button"
                   onClick={handleConcluirProjeto}
                   disabled={concluindoProjeto}
-                  className="px-5 py-2.5 rounded-xl text-sm font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-sm font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {concluindoProjeto ? (
                     <><Loader2 className="w-4 h-4 animate-spin" /><span>Concluindo...</span></>
@@ -3914,10 +4055,10 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: ADICIONAR NOVO RESPONSÁVEL ─────────────────────────────── */}
       {isAddResponsavelModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-emerald-500/15">
                   <Users className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
@@ -3937,7 +4078,7 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Body */}
-            <div className="p-5 space-y-4">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
               <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3.5 text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
                 <Info className="w-4 h-4 text-blue-400 inline-block mr-1" />
                 Este cadastro ficará salvo no banco e estará disponível para todos os usuários, igual à página de Responsáveis.
@@ -3978,7 +4119,7 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-4 flex items-center justify-end gap-3">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsAddResponsavelModalOpen(false)}
@@ -4005,23 +4146,23 @@ export default function DiarioCampoTimelinePage() {
 
       {/* ── MODAL: CONCLUIR FASE ──────────────────────────────────────────── */}
       {isConcluirFaseModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
-            <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-5 text-white">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-r from-emerald-600 to-emerald-500 p-4 sm:p-5 text-white shrink-0">
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <div className="flex items-center gap-2.5 sm:gap-3">
                   <div className="p-2 rounded-xl bg-white/20">
-                    <CheckCircle2 className="w-6 h-6" />
+                    <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black">Concluir Fase</h3>
-                    <p className="text-sm text-emerald-50 opacity-90">Marcar como 100% concluída</p>
+                    <h3 className="text-lg sm:text-xl font-black">Concluir Fase</h3>
+                    <p className="text-xs sm:text-sm text-emerald-50 opacity-90">Marcar como 100% concluída</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsConcluirFaseModalOpen(false)}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                  className="p-1.5 sm:p-2 hover:bg-white/20 rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -4029,23 +4170,23 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
               {/* Informações da Fase */}
-              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4">
+              <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 sm:p-4">
                 <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-emerald-500/15">
-                    <span className="text-2xl">
+                  <div className="p-2 rounded-lg bg-emerald-500/15 shrink-0">
+                    <span className="text-xl sm:text-2xl">
                       {ETAPAS_CAMPO.find(e => e.key === selectedEtapa)?.icon || '📋'}
                     </span>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-0.5 truncate">
                       {selectedProjeto}
                     </p>
-                    <h4 className="text-base font-bold text-slate-900 dark:text-white capitalize mb-2">
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white capitalize mb-2">
                       {selectedEtapa}
                     </h4>
-                    <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-3 text-xs">
                       <div>
                         <span className="text-slate-500 dark:text-slate-400 block">Início:</span>
                         <span className="font-bold text-slate-900 dark:text-white">
@@ -4068,9 +4209,9 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* Aviso Importante */}
-              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
-                <div className="flex gap-3">
-                  <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3.5 sm:p-4">
+                <div className="flex gap-2.5 sm:gap-3">
+                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div className="text-xs text-blue-900 dark:text-blue-100 leading-relaxed space-y-1">
                     <p className="font-bold">Ao concluir esta fase:</p>
                     <ul className="list-disc list-inside space-y-0.5 text-blue-800 dark:text-blue-200">
@@ -4085,7 +4226,7 @@ export default function DiarioCampoTimelinePage() {
 
               {/* Observações Finais */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
                   Observações Finais da Conclusão (opcional):
                 </label>
                 <textarea
@@ -4093,16 +4234,16 @@ export default function DiarioCampoTimelinePage() {
                   placeholder="Ex: Fase concluída dentro do prazo. Todas as valetas niveladas e aprovadas pela equipe técnica..."
                   value={observacaoConclusao}
                   onChange={(e) => setObservacaoConclusao(e.target.value)}
-                  className="w-full bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 resize-none placeholder:text-slate-400"
+                  className="w-full bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-3 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 resize-none placeholder:text-slate-400"
                 />
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Esta mensagem ficará registrada permanentemente no histórico da fase.
                 </p>
               </div>
 
               {/* Responsáveis */}
               {currentEtapaResponsaveis.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <span className="text-xs font-semibold text-slate-500">Responsáveis:</span>
                   {currentEtapaResponsaveis.map((resp, idx) => (
                     <span
@@ -4117,11 +4258,11 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-5 flex items-center justify-end gap-3">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-5 flex items-center justify-end gap-2 sm:gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsConcluirFaseModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
+                className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors"
               >
                 Cancelar
               </button>
@@ -4129,7 +4270,7 @@ export default function DiarioCampoTimelinePage() {
                 type="button"
                 onClick={handleConcluirFase}
                 disabled={concluindoFase}
-                className="px-6 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 sm:px-6 py-2.5 rounded-xl text-xs sm:text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {concluindoFase ? (
                   <>
