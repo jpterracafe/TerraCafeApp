@@ -17,7 +17,7 @@ import {
 import {
   ChevronRight, Layers, AlertTriangle, CheckCircle2,
   Users, Activity, TrendingUp, BarChart2, RefreshCw, Briefcase,
-  FileDown, Calendar, Info, Sparkles, X, Wrench, Eye, ArrowUpRight, CloudRain
+  FileDown, Calendar, Info, Sparkles, X, Wrench, Eye, ArrowUpRight, CloudRain, Clock
 } from 'lucide-react';
 import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
 import { hojeSP } from '@/lib/validators';
@@ -124,6 +124,7 @@ interface ObraCampoResumo {
   responsaveis: string[];
   ultimoLog?: DiarioLog;
   historicoRendimento: { acima: number; dentro: number; abaixo: number; chuva: number };
+  prazoFinal?: string | null;
 }
 
 // ── Componente Principal ──────────────────────────────────────────────────────
@@ -553,9 +554,10 @@ export default function DashboardPage() {
         responsaveis: respTodos,
         ultimoLog: ultimoLogProjeto,
         historicoRendimento: rend,
+        prazoFinal: projetosPrazoFinal[nomeProjeto] || null,
       };
     });
-  }, [projetosListFiltrados, logs, fases, projetoStartDates, configEtapas, responsaveisPorEtapa]);
+  }, [projetosListFiltrados, logs, fases, projetoStartDates, configEtapas, responsaveisPorEtapa, projetosPrazoFinal]);
 
   // Obra selecionada (se houver filtro específico)
   const obraSelecionada = useMemo(() => {
@@ -1501,13 +1503,45 @@ export default function DashboardPage() {
                               <CloudRain className="w-3 h-3" /> Chuva / Parada
                             </span>
                           )}
+
+                          {/* Alerta Preventivo de Prazo Final */}
+                          {(() => {
+                            const pFinal = obra.prazoFinal;
+                            if (!pFinal) return null;
+                            const hoje = new Date();
+                            hoje.setHours(0, 0, 0, 0);
+                            const prazo = new Date(`${String(pFinal).slice(0, 10)}T00:00:00`);
+                            if (isNaN(prazo.getTime())) return null;
+                            const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                            if (diffDias < 0) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                  <Clock className="w-3 h-3 text-rose-500" /> Prazo Estourado ({Math.abs(diffDias)}d)
+                                </span>
+                              );
+                            }
+                            if (diffDias <= 7) {
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 animate-pulse">
+                                  <Clock className="w-3 h-3 text-amber-500" />
+                                  {diffDias === 0 ? 'Prazo Vence Hoje!' : diffDias === 1 ? 'Vence Amanhã!' : `Faltam ${diffDias} dias p/ prazo`}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
 
                         <h3 className="font-bold text-slate-900 dark:text-white text-base truncate" title={obra.nome}>
                           {extractProjectBaseName(obra.nome)}
                         </h3>
                         <p className="text-[11px] text-slate-400">
-                          Início da obra: {new Date(`${obra.dataStart}T00:00:00`).toLocaleDateString('pt-BR')} · <strong>Dia {obra.diaAtual}</strong>
+                          Início: {new Date(`${obra.dataStart}T00:00:00`).toLocaleDateString('pt-BR')} · <strong>Dia {obra.diaAtual}</strong>
+                          {obra.prazoFinal && (
+                            <>
+                              {' '}· Prazo Final: <strong className="text-slate-600 dark:text-slate-300">{new Date(`${obra.prazoFinal.slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR')}</strong>
+                            </>
+                          )}
                         </p>
                       </div>
 

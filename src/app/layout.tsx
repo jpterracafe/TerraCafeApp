@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavigationDrawer from "@/components/NavigationDrawer";
 import Providers from "@/components/Providers";
+import InstallPWA from "@/components/InstallPWA";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Terra Café",
   description: "Sistema de Gestão e Irrigação - Terra Café",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TerraCafé",
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
@@ -40,6 +47,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <meta name="theme-color" content="#0b1329" />
+        <meta name="mobile-web-app-capable" content="yes" />
         {/*
           Script inline bloqueante — executa ANTES do primeiro paint.
           Aplica a classe "dark" no <html> imediatamente, sem esperar o JS
@@ -57,6 +66,7 @@ export default function RootLayout({
           <main className="flex-1 w-full relative">
             {children}
           </main>
+          <InstallPWA />
         </Providers>
       </body>
     </html>

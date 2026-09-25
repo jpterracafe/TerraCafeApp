@@ -1830,6 +1830,40 @@ export default function DiarioCampoTimelinePage() {
                         </span>
                       )}
                     </div>
+
+                    {/* Alerta Preventivo de Prazo Final no Sidebar */}
+                    {(() => {
+                      const prazoStr = projetosPrazoFinal[proj];
+                      if (!prazoStr) return null;
+                      const hoje = new Date();
+                      hoje.setHours(0, 0, 0, 0);
+                      const prazo = new Date(`${prazoStr.slice(0, 10)}T00:00:00`);
+                      if (isNaN(prazo.getTime())) return null;
+                      const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                      if (diffDias < 0) {
+                        return (
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                              isSelected ? 'bg-rose-500 text-white border-rose-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                            }`}>
+                              <Clock className="w-2.5 h-2.5" /> Prazo estourado ({Math.abs(diffDias)}d)
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (diffDias <= 7) {
+                        return (
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                              isSelected ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 animate-pulse'
+                            }`}>
+                              <Clock className="w-2.5 h-2.5" /> {diffDias === 0 ? 'Vence hoje!' : diffDias === 1 ? 'Vence amanhã!' : `Faltam ${diffDias} dias p/ prazo`}
+                            </span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'rotate-90 text-white' : 'text-slate-400'}`} />
                 </button>
@@ -1846,7 +1880,7 @@ export default function DiarioCampoTimelinePage() {
               <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-xl space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1e293b] pb-4">
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                         Projeto em Execução
                       </span>
@@ -1854,6 +1888,46 @@ export default function DiarioCampoTimelinePage() {
                       <span className="text-xs text-slate-500 dark:text-slate-400">
                         Início: {new Date(`${dataStartProjeto}T00:00:00`).toLocaleDateString('pt-BR')}
                       </span>
+
+                      {/* Alerta Preventivo de Prazo no Cabeçalho */}
+                      {(() => {
+                        const prazoStr = projetosPrazoFinal[selectedProjeto];
+                        if (!prazoStr) return null;
+                        const hoje = new Date();
+                        hoje.setHours(0, 0, 0, 0);
+                        const prazo = new Date(`${prazoStr.slice(0, 10)}T00:00:00`);
+                        if (isNaN(prazo.getTime())) return null;
+                        const diffDias = Math.ceil((prazo.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+                        if (diffDias < 0) {
+                          return (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-700">•</span>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                <Clock className="w-3 h-3 text-rose-500" /> Prazo Estourado ({Math.abs(diffDias)}d)
+                              </span>
+                            </>
+                          );
+                        }
+                        if (diffDias <= 7) {
+                          return (
+                            <>
+                              <span className="text-slate-300 dark:text-slate-700">•</span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-500/30 animate-pulse">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                {diffDias === 0 ? 'Atenção: Prazo Vence Hoje!' : diffDias === 1 ? 'Atenção: Prazo Vence Amanhã!' : `Atenção: Faltam ${diffDias} dias para o Prazo Final`}
+                              </span>
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            <span className="text-slate-300 dark:text-slate-700">•</span>
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              Prazo Final: <strong className="text-slate-700 dark:text-slate-300">{prazo.toLocaleDateString('pt-BR')}</strong> ({diffDias}d rest.)
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">
