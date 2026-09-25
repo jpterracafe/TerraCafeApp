@@ -177,42 +177,41 @@ export default function VisaoGeralDiretorPage() {
     }
   }, [toastError]);
 
+  const loadingRef = useRef(loading);
+  const refreshingRef = useRef(refreshing);
   useEffect(() => {
-    carregarDados();
+    loadingRef.current = loading;
+    refreshingRef.current = refreshing;
+  }, [loading, refreshing]);
+
+  const initialLoadDone = useRef(false);
+  useEffect(() => {
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true;
+      carregarDados();
+    }
   }, [carregarDados]);
 
   // Auto-refresh: 20s no Modo TV / 30s no modo normal
   useEffect(() => {
-    let timerId: ReturnType<typeof setInterval> | null = null;
     const REFRESH_MS = modoTV ? 20 * 1000 : 30 * 1000;
 
-    const startPolling = () => {
-      if (timerId) return;
-      timerId = setInterval(() => {
-        if (!loading && !refreshing) carregarDados();
-      }, REFRESH_MS);
-    };
-
-    const stopPolling = () => {
-      if (timerId) { clearInterval(timerId); timerId = null; }
-    };
+    const timerId = setInterval(() => {
+      if (!loadingRef.current && !refreshingRef.current) carregarDados();
+    }, REFRESH_MS);
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!loading && !refreshing) carregarDados();
-        startPolling();
-      } else {
-        stopPolling();
+        if (!loadingRef.current && !refreshingRef.current) carregarDados();
       }
     };
 
-    startPolling();
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      stopPolling();
+      clearInterval(timerId);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [carregarDados, loading, refreshing, modoTV]);
+  }, [carregarDados, modoTV]);
 
   const handleRefresh = () => {
     setRefreshing(true);

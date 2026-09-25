@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#0f172a"/>
+  <!-- Coffee bean & water drop badge -->
+  <path d="M32 10 C32 10 16 26 16 38 A16 16 0 0 0 48 38 C48 26 32 10 32 10 Z" fill="url(#grad1)" opacity="0.9"/>
+  <path d="M32 20 C32 20 22 30 22 38 A10 10 0 0 0 42 38 C42 30 32 20 32 20 Z" fill="#ffffff" opacity="0.25"/>
+  <!-- Golden coffee element -->
+  <ellipse cx="32" cy="42" rx="7" ry="10" transform="rotate(35 32 42)" fill="url(#grad2)"/>
+  <path d="M29 34 Q33 42 35 50" stroke="#78350f" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+</svg>

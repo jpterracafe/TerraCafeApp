@@ -7,7 +7,21 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
-      return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+      // Fallback gracioso: retorna lojas ativas sem mapeamentos confidenciais para não quebrar a UI nem disparar 401 em inicializações
+      const lojas = await getLojas();
+      return NextResponse.json(
+        {
+          lojas: lojas.filter((l) => l.ativo !== false),
+          projetosLojas: {},
+          usuariosLojas: {},
+        },
+        {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
+          },
+        }
+      );
     }
 
     const [lojas, projetosLojas, usuariosLojas] = await Promise.all([

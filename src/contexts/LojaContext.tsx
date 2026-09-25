@@ -94,8 +94,10 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadLojasData();
-  }, [loadLojasData]);
+    if (status === "authenticated") {
+      loadLojasData();
+    }
+  }, [status, loadLojasData]);
 
   // Inicializa a loja selecionada de acordo com o perfil
   useEffect(() => {
@@ -186,23 +188,39 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
     [selectedLoja, projetosLojas, usuariosLojas]
   );
 
+  const contextValue = useMemo<LojaContextType>(
+    () => ({
+      lojas,
+      selectedLoja,
+      setSelectedLoja,
+      userAssignedLoja,
+      canSwitchLoja,
+      isDiretor,
+      isAdmin,
+      projetosLojas,
+      usuariosLojas,
+      refreshLojas: loadLojasData,
+      atribuirProjetoLoja,
+      isProjectInSelectedLoja,
+    }),
+    [
+      lojas,
+      selectedLoja,
+      setSelectedLoja,
+      userAssignedLoja,
+      canSwitchLoja,
+      isDiretor,
+      isAdmin,
+      projetosLojas,
+      usuariosLojas,
+      loadLojasData,
+      atribuirProjetoLoja,
+      isProjectInSelectedLoja,
+    ]
+  );
+
   return (
-    <LojaContext.Provider
-      value={{
-        lojas,
-        selectedLoja,
-        setSelectedLoja,
-        userAssignedLoja,
-        canSwitchLoja,
-        isDiretor,
-        isAdmin,
-        projetosLojas,
-        usuariosLojas,
-        refreshLojas: loadLojasData,
-        atribuirProjetoLoja,
-        isProjectInSelectedLoja,
-      }}
-    >
+    <LojaContext.Provider value={contextValue}>
       {children}
     </LojaContext.Provider>
   );

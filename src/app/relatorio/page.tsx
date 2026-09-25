@@ -109,7 +109,11 @@ function RelatorioContent() {
     }
   }, [projeto]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (status === 'authenticated') {
+      load();
+    }
+  }, [status, load]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'sans-serif', color: '#64748b' }}>

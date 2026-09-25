@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { DashboardSkeleton } from '@/components/Skeleton';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -196,19 +196,24 @@ export default function DashboardPage() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent && !cachedData) setLoading(true);
     try {
-      // Ler localStorage como suporte
+      let nextConfigEtapas: Record<string, EtapaConfig> = {};
+      let nextProjetoStartDates: Record<string, string> = {};
+      let nextResponsaveisPorEtapa: Record<string, string[]> = {};
+      let nextProjetosPrazoFinal: Record<string, string> = {};
+
+      // Ler localStorage como suporte inicial
       try {
         const savedConfig = localStorage.getItem('diario_etapas_config_v1');
-        if (savedConfig) setConfigEtapas(JSON.parse(savedConfig));
+        if (savedConfig) nextConfigEtapas = JSON.parse(savedConfig);
 
         const savedStarts = localStorage.getItem('diario_projeto_starts_v1');
-        if (savedStarts) setProjetoStartDates(JSON.parse(savedStarts));
+        if (savedStarts) nextProjetoStartDates = JSON.parse(savedStarts);
 
         const savedResp = localStorage.getItem('diario_responsaveis_por_etapa_v1');
-        if (savedResp) setResponsaveisPorEtapa(JSON.parse(savedResp));
+        if (savedResp) nextResponsaveisPorEtapa = JSON.parse(savedResp);
 
         const savedPrazos = localStorage.getItem('diario_projetos_prazo_final_v1');
-        if (savedPrazos) setProjetosPrazoFinal(JSON.parse(savedPrazos));
+        if (savedPrazos) nextProjetosPrazoFinal = JSON.parse(savedPrazos);
       } catch (e) {
         console.error('[dashboard] Erro ao ler localStorage:', e);
       }
@@ -227,29 +232,17 @@ export default function DashboardPage() {
       const configJson = configRes.ok ? await configRes.json() : null;
       const rolesJson  = rolesRes.ok  ? await rolesRes.json()  : { users: [] };
 
-      let nextConfigEtapas = configEtapas;
-      let nextProjetoStartDates = projetoStartDates;
-      let nextResponsaveisPorEtapa = responsaveisPorEtapa;
-      let nextProjetosPrazoFinal = projetosPrazoFinal;
-
       if (configJson) {
-        if (configJson.configEtapas) {
-          nextConfigEtapas = configJson.configEtapas;
-          setConfigEtapas(configJson.configEtapas);
-        }
-        if (configJson.projetoStartDates) {
-          nextProjetoStartDates = configJson.projetoStartDates;
-          setProjetoStartDates(configJson.projetoStartDates);
-        }
-        if (configJson.responsaveisPorEtapa) {
-          nextResponsaveisPorEtapa = configJson.responsaveisPorEtapa;
-          setResponsaveisPorEtapa(configJson.responsaveisPorEtapa);
-        }
-        if (configJson.projetosPrazoFinal) {
-          nextProjetosPrazoFinal = configJson.projetosPrazoFinal;
-          setProjetosPrazoFinal(configJson.projetosPrazoFinal);
-        }
+        if (configJson.configEtapas) nextConfigEtapas = configJson.configEtapas;
+        if (configJson.projetoStartDates) nextProjetoStartDates = configJson.projetoStartDates;
+        if (configJson.responsaveisPorEtapa) nextResponsaveisPorEtapa = configJson.responsaveisPorEtapa;
+        if (configJson.projetosPrazoFinal) nextProjetosPrazoFinal = configJson.projetosPrazoFinal;
       }
+
+      setConfigEtapas(nextConfigEtapas);
+      setProjetoStartDates(nextProjetoStartDates);
+      setResponsaveisPorEtapa(nextResponsaveisPorEtapa);
+      setProjetosPrazoFinal(nextProjetosPrazoFinal);
 
       // Captura criadores dos projetos (do /api/projetos)
       const nextCriadores = projJson.criadores || {};
@@ -326,60 +319,50 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [cachedData, configEtapas, projetoStartDates, responsaveisPorEtapa, projetosPrazoFinal]);
+  }, [cachedData]);
+
+  const initialLoadDone = useRef(false);
 
   useEffect(() => {
-    if (status === 'authenticated') {
-      const timer = setTimeout(() => {
-        void loadData(Boolean(cachedData));
-      }, 0);
-      return () => clearTimeout(timer);
+    if (status === 'authenticated' && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      void loadData(Boolean(cachedData));
     }
   }, [status, loadData, cachedData]);
 
   // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
+  const loadingRef = useRef(loading);
+  useEffect(() => {
+    loadingRef.current = loading;
+  }, [loading]);
+
   useEffect(() => {
     if (status !== 'authenticated') return;
-    let timerId: ReturnType<typeof setInterval> | null = null;
     const REFRESH_MS = 30 * 1000;
 
-    const startPolling = () => {
-      if (timerId) return;
-      timerId = setInterval(() => {
-        if (!loading) void loadData(true);
-      }, REFRESH_MS);
-    };
-
-    const stopPolling = () => {
-      if (timerId) {
-        clearInterval(timerId);
-        timerId = null;
-      }
-    };
+    const timerId = setInterval(() => {
+      if (!loadingRef.current) void loadData(true);
+    }, REFRESH_MS);
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        if (!loading) void loadData(true);
-        startPolling();
-      } else {
-        stopPolling();
+      if (document.visibilityState === 'visible' && !loadingRef.current) {
+        void loadData(true);
       }
     };
 
     const onFocus = () => {
-      if (!loading) void loadData(true);
+      if (!loadingRef.current) void loadData(true);
     };
 
-    startPolling();
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('focus', onFocus);
 
     return () => {
-      stopPolling();
+      clearInterval(timerId);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [status, loadData, loading]);
+  }, [status, loadData]);
 
   const { selectedLoja, isProjectInSelectedLoja } = useLoja();
 
