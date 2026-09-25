@@ -18,6 +18,7 @@ import {
 } from '@/lib/responsaveis';
 import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
+import InstallAppButton from '@/components/InstallPWA';
 import { offlineFetch } from '@/lib/offline';
 
 interface JustificativaItem {
@@ -709,6 +710,8 @@ export default function VisaoGeralDiretorPage() {
               <FileText className="w-3.5 h-3.5" />
               <span>Diário de Campo</span>
             </button>
+
+            <InstallAppButton className="py-2 font-bold" />
           </div>
         </header>
         </>

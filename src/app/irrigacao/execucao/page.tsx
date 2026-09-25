@@ -35,6 +35,7 @@ import {
   TERMOS_GENERICOS_RESPONSAVEL,
 } from '@/lib/responsaveis';
 import { useLoja } from '@/contexts/LojaContext';
+import InstallAppButton from '@/components/InstallPWA';
 import LojaSelector from '@/components/LojaSelector';
 
 // ── Helpers para controle de versões de projetos (mantidos para compatibilidade) ──
@@ -448,6 +449,8 @@ export default function PainelOperacionalObrasPage() {
               <FileText className="w-3.5 h-3.5" />
               <span>Diário de Campo</span>
             </Link>
+
+            <InstallAppButton className="py-2 font-bold" />
 
             <Link
               href="/visao-geral"
