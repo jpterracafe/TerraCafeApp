@@ -29,7 +29,7 @@ interface LojaContextType {
 const LojaContext = createContext<LojaContextType | undefined>(undefined);
 
 export function LojaProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   // Inicialização instantânea do cache local para não travar a abertura das telas
   const [lojas, setLojas] = useState<LojaItem[]>(() => {
