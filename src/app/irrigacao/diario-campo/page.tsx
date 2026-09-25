@@ -12,7 +12,7 @@ import {
   Paperclip, X, Video, Loader2, TrendingUp, TrendingDown, Settings2,
   Users, Check, Droplets, Layers, ChevronDown, PlayCircle, Flag,
   FileText, Printer, Copy, CheckSquare, Square, Share2, Info, Building2,
-  FileSpreadsheet, CloudOff, ExternalLink
+  FileSpreadsheet, CloudOff, ExternalLink, Camera
 } from 'lucide-react';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
@@ -627,6 +627,8 @@ export default function DiarioCampoTimelinePage() {
       if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
       return URL.createObjectURL(finalFile);
     });
+    // Limpa o valor para permitir tirar fotos consecutivas ou re-selecionar o mesmo arquivo
+    e.target.value = '';
   };
 
   const clearMidia = () => {
@@ -2720,30 +2722,63 @@ export default function DiarioCampoTimelinePage() {
                   />
                 </div>
 
-                {/* Anexo de Foto/Vídeo e Botão Salvar */}
+                {/* Anexo de Foto/Vídeo, Câmera e Botão Salvar */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                    <label className={`flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border w-full sm:w-auto min-h-[42px] ${
-                      isFaseConcluida
-                        ? 'bg-slate-100 dark:bg-slate-900/20 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed'
-                        : 'bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] cursor-pointer active:scale-95'
-                    }`}>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap w-full sm:w-auto">
+                    {/* Botão Tirar Foto Direto na Câmera */}
+                    <label 
+                      title="Abrir câmera e tirar foto da obra agora"
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border min-h-[42px] ${
+                        isFaseConcluida
+                          ? 'bg-slate-100 dark:bg-slate-900/20 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed'
+                          : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800/60 cursor-pointer active:scale-95 shadow-sm'
+                      }`}
+                    >
+                      <Camera className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                      <span>{isFaseConcluida ? 'Câmera Bloqueada' : 'Tirar Foto'}</span>
+                      {!isFaseConcluida && (
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          capture="environment" 
+                          className="hidden" 
+                          onChange={handleMidiaChange} 
+                        />
+                      )}
+                    </label>
+
+                    {/* Botão Anexar Foto / Arquivo da Galeria */}
+                    <label 
+                      title="Escolher foto ou vídeo da galeria"
+                      className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border min-h-[42px] ${
+                        isFaseConcluida
+                          ? 'bg-slate-100 dark:bg-slate-900/20 text-slate-400 border-slate-300 dark:border-slate-700 cursor-not-allowed'
+                          : 'bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#1e293b] cursor-pointer active:scale-95'
+                      }`}
+                    >
                       <Paperclip className={`w-4 h-4 ${isFaseConcluida ? 'text-slate-400' : 'text-blue-500'}`} />
-                      <span>{isFaseConcluida ? 'Anexo Bloqueado' : 'Anexar Foto / Vídeo'}</span>
-                      {!isFaseConcluida && <input type="file" accept="image/*,video/*" className="hidden" onChange={handleMidiaChange} />}
+                      <span>{isFaseConcluida ? 'Anexo Bloqueado' : 'Anexar Foto'}</span>
+                      {!isFaseConcluida && (
+                        <input 
+                          type="file" 
+                          accept="image/*,video/*" 
+                          className="hidden" 
+                          onChange={handleMidiaChange} 
+                        />
+                      )}
                     </label>
 
                     {midiaPreview && (
-                      <div className="relative inline-flex items-center gap-2 px-2.5 py-1.5 bg-slate-100 dark:bg-[#111a30] rounded-xl border border-slate-300 dark:border-slate-700 text-xs">
+                      <div className="relative inline-flex items-center gap-2 px-2.5 py-1.5 bg-slate-100 dark:bg-[#111a30] rounded-xl border border-slate-300 dark:border-slate-700 text-xs w-full sm:w-auto">
                         {midiaTipo === 'image' ? (
-                          <div className="relative w-8 h-8 rounded-lg overflow-hidden">
+                          <div className="relative w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
                             <Image src={midiaPreview} alt="preview" fill className="object-cover" unoptimized />
                           </div>
                         ) : (
-                          <Video className="w-4 h-4 text-blue-400" />
+                          <Video className="w-4 h-4 text-blue-400 flex-shrink-0" />
                         )}
-                        <span className="text-slate-700 dark:text-slate-200 truncate max-w-[120px]">{midiaFile?.name}</span>
-                        <button type="button" onClick={clearMidia} className="p-1 rounded-full hover:bg-rose-500/20 text-rose-500">
+                        <span className="text-slate-700 dark:text-slate-200 truncate max-w-[120px] font-medium">{midiaFile?.name}</span>
+                        <button type="button" onClick={clearMidia} className="p-1 rounded-full hover:bg-rose-500/20 text-rose-500 ml-auto" title="Remover mídia">
                           <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
