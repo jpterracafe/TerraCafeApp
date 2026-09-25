@@ -20,6 +20,7 @@ import { offlineFetch, isOnline } from '@/lib/offline';
 import { useLoja } from '@/contexts/LojaContext';
 import { compressImage } from '@/lib/image-compress';
 import { exportToCSV } from '@/lib/export-csv';
+import InstallAppButton from '@/components/InstallPWA';
 
 interface DiarioUser { 
   id: string; 
@@ -1706,6 +1707,11 @@ export default function DiarioCampoTimelinePage() {
             </div>
           </div>
         </div>
+
+        {/* Botão Instalar App Estratégico no topo do Diário */}
+        <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+          <InstallAppButton />
+        </div>
       </div>
 
       {/* ── CORPO PRINCIPAL: SIDEBAR DE PROJETOS + PAINEL DO PROJETO ── */}
@@ -1878,7 +1884,7 @@ export default function DiarioCampoTimelinePage() {
             <>
               {/* ── CABEÇALHO DO PROJETO: INDICADOR DE START & DIA DO PROJETO ── */}
               <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 md:p-6 shadow-xl space-y-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1e293b] pb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-[#1e293b] pb-4">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
@@ -1943,10 +1949,11 @@ export default function DiarioCampoTimelinePage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  {/* Barra Unificada de Ações (Todos rigorosamente na mesma linha com design premium) */}
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap overflow-x-auto no-scrollbar shrink-0">
                     {/* Badge destacado: Dia X do Projeto */}
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-600 dark:text-blue-300 font-bold text-sm shadow-sm">
-                      <Flag className="w-4 h-4 text-blue-500" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-blue-600 dark:text-blue-400 font-bold text-xs whitespace-nowrap shadow-xs shrink-0">
+                      <Flag className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                       <span>Dia {diaAtualDoProjeto} do Projeto</span>
                     </div>
 
@@ -1954,10 +1961,10 @@ export default function DiarioCampoTimelinePage() {
                     <button
                       type="button"
                       onClick={() => setIsResumoModalOpen(true)}
-                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white flex items-center gap-2 shadow-md shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white flex items-center gap-1.5 shadow-sm shadow-blue-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0"
                       title="Gerar resumo executivo personalizado para enviar ao diretor"
                     >
-                      <FileText className="w-3.5 h-3.5 text-white" />
+                      <FileText className="w-3.5 h-3.5 text-white shrink-0" />
                       <span>Resumo p/ Diretoria</span>
                     </button>
 
@@ -1965,33 +1972,33 @@ export default function DiarioCampoTimelinePage() {
                     <button
                       type="button"
                       onClick={() => { setNovoResponsavelNome(''); setNovoResponsavelCargo(''); setIsAddResponsavelModalOpen(true); }}
-                      className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-1.5 shadow-md shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1a2644] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap shrink-0"
                       title="Cadastrar novo responsável da equipe de campo"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       <span>Novo Responsável</span>
-                    </button>
-
-                    {/* Botão Excluir Projeto (enviar para Lixeira) */}
-                    <button
-                      type="button"
-                      onClick={() => setIsDeleteProjectModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-1.5 transition-all"
-                      title="Mover este projeto para a Lixeira (pode ser restaurado depois)"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Excluir Projeto</span>
                     </button>
 
                     {/* Botão Concluir Projeto (enviar para Projetos Concluídos) */}
                     <button
                       type="button"
                       onClick={() => setIsConcluirProjetoModalOpen(true)}
-                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5 transition-all"
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap shrink-0"
                       title="Marcar este projeto como concluído (pode ser reaberto depois)"
                     >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                       <span>Concluir Projeto</span>
+                    </button>
+
+                    {/* Botão Excluir Projeto (enviar para Lixeira) */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteProjectModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-1.5 transition-all active:scale-95 whitespace-nowrap shrink-0"
+                      title="Mover este projeto para a Lixeira (pode ser restaurado depois)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                      <span>Excluir Projeto</span>
                     </button>
                   </div>
                 </div>

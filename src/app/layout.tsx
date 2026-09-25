@@ -3,7 +3,6 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavigationDrawer from "@/components/NavigationDrawer";
 import Providers from "@/components/Providers";
-import InstallPWA from "@/components/InstallPWA";
 
 export const dynamic = 'force-dynamic';
 
@@ -66,7 +65,6 @@ export default function RootLayout({
           <main className="flex-1 w-full relative">
             {children}
           </main>
-          <InstallPWA />
         </Providers>
       </body>
     </html>

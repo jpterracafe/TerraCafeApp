@@ -24,6 +24,7 @@ import { hojeSP } from '@/lib/validators';
 import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
 import { offlineFetch } from '@/lib/offline';
+import InstallAppButton from '@/components/InstallPWA';
 
 import { EtapaCampo } from '@/app/irrigacao/types';
 import { extractProjectBaseName, getProjectVersion } from '@/app/irrigacao/execucao/page';
@@ -984,6 +985,8 @@ export default function DashboardPage() {
 
         {/* Barra de Ações Rápidas */}
         <div className="flex flex-wrap items-center gap-2.5">
+          <InstallAppButton />
+
           <button
             onClick={() => void loadData()}
             title="Atualizar dados do servidor"
