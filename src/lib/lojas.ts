@@ -29,9 +29,46 @@ export function invalidateLojasCache() {
   cacheProjectLojas = null;
 }
 
+export const DEFAULT_LOJAS: Loja[] = [
+  { id: "loja-guaxupe", nome: "Terra Café Guaxupé", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-pouso-alegre", nome: "DaTerra Pouso Alegre", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-sao-joao", nome: "DaTerra São João da Boa Vista", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-taubate", nome: "DaTerra Taubaté", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-patrocinio", nome: "DaTerra Patrocínio", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+];
+
+function normalizeLojaName(nome: string): string {
+  return (nome || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function mergeWithDefaultLojas(existing: Loja[]): { result: Loja[]; changed: boolean } {
+  const result: Loja[] = [...existing];
+  let changed = false;
+
+  for (const def of DEFAULT_LOJAS) {
+    const defNorm = normalizeLojaName(def.nome);
+    const found = result.some((l) => {
+      const lNorm = normalizeLojaName(l.nome);
+      return lNorm === defNorm;
+    });
+
+    if (!found) {
+      result.push(def);
+      changed = true;
+    }
+  }
+
+  return { result, changed };
+}
+
 /**
  * Retorna a lista de todas as lojas cadastradas no sistema.
  * Prioriza tabela `lojas` se existir, com fallback para `configuracoes_sistema`.
+ * Garante automaticamente a presença das lojas oficiais Terra Café e DaTerra.
  */
 export async function getLojas(): Promise<Loja[]> {
   if (cacheLojas && Date.now() < cacheLojas.expiresAt) {
@@ -39,6 +76,7 @@ export async function getLojas(): Promise<Loja[]> {
   }
 
   const db = getSupabase();
+  let loadedLojas: Loja[] | null = null;
 
   // 1. Tenta buscar da tabela 'lojas' se ainda não determinamos que ela não existe
   if (tableLojasAvailable !== false) {
@@ -50,16 +88,13 @@ export async function getLojas(): Promise<Loja[]> {
 
       if (!error && data && data.length > 0) {
         tableLojasAvailable = true;
-        const mapped = data.map((d: any) => ({
+        loadedLojas = data.map((d: any) => ({
           id: String(d.id),
           nome: String(d.nome),
           ativo: d.ativo !== false,
           createdAt: d.created_at || new Date().toISOString(),
         }));
-        cacheLojas = { data: mapped, expiresAt: Date.now() + CACHE_TTL_MS };
-        return mapped;
-      }
-      if (error) {
+      } else if (error) {
         tableLojasAvailable = false;
       }
     } catch {
@@ -68,23 +103,33 @@ export async function getLojas(): Promise<Loja[]> {
   }
 
   // 2. Fallback: configuracoes_sistema
-  try {
-    const { data: configRow } = await db
-      .from("configuracoes_sistema")
-      .select("valor")
-      .eq("chave", CHAVE_LOJAS)
-      .maybeSingle();
+  if (!loadedLojas) {
+    try {
+      const { data: configRow } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", CHAVE_LOJAS)
+        .maybeSingle();
 
-    if (configRow?.valor && Array.isArray(configRow.valor)) {
-      const mapped = configRow.valor as Loja[];
-      cacheLojas = { data: mapped, expiresAt: Date.now() + CACHE_TTL_MS };
-      return mapped;
+      if (configRow?.valor && Array.isArray(configRow.valor) && configRow.valor.length > 0) {
+        loadedLojas = configRow.valor as Loja[];
+      }
+    } catch (err) {
+      console.error("[getLojas] Erro ao buscar de configuracoes_sistema:", err);
     }
-  } catch (err) {
-    console.error("[getLojas] Erro ao buscar de configuracoes_sistema:", err);
   }
 
-  return [];
+  const { result: finalLojas, changed } = mergeWithDefaultLojas(loadedLojas || []);
+
+  // Se foram adicionadas lojas padrão que ainda não estavam salvas, persiste no Supabase
+  if (changed || !loadedLojas) {
+    saveLojas(finalLojas).catch((err) =>
+      console.warn("[getLojas] Aviso ao sincronizar lojas padrão no banco:", err)
+    );
+  }
+
+  cacheLojas = { data: finalLojas, expiresAt: Date.now() + CACHE_TTL_MS };
+  return finalLojas;
 }
 
 /**

@@ -28,16 +28,28 @@ interface LojaContextType {
 
 const LojaContext = createContext<LojaContextType | undefined>(undefined);
 
+export const DEFAULT_LOJAS_LIST: LojaItem[] = [
+  { id: "loja-guaxupe", nome: "Terra Café Guaxupé", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-pouso-alegre", nome: "DaTerra Pouso Alegre", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-sao-joao", nome: "DaTerra São João da Boa Vista", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-taubate", nome: "DaTerra Taubaté", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+  { id: "loja-patrocinio", nome: "DaTerra Patrocínio", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
+];
+
 export function LojaProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
 
   // Inicialização instantânea do cache local para não travar a abertura das telas
   const [lojas, setLojas] = useState<LojaItem[]>(() => {
-    if (typeof window === "undefined") return [];
+    if (typeof window === "undefined") return DEFAULT_LOJAS_LIST;
     try {
       const saved = sessionStorage.getItem("terracafe_lojas_cache");
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+      return DEFAULT_LOJAS_LIST;
+    } catch { return DEFAULT_LOJAS_LIST; }
   });
   const [projetosLojas, setProjetosLojas] = useState<Record<string, string>>(() => {
     if (typeof window === "undefined") return {};
