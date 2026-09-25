@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
+import { matchLojaNames } from "@/lib/lojas";
 
 export interface SessionUser {
   id?: string;
@@ -120,7 +121,7 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
       const mapLojas = projLojasRes.data.valor as Record<string, string>;
       const sessionLojaLc = sessionLoja.toLowerCase();
       for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
-        if (lojaNome && lojaNome.trim().toLowerCase() === sessionLojaLc) {
+        if (lojaNome && matchLojaNames(lojaNome, sessionLoja)) {
           userProjetosPermitidos.add(projNome);
         }
       }

@@ -11,6 +11,7 @@ import {
   normalizeStatusFase,
 } from "@/lib/validators";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
+import { matchLojaNames } from "@/lib/lojas";
 
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET() {
@@ -76,8 +77,8 @@ export async function GET() {
 
         // 🏢 Gerente: vê todas as fases de projetos da sua cidade/filial
         if (isGerente && sessionLoja) {
-          const lojaDoProj = (mapProjetosLojas[pNome] || "").trim().toLowerCase();
-          if (lojaDoProj === sessionLoja) {
+          const lojaDoProj = mapProjetosLojas[pNome];
+          if (lojaDoProj && matchLojaNames(lojaDoProj, sessionLoja)) {
             return true;
           }
         }

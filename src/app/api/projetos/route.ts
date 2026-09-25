@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
-import { getUserAssignedLoja, setProjectLoja } from "@/lib/lojas";
+import { getUserAssignedLoja, setProjectLoja, matchLojaNames } from "@/lib/lojas";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -122,8 +122,8 @@ export async function GET(req: Request) {
 
       // 🏢 Gerente: tem acesso garantido a todas as obras da sua cidade/filial
       if (isGerente && sessionLoja && !emailAlvo) {
-        const lojaDoProj = (mapProjetosLojas[nome] || "").trim().toLowerCase();
-        if (lojaDoProj === sessionLoja) {
+        const lojaDoProj = mapProjetosLojas[nome];
+        if (lojaDoProj && matchLojaNames(lojaDoProj, sessionLoja)) {
           return true;
         }
       }

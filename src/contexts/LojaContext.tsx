@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { isMasterDevSession } from "@/lib/client-roles";
+import { matchLojaNames } from "@/lib/lojas";
 
 export interface LojaItem {
   id: string;
@@ -174,7 +175,13 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ projetoNome, lojaNome }),
       });
       if (res.ok) {
-        setProjetosLojas((prev) => ({ ...prev, [projetoNome]: lojaNome }));
+        setProjetosLojas((prev) => {
+          const updated = { ...prev, [projetoNome]: lojaNome };
+          try {
+            sessionStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
         return true;
       }
     } catch (e) {
@@ -188,12 +195,26 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
    */
   const isProjectInSelectedLoja = useCallback(
     (projetoNome: string, criadorEmail?: string): boolean => {
-      if (selectedLoja === "TODAS") return true;
+      if (!selectedLoja || selectedLoja === "TODAS") return true;
+
+      const pNomeTrim = (projetoNome || "").trim();
+      if (!pNomeTrim) return false;
 
       // 1. Vínculo direto projeto -> loja
-      const lojaDireta = projetosLojas[projetoNome];
+      let lojaDireta = projetosLojas[pNomeTrim] || projetosLojas[projetoNome];
+      if (!lojaDireta) {
+        // Tenta achar com chave insensível a maiúsculas / espaços
+        const pNomeLc = pNomeTrim.toLowerCase();
+        for (const [k, v] of Object.entries(projetosLojas)) {
+          if (k.trim().toLowerCase() === pNomeLc) {
+            lojaDireta = v;
+            break;
+          }
+        }
+      }
+
       if (lojaDireta) {
-        return lojaDireta.toLowerCase() === selectedLoja.toLowerCase();
+        return matchLojaNames(lojaDireta, selectedLoja);
       }
 
       // 2. Vínculo herdado do criador do projeto
@@ -201,12 +222,16 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         const emailLc = criadorEmail.toLowerCase().trim();
         const lojaCriador = usuariosLojas[emailLc];
         if (lojaCriador) {
-          return lojaCriador.toLowerCase() === selectedLoja.toLowerCase();
+          return matchLojaNames(lojaCriador, selectedLoja);
         }
       }
 
-      // 3. Projetos ainda sem atribuição aparecem se o usuário estiver vendo "TODAS",
-      // mas se estiver vendo uma loja específica, ficam ocultos daquela loja
+      // 3. Verifica se o próprio nome do projeto cita a cidade da filial selecionada
+      if (matchLojaNames(pNomeTrim, selectedLoja)) {
+        return true;
+      }
+
+      // 4. Projetos sem nenhum vínculo com essa loja NÃO aparecem nessa filial
       return false;
     },
     [selectedLoja, projetosLojas, usuariosLojas]

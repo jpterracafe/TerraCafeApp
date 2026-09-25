@@ -37,12 +37,39 @@ export const DEFAULT_LOJAS: Loja[] = [
   { id: "loja-patrocinio", nome: "DaTerra Patrocínio", ativo: true, createdAt: "2026-01-01T00:00:00.000Z" },
 ];
 
-function normalizeLojaName(nome: string): string {
+export function normalizeLojaName(nome: string): string {
   return (nome || "")
     .trim()
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Compara dois nomes de filiais de forma resiliente:
+ * 1. Igualdade direta ou normalizada sem acentos
+ * 2. Casamento por cidade principal (ex: "guaxupe", "pouso alegre", "taubate", "patrocinio", "sao joao", "tres pontas")
+ */
+export function matchLojaNames(lojaA?: string | null, lojaB?: string | null): boolean {
+  if (!lojaA || !lojaB) return false;
+  const a = normalizeLojaName(lojaA);
+  const b = normalizeLojaName(lojaB);
+  if (a === b) return true;
+
+  const cidades = [
+    "guaxupe",
+    "pouso alegre",
+    "sao joao da boa vista",
+    "sao joao",
+    "taubate",
+    "patrocinio",
+    "tres pontas",
+  ];
+
+  for (const c of cidades) {
+    if (a.includes(c) && b.includes(c)) return true;
+  }
+  return false;
 }
 
 function mergeWithDefaultLojas(existing: Loja[]): { result: Loja[]; changed: boolean } {

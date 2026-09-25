@@ -123,11 +123,12 @@ export default function ProjetosConcluidosPage() {
     const mapa: Record<string, FaseAcao[]> = {};
     fasesConcluidas.forEach(f => {
       const key = f.projetoCliente?.trim() || '(Sem projeto)';
+      if (!isProjectInSelectedLoja(key, (f as any).criadoPorEmail || (f as any).criado_por_email)) return;
       if (!mapa[key]) mapa[key] = [];
       mapa[key].push(f);
     });
     return mapa;
-  }, [fasesConcluidas]);
+  }, [fasesConcluidas, isProjectInSelectedLoja]);
 
   const toggleExpand = (nome: string) => {
     setExpandedProjects(prev => {
