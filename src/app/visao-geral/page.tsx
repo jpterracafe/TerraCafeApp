@@ -281,7 +281,7 @@ export default function VisaoGeralDiretorPage() {
     };
   }, [modoTV]);
 
-  const { selectedLoja, isProjectInSelectedLoja } = useLoja();
+  const { selectedLoja, userAssignedLoja, isProjectInSelectedLoja } = useLoja();
 
   const projetosListFiltrados = useMemo(() => {
     if (selectedLoja === 'TODAS') return projetosList;
@@ -656,7 +656,13 @@ export default function VisaoGeralDiretorPage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                {['Diretor', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role) ? '👑 Painel Executivo Geral' : '🌱 Meus Projetos & Obras'}
+                {(session?.user as any)?.role === 'Gerente'
+                  ? `🏢 Painel do Gerente · ${userAssignedLoja || 'Minha Cidade'}`
+                  : (session?.user as any)?.role === 'Coordenador'
+                  ? '📊 Painel do Coordenador Geral'
+                  : ['Diretor', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role)
+                  ? '👑 Painel Executivo Geral'
+                  : '🛠️ Meus Projetos & Obras'}
               </span>
               <span className="text-xs text-slate-400">• {lastUpdate.toLocaleTimeString('pt-BR')}</span>
             </div>
@@ -664,7 +670,9 @@ export default function VisaoGeralDiretorPage() {
               📊 Visão Geral das Obras
             </h1>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-              {['Diretor', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role)
+              {(session?.user as any)?.role === 'Gerente'
+                ? `Acompanhamento de todas as obras da sua filial (${userAssignedLoja || 'sua cidade'}).`
+                : ['Diretor', 'Coordenador', 'Desenvolvedor', 'Admin'].includes((session?.user as any)?.role)
                 ? 'Painel geral consolidado de todas as obras, equipes e prazos da empresa.'
                 : 'Acompanhamento exclusivo das suas obras, responsáveis e progresso das fases.'}
             </p>

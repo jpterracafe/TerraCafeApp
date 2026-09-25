@@ -59,7 +59,11 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
   const sessionName = session?.user?.name?.trim() ?? "";
   const sessionRole = (session?.user as { role?: string } | undefined)?.role || "Colaborador";
 
-  const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+  const sessionLoja = ((session?.user as any)?.loja || "").trim();
+
+  // Coordenador possui a mesma visão executiva do Diretor
+  const isDiretorOuAdmin = ["Diretor", "Coordenador", "Desenvolvedor", "Admin"].includes(sessionRole);
+  const isGerente = sessionRole === "Gerente";
 
   const db = getSupabase();
 
@@ -67,7 +71,7 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
   const userProjetosPermitidos = new Set<string>();
 
   try {
-    const [criadoresRes, upRes] = await Promise.all([
+    const [criadoresRes, upRes, projLojasRes] = await Promise.all([
       Promise.resolve(
         db
           .from("configuracoes_sistema")
@@ -80,6 +84,15 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
           .from("user_projetos")
           .select("projeto_nome, user_email")
       ).catch(() => ({ data: null })),
+      isGerente && sessionLoja
+        ? Promise.resolve(
+            db
+              .from("configuracoes_sistema")
+              .select("valor")
+              .eq("chave", "sistema_projetos_lojas_v1")
+              .maybeSingle()
+          ).catch(() => ({ data: null }))
+        : Promise.resolve({ data: null }),
     ]);
 
     if (criadoresRes?.data?.valor) {
@@ -98,6 +111,17 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
           if (uEmail === sessionEmail) {
             userProjetosPermitidos.add(pNome);
           }
+        }
+      }
+    }
+
+    // 🏢 Regra do Gerente: acesso a todas as obras da sua cidade/filial
+    if (isGerente && sessionLoja && projLojasRes?.data?.valor) {
+      const mapLojas = projLojasRes.data.valor as Record<string, string>;
+      const sessionLojaLc = sessionLoja.toLowerCase();
+      for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
+        if (lojaNome && lojaNome.trim().toLowerCase() === sessionLojaLc) {
+          userProjetosPermitidos.add(projNome);
         }
       }
     }

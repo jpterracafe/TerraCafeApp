@@ -25,8 +25,11 @@ export async function GET() {
 
     const db = getSupabase();
 
-    // Carrega mapa de criadores e fases em paralelo
-    const [criadoresRes, fasesRes] = await Promise.all([
+    const sessionLoja = ((session?.user as any)?.loja || "").trim().toLowerCase();
+    const isGerente = sessionRole === "Gerente";
+
+    // Carrega mapa de criadores, fases e projetos-lojas em paralelo
+    const [criadoresRes, fasesRes, projLojasRes] = await Promise.all([
       db
         .from("configuracoes_sistema")
         .select("valor")
@@ -36,6 +39,13 @@ export async function GET() {
         .from("fases_acao")
         .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
         .order("created_at", { ascending: true }),
+      isGerente && sessionLoja
+        ? db
+            .from("configuracoes_sistema")
+            .select("valor")
+            .eq("chave", "sistema_projetos_lojas_v1")
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     let mapCriadores: Record<string, { email: string }> = {};
@@ -43,10 +53,16 @@ export async function GET() {
       mapCriadores = criadoresRes.data.valor;
     }
 
+    let mapProjetosLojas: Record<string, string> = {};
+    if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
+      mapProjetosLojas = projLojasRes.data.valor as Record<string, string>;
+    }
+
     const { data, error } = fasesRes;
     if (error) throw error;
 
-    const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+    // Coordenador possui a mesma visão executiva do Diretor
+    const isDiretorOuAdmin = ["Diretor", "Coordenador", "Desenvolvedor", "Admin"].includes(sessionRole);
 
     const sessionEmailLc = sessionEmail.toLowerCase();
 
@@ -55,13 +71,21 @@ export async function GET() {
         const pNome = (f.projeto_cliente || "").trim();
         if (!pNome) return false;
 
-        // 👑 Diretor, Admin e Desenvolvedor vêem todas as fases
+        // 👑 Diretor, Coordenador, Admin e Desenvolvedor vêem todas as fases
         if (isDiretorOuAdmin) return true;
+
+        // 🏢 Gerente: vê todas as fases de projetos da sua cidade/filial
+        if (isGerente && sessionLoja) {
+          const lojaDoProj = (mapProjetosLojas[pNome] || "").trim().toLowerCase();
+          if (lojaDoProj === sessionLoja) {
+            return true;
+          }
+        }
 
         const criador = mapCriadores[pNome];
         const criadorEmail = criador?.email?.trim().toLowerCase();
 
-        // Se o projeto tem criador cadastrado e NÃO é o agricultor logado:
+        // Se o projeto tem criador cadastrado e NÃO é o montador logado:
         if (criadorEmail && criadorEmail !== sessionEmailLc) {
           // Verifica se o usuário é responsável pela fase (por email ou por nome, item a item)
           const resp = (f.responsavel || "").trim();
@@ -74,7 +98,7 @@ export async function GET() {
 
           // Se não for responsável por email nem por nome, esconde a fase
           if (!ehResponsavelEmail && !ehResponsavelNome) {
-            return false; // Oculta fase deste projeto para outro agricultor
+            return false; // Oculta fase deste projeto para outro montador
           }
         }
         return true;

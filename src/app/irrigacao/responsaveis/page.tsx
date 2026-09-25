@@ -24,7 +24,7 @@ export default function ResponsaveisPage() {
   // ── Criar login (admin) ──
   const [loginTarget, setLoginTarget] = useState<Responsavel | null>(null);
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginCargo, setLoginCargo] = useState('Agricultor');
+  const [loginCargo, setLoginCargo] = useState('Montador');
   const [loginSaving, setLoginSaving] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [loginResult, setLoginResult] = useState<{ senha: string; projetos: string[]; aviso?: string | null } | null>(null);
@@ -89,7 +89,7 @@ export default function ResponsaveisPage() {
     // Sugere email a partir do nome (admin ajusta antes de confirmar)
     const sugestao = r.nome.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z ]/g, '').trim().split(/\s+/).join('.');
     setLoginEmail(sugestao ? `${sugestao}@terracafe.com.br` : '');
-    setLoginCargo('Agricultor');
+    setLoginCargo('Montador');
     setLoginError('');
     setLoginResult(null);
     setCopied(false);
@@ -98,7 +98,7 @@ export default function ResponsaveisPage() {
   const closeCriarLogin = () => {
     setLoginTarget(null);
     setLoginEmail('');
-    setLoginCargo('Agricultor');
+    setLoginCargo('Montador');
     setLoginError('');
     setLoginResult(null);
     setLoginConflito(null);
@@ -458,10 +458,11 @@ export default function ResponsaveisPage() {
                   <div>
                     <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">Nível de acesso</label>
                     <select value={loginCargo} onChange={(e) => setLoginCargo(e.target.value)} className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500 transition-colors">
-                      <option value="Agricultor">🌱 Agricultor</option>
-                      <option value="Colaborador">👷 Colaborador</option>
+                      <option value="Montador">🛠️ Montador</option>
+                      <option value="Gerente">🏢 Gerente (Obras da sua cidade)</option>
+                      <option value="Coordenador">📊 Coordenador (Visão do Diretor)</option>
+                      <option value="Diretor">👔 Diretor (Visão Geral Corporativa)</option>
                       <option value="Admin">🛡️ Admin</option>
-                      <option value="Diretor">👔 Diretor</option>
                     </select>
                   </div>
                   <p className="text-xs text-slate-500">A senha é gerada aleatoriamente e fica visível na tela + salva para consulta.</p>

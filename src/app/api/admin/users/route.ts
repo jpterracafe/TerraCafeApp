@@ -7,10 +7,13 @@ import { authOptions, isAdminSession, extractUsernameFromEmail } from "@/lib/aut
 import { getUserLojasMap, setUserLoja } from "@/lib/lojas";
 
 export const ALLOWED_ROLES = [
-  "Agricultor",
-  "Admin",
+  "Montador",
+  "Gerente",
+  "Coordenador",
   "Diretor",
+  "Admin",
   "Desenvolvedor",
+  "Agricultor",
   "Colaborador",
 ] as const;
 
@@ -71,7 +74,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const email = String(body?.email ?? "").trim().toLowerCase();
     const cargoRaw = String(body?.cargo || body?.role || "").trim();
-    const cargo = (cargoRaw || "Agricultor");
+    const cargo = cargoRaw === "Agricultor" ? "Montador" : (cargoRaw || "Montador");
     const loja = String(body?.loja ?? "").trim();
     let nome    = String(body?.nome  ?? "").trim();
 

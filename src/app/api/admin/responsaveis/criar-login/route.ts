@@ -10,10 +10,10 @@ import { normalizeName, parseResponsavelEmails } from "@/lib/responsaveis";
 // o João Pedro entra com login de Admin e precisa ter acesso.)
 function podeCriarLogin(session: unknown): boolean {
   const role = (session as { user?: { role?: string } } | null)?.user?.role || "";
-  return ["Admin", "Diretor", "Desenvolvedor"].includes(role);
+  return ["Admin", "Diretor", "Coordenador", "Desenvolvedor"].includes(role);
 }
 
-const ALLOWED_ROLES = ["Agricultor", "Colaborador", "Admin", "Diretor"] as const;
+const ALLOWED_ROLES = ["Montador", "Gerente", "Coordenador", "Diretor", "Admin", "Agricultor", "Colaborador"] as const;
 
 function gerarSenhaAleatoria(tamanho = 8): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

@@ -92,13 +92,40 @@ export async function GET(req: Request) {
     }
 
     // Regra de autorização / isolamento por perfil:
-    const isDiretorOuAdmin = ["Diretor", "Desenvolvedor", "Admin"].includes(sessionRole);
+    const isDiretorOuAdmin = ["Diretor", "Coordenador", "Desenvolvedor", "Admin"].includes(sessionRole);
+    const sessionLoja = ((session?.user as any)?.loja || "").trim().toLowerCase();
+    const isGerente = sessionRole === "Gerente";
     const emailAlvo = emailFiltro || (apenasMeus ? sessionEmail : "");
 
+    // Carrega mapa de projetos para lojas caso o usuário seja Gerente
+    let mapProjetosLojas: Record<string, string> = {};
+    if (isGerente && sessionLoja) {
+      try {
+        const { data: plRow } = await db
+          .from("configuracoes_sistema")
+          .select("valor")
+          .eq("chave", "sistema_projetos_lojas_v1")
+          .maybeSingle();
+        if (plRow?.valor && typeof plRow.valor === "object") {
+          mapProjetosLojas = plRow.valor as Record<string, string>;
+        }
+      } catch {
+        // silent
+      }
+    }
+
     const temAcessoAoProjeto = (nome: string): boolean => {
-      // 👑 Diretor, Admin e Desenvolvedor vêem todos os projetos de todos os logins por padrão
+      // 👑 Diretor, Coordenador, Admin e Desenvolvedor vêem todos os projetos de todos os logins por padrão
       if (isDiretorOuAdmin && !emailAlvo) {
         return true;
+      }
+
+      // 🏢 Gerente: tem acesso garantido a todas as obras da sua cidade/filial
+      if (isGerente && sessionLoja && !emailAlvo) {
+        const lojaDoProj = (mapProjetosLojas[nome] || "").trim().toLowerCase();
+        if (lojaDoProj === sessionLoja) {
+          return true;
+        }
       }
 
       const criador = mapCriadores[nome];
@@ -128,7 +155,7 @@ export async function GET(req: Request) {
         });
         if (ehResponsavel) return true;
 
-        // Pertence a outro usuário -> oculta do agricultor
+        // Pertence a outro usuário -> oculta do montador/técnico
         return false;
       }
 

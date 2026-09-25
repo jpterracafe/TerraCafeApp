@@ -1,4 +1,4 @@
-export type RoleSistema = 'Agricultor' | 'Admin' | 'Diretor' | 'Desenvolvedor' | 'Colaborador';
+export type RoleSistema = 'Montador' | 'Gerente' | 'Coordenador' | 'Diretor' | 'Admin' | 'Desenvolvedor' | 'Agricultor' | 'Colaborador';
 
 export interface UsuarioSistema {
   id: string;

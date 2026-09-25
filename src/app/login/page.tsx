@@ -32,12 +32,14 @@ export default function LoginPage() {
         // Admin NÃO é master de /admin/usuarios (a página o redirecionaria
         // para diario-campo) — vai direto para evitar o "quique" entre páginas.
         router.replace('/irrigacao/diario-campo');
-      } else if (role === 'Diretor') {
+      } else if (role === 'Diretor' || role === 'Coordenador') {
         router.replace('/visao-geral');
-      } else if (role === 'Agricultor') {
+      } else if (role === 'Gerente') {
+        router.replace('/visao-geral');
+      } else if (role === 'Montador' || role === 'Agricultor') {
         router.replace('/irrigacao/diario-campo');
       } else {
-        // Colaborador e outros roles vão para o diário (execução oculta)
+        // Colaborador e outros roles vão para o diário de campo
         router.replace('/irrigacao/diario-campo');
       }
     }

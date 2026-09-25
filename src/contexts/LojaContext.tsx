@@ -18,6 +18,8 @@ interface LojaContextType {
   userAssignedLoja: string | null;
   canSwitchLoja: boolean;
   isDiretor: boolean;
+  isCoordenador: boolean;
+  isGerente: boolean;
   isAdmin: boolean;
   projetosLojas: Record<string, string>;
   usuariosLojas: Record<string, string>;
@@ -69,9 +71,11 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const userRole = (session?.user as any)?.role || "Colaborador";
   const isMasterDev = isMasterDevSession(session);
-  const isDiretor = userRole === "Diretor";
+  const isCoordenador = userRole === "Coordenador";
+  const isDiretor = userRole === "Diretor" || isCoordenador;
+  const isGerente = userRole === "Gerente";
   const isAdmin = userRole === "Admin" || isMasterDev;
-  const canSwitchLoja = isDiretor || isAdmin;
+  const canSwitchLoja = isDiretor || isCoordenador || isAdmin;
 
   // Loja atribuída ao usuário na sessão ou no banco
   const userAssignedLoja = useMemo(() => {
@@ -117,8 +121,8 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
     const saved = localStorage.getItem("terracafe_selected_loja");
 
-    if (isDiretor) {
-      // Diretor: por padrão começa com a sua loja atribuída (se houver)
+    if (isDiretor || isCoordenador) {
+      // Diretor e Coordenador: visão executiva geral, pode alternar entre todas as filiais
       const userLoja = (session.user as any)?.loja;
       if (saved && saved !== "TODAS") {
         setSelectedLojaState(saved);
@@ -134,8 +138,16 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       } else {
         setSelectedLojaState("TODAS");
       }
+    } else if (isGerente) {
+      // Gerente: fixado na sua loja atribuída (acesso a todas as obras da sua cidade)
+      const userLoja = (session.user as any)?.loja;
+      if (userLoja) {
+        setSelectedLojaState(userLoja);
+      } else {
+        setSelectedLojaState("TODAS");
+      }
     } else {
-      // Agricultor/Colaborador: fixado na sua loja se tiver, ou TODAS
+      // Montador / Colaborador: fixado na sua loja se tiver, ou TODAS
       const userLoja = (session.user as any)?.loja;
       if (userLoja) {
         setSelectedLojaState(userLoja);
@@ -143,7 +155,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         setSelectedLojaState("TODAS");
       }
     }
-  }, [session, isDiretor, isAdmin]);
+  }, [session, isDiretor, isCoordenador, isGerente, isAdmin]);
 
   const setSelectedLoja = useCallback((loja: string) => {
     setSelectedLojaState(loja);
@@ -208,6 +220,8 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       userAssignedLoja,
       canSwitchLoja,
       isDiretor,
+      isCoordenador,
+      isGerente,
       isAdmin,
       projetosLojas,
       usuariosLojas,
@@ -222,6 +236,8 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       userAssignedLoja,
       canSwitchLoja,
       isDiretor,
+      isCoordenador,
+      isGerente,
       isAdmin,
       projetosLojas,
       usuariosLojas,

@@ -99,7 +99,7 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: displayName,
             email: user.email ?? emailNormalizado,
-            role: user.role,
+            role: user.role === "Agricultor" ? "Montador" : user.role,
             loja: loja ?? null,
           };
         } catch (err) {

@@ -349,7 +349,7 @@ export default function AdminUsuariosPage() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [novoEmail, setNovoEmail] = useState('');
   const [novoNome, setNovoNome] = useState('');
-  const [novoCargo, setNovoCargo] = useState<RoleSistema>('Agricultor');
+  const [novoCargo, setNovoCargo] = useState<RoleSistema>('Montador');
   const [novaLoja, setNovaLoja] = useState('');
   const [novaSenhaManual, setNovaSenhaManual] = useState('');
   const [inviteLink, setInviteLink] = useState('');
@@ -463,7 +463,7 @@ export default function AdminUsuariosPage() {
     setInviteLink('');
     setNovoEmail('');
     setNovoNome('');
-    setNovoCargo('Agricultor');
+    setNovoCargo('Montador');
     setNovaLoja('');
     setNovaSenhaManual('');
     setInviteError('');
@@ -649,9 +649,11 @@ export default function AdminUsuariosPage() {
                             className="bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer disabled:opacity-60"
                             title="Clique para alterar o nível de acesso"
                           >
-                            <option value="Agricultor">🌱 Agricultor</option>
-                            <option value="Admin">🛡️ Admin</option>
+                            <option value="Montador">🛠️ Montador</option>
+                            <option value="Gerente">🏢 Gerente</option>
+                            <option value="Coordenador">📊 Coordenador</option>
                             <option value="Diretor">👔 Diretor</option>
+                            <option value="Admin">🛡️ Admin</option>
                           </select>
                           {updatingRoleId === u.id && (
                             <span className="w-3.5 h-3.5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
@@ -848,9 +850,11 @@ export default function AdminUsuariosPage() {
                       onChange={(e) => setNovoCargo(e.target.value as RoleSistema)}
                       className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
                     >
-                      <option value="Agricultor">🌱 Agricultor (Aponta no Diário / Técnico de Campo)</option>
+                      <option value="Montador">🛠️ Montador (Técnico de Campo / Aponta no Diário)</option>
+                      <option value="Gerente">🏢 Gerente (Acesso a todas as obras da sua cidade)</option>
+                      <option value="Coordenador">📊 Coordenador (Visão do Diretor / Gestão geral)</option>
+                      <option value="Diretor">👔 Diretor (Acompanhamento Executivo Geral)</option>
                       <option value="Admin">🛡️ Admin (Administrador da Plataforma)</option>
-                      <option value="Diretor">👔 Diretor (Acompanhamento Executivo)</option>
                     </select>
                   </div>
 
