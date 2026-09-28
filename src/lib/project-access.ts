@@ -25,6 +25,7 @@ export interface ProjectAccessResult {
   sessionEmail: string;
   sessionName: string;
   sessionRole: string;
+  sessionLoja?: string;
 }
 
 interface FaseRow {
@@ -117,12 +118,19 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
     }
 
     // 🏢 Regra do Gerente: acesso a todas as obras da sua cidade/filial
-    if (isGerente && sessionLoja && projLojasRes?.data?.valor) {
-      const mapLojas = projLojasRes.data.valor as Record<string, string>;
-      const sessionLojaLc = sessionLoja.toLowerCase();
-      for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
-        if (lojaNome && matchLojaNames(lojaNome, sessionLoja)) {
-          userProjetosPermitidos.add(projNome);
+    if (isGerente && sessionLoja) {
+      if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
+        const mapLojas = projLojasRes.data.valor as Record<string, string>;
+        for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
+          if (lojaNome && matchLojaNames(lojaNome, sessionLoja)) {
+            userProjetosPermitidos.add(projNome);
+          }
+        }
+      }
+      // Também inclui projetos cujo próprio nome cite a cidade da filial
+      for (const pNome of Object.keys(mapCriadores)) {
+        if (matchLojaNames(pNome, sessionLoja)) {
+          userProjetosPermitidos.add(pNome);
         }
       }
     }
@@ -137,6 +145,7 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
     sessionEmail,
     sessionName,
     sessionRole,
+    sessionLoja,
   };
 }
 
@@ -148,21 +157,23 @@ export function hasProjectAccess(
   access: ProjectAccessResult,
   fasesPorProjeto?: FaseMap
 ): boolean {
-  const { isDiretorOuAdmin, mapCriadores, sessionEmail, sessionName, allowedProjects } = access;
+  const { isDiretorOuAdmin, mapCriadores, sessionEmail, sessionName, allowedProjects, sessionRole, sessionLoja } = access;
 
   // Diretor, Admin e Desenvolvedor veem todos os projetos
   if (isDiretorOuAdmin) {
     return true;
   }
 
-const criador = mapCriadores[projectName];
+  // Gerente tem acesso a projetos da sua filial ou com a cidade no nome
+  if (sessionRole === "Gerente" && sessionLoja && matchLojaNames(projectName, sessionLoja)) {
+    return true;
+  }
+
+  const criador = mapCriadores[projectName];
   const criadorEmail = criador?.email?.trim().toLowerCase();
   
   // Verifica acesso para projetos com OU sem criador definido
-  // 1. Diretor/Admin veem todos
-  if (isDiretorOuAdmin) return true;
-  
-  // 2. Tem permissão explícita via user_projetos (inclui projetos legacy)
+  // 1. Tem permissão explícita via user_projetos ou regra de loja
   if (allowedProjects.has(projectName)) return true;
   
   // 3. Se o projeto tem criador cadastrado: verifica se é o criador ou responsável

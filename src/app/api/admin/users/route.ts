@@ -6,6 +6,9 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions, isAdminSession, extractUsernameFromEmail } from "@/lib/auth";
 import { getUserLojasMap, setUserLoja } from "@/lib/lojas";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export const ALLOWED_ROLES = [
   "Montador",
   "Gerente",

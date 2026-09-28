@@ -122,8 +122,20 @@ export async function GET(req: Request) {
 
       // 🏢 Gerente: tem acesso garantido a todas as obras da sua cidade/filial
       if (isGerente && sessionLoja && !emailAlvo) {
-        const lojaDoProj = mapProjetosLojas[nome];
+        let lojaDoProj = mapProjetosLojas[nome] || mapProjetosLojas[nome.trim()];
+        if (!lojaDoProj) {
+          const nomeLc = nome.trim().toLowerCase();
+          for (const [k, v] of Object.entries(mapProjetosLojas)) {
+            if (k.trim().toLowerCase() === nomeLc) {
+              lojaDoProj = v;
+              break;
+            }
+          }
+        }
         if (lojaDoProj && matchLojaNames(lojaDoProj, sessionLoja)) {
+          return true;
+        }
+        if (matchLojaNames(nome, sessionLoja)) {
           return true;
         }
       }

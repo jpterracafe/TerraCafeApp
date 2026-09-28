@@ -8,6 +8,9 @@ import env from "@/lib/env";
 import { ALLOWED_ROLES } from "../route";
 import { setUserLoja } from "@/lib/lojas";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }

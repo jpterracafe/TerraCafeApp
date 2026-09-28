@@ -457,9 +457,12 @@ export async function setProjectLoja(projetoNome: string, lojaNome: string): Pro
   const db = getSupabase();
   try {
     const currentMap = await getProjectLojasMap();
+    const cleanProj = projetoNome.trim();
     if (lojaNome) {
+      currentMap[cleanProj] = lojaNome.trim();
       currentMap[projetoNome] = lojaNome.trim();
     } else {
+      delete currentMap[cleanProj];
       delete currentMap[projetoNome];
     }
 

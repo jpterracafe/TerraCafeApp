@@ -103,9 +103,20 @@ function RelatorioContent() {
 
       if (resLojas.ok) {
         const dataLojas = await resLojas.json();
-        const mapProjLojas = dataLojas?.projetosLojas || {};
-        if (projeto && mapProjLojas[projeto]) {
-          setNomeLoja(mapProjLojas[projeto]);
+        const mapProjLojas: Record<string, string> = dataLojas?.projetosLojas || {};
+        const pTrim = (projeto || '').trim();
+        let lojaEncontrada = mapProjLojas[pTrim] || mapProjLojas[projeto];
+        if (!lojaEncontrada && pTrim) {
+          const pLc = pTrim.toLowerCase();
+          for (const [k, v] of Object.entries(mapProjLojas)) {
+            if (k.trim().toLowerCase() === pLc) {
+              lojaEncontrada = v;
+              break;
+            }
+          }
+        }
+        if (lojaEncontrada) {
+          setNomeLoja(lojaEncontrada);
         }
       }
     } catch {

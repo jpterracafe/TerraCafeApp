@@ -77,8 +77,20 @@ export async function GET() {
 
         // 🏢 Gerente: vê todas as fases de projetos da sua cidade/filial
         if (isGerente && sessionLoja) {
-          const lojaDoProj = mapProjetosLojas[pNome];
+          let lojaDoProj = mapProjetosLojas[pNome] || mapProjetosLojas[pNome.trim()];
+          if (!lojaDoProj) {
+            const pNomeLc = pNome.trim().toLowerCase();
+            for (const [k, v] of Object.entries(mapProjetosLojas)) {
+              if (k.trim().toLowerCase() === pNomeLc) {
+                lojaDoProj = v;
+                break;
+              }
+            }
+          }
           if (lojaDoProj && matchLojaNames(lojaDoProj, sessionLoja)) {
+            return true;
+          }
+          if (matchLojaNames(pNome, sessionLoja)) {
             return true;
           }
         }
