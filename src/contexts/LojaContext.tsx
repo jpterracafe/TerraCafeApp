@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useSession } from "next-auth/react";
 import { isMasterDevSession } from "@/lib/client-roles";
 import { matchLojaNames } from "@/lib/lojas";
+import { offlineFetch } from "@/lib/offline";
 
 export interface LojaItem {
   id: string;
@@ -46,7 +47,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
   const [lojas, setLojas] = useState<LojaItem[]>(() => {
     if (typeof window === "undefined") return DEFAULT_LOJAS_LIST;
     try {
-      const saved = sessionStorage.getItem("terracafe_lojas_cache");
+      const saved = localStorage.getItem("terracafe_lojas_cache") || sessionStorage.getItem("terracafe_lojas_cache");
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -57,14 +58,14 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
   const [projetosLojas, setProjetosLojas] = useState<Record<string, string>>(() => {
     if (typeof window === "undefined") return {};
     try {
-      const saved = sessionStorage.getItem("terracafe_projetos_lojas_cache");
+      const saved = localStorage.getItem("terracafe_projetos_lojas_cache") || sessionStorage.getItem("terracafe_projetos_lojas_cache");
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
   const [usuariosLojas, setUsuariosLojas] = useState<Record<string, string>>(() => {
     if (typeof window === "undefined") return {};
     try {
-      const saved = sessionStorage.getItem("terracafe_usuarios_lojas_cache");
+      const saved = localStorage.getItem("terracafe_usuarios_lojas_cache") || sessionStorage.getItem("terracafe_usuarios_lojas_cache");
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
@@ -85,8 +86,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const loadLojasData = useCallback(async () => {
     try {
-      // Uma única requisição unificada e rápida sem cache defasado
-      const res = await fetch("/api/lojas", { cache: "no-store" });
+      const res = await offlineFetch("/api/lojas");
       if (res.ok) {
         const data = await res.json();
         const listaLojas = data.lojas || [];
@@ -98,28 +98,27 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         setUsuariosLojas(mapUsers);
 
         try {
-          sessionStorage.setItem("terracafe_lojas_cache", JSON.stringify(listaLojas));
-          sessionStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(mapProj));
-          sessionStorage.setItem("terracafe_usuarios_lojas_cache", JSON.stringify(mapUsers));
+          localStorage.setItem("terracafe_lojas_cache", JSON.stringify(listaLojas));
+          localStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(mapProj));
+          localStorage.setItem("terracafe_usuarios_lojas_cache", JSON.stringify(mapUsers));
         } catch {
           // ignore
         }
       }
     } catch (err) {
-      console.error("[LojaProvider] Erro ao carregar lojas:", err);
+      console.warn("[LojaProvider] Dados carregados do cache offline:", err);
     }
   }, []);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      loadLojasData();
-    }
+    loadLojasData();
   }, [status, loadLojasData]);
 
   // Listener para sincronização instantânea quando uma loja for criada, editada ou excluída no admin
   useEffect(() => {
     const handleLojasUpdated = () => {
       try {
+        localStorage.removeItem("terracafe_lojas_cache");
         sessionStorage.removeItem("terracafe_lojas_cache");
       } catch {}
       loadLojasData();

@@ -16,7 +16,8 @@ import {
 } from 'lucide-react';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
-import { offlineFetch, isOnline } from '@/lib/offline';
+import { offlineFetch, isOnline, enqueueOfflineMutation, subscribe } from '@/lib/offline';
+import { idbSaveLocalDiarioLog, idbGetLocalDiarioLogs, idbRemoveLocalDiarioLog } from '@/lib/idb';
 import { useLoja } from '@/contexts/LojaContext';
 import { compressImage } from '@/lib/image-compress';
 import { exportToCSV } from '@/lib/export-csv';
@@ -402,17 +403,31 @@ export default function DiarioCampoTimelinePage() {
     }
   }, []);
 
-  // Carrega logs do diário (offline: usa cache da última carga)
+  // Carrega logs do diário (offline: usa cache da última carga + logs locais pendentes)
   const loadLogs = useCallback(async () => {
     setLoadingLogs(true);
     try {
-      const res = await offlineFetch('/api/diario-logs');
-      if (res.ok) {
-        const { logs } = await res.json();
-        setRegistros(logs ?? []);
+      const [res, localSaved] = await Promise.all([
+        offlineFetch('/api/diario-logs').catch(() => null),
+        idbGetLocalDiarioLogs().catch(() => []),
+      ]);
+      let remoteLogs: RegistroDiarioCampo[] = [];
+      if (res && res.ok) {
+        const data = await res.json().catch(() => null);
+        remoteLogs = data?.logs ?? [];
       }
+      // Combina logs remotos com logs locais pendentes sem duplicar
+      const remoteIds = new Set(remoteLogs.map(r => r.id));
+      const filteredLocal = (localSaved || []).filter((l: any) => !remoteIds.has(l.id));
+      setRegistros([...filteredLocal, ...remoteLogs]);
     } catch (e) {
       console.error('[diario] Erro ao carregar logs:', e);
+      try {
+        const localSaved = await idbGetLocalDiarioLogs();
+        if (localSaved && localSaved.length > 0) setRegistros(localSaved);
+      } catch {
+        // noop
+      }
     } finally {
       setLoadingLogs(false);
     }
@@ -475,6 +490,8 @@ export default function DiarioCampoTimelinePage() {
 
   useEffect(() => {
     refreshAll();
+    const unsub = subscribe(refreshAll);
+    return () => unsub();
   }, [refreshAll]);
 
   // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
@@ -1322,20 +1339,54 @@ export default function DiarioCampoTimelinePage() {
     try {
       let midiaUrl = '';
       let midiaFinalTipo = '';
+      let pendingMediaAttachment: { fileName: string; fileType: string; blob: Blob } | undefined = undefined;
+
       if (midiaFile) {
-        setUploadingMidia(true);
-        const fd = new FormData();
-        fd.append('file', midiaFile);
-        const upRes = await fetch('/api/diario-upload', { method: 'POST', body: fd });
-        if (upRes.ok) {
-          const upData = await upRes.json();
-          midiaUrl       = upData.url  ?? '';
-          midiaFinalTipo = upData.tipo ?? '';
+        if (isOnline()) {
+          setUploadingMidia(true);
+          try {
+            const fd = new FormData();
+            fd.append('file', midiaFile);
+            const upRes = await fetch('/api/diario-upload', { method: 'POST', body: fd });
+            if (upRes.ok) {
+              const upData = await upRes.json();
+              midiaUrl       = upData.url  ?? '';
+              midiaFinalTipo = upData.tipo ?? '';
+            } else {
+              // Upload falhou mesmo parecendo online: salva mídia localmente com segurança!
+              const localBlobUrl = URL.createObjectURL(midiaFile);
+              midiaUrl = localBlobUrl;
+              midiaFinalTipo = midiaFile.type.startsWith('video/') ? 'video' : 'image';
+              pendingMediaAttachment = {
+                fileName: midiaFile.name,
+                fileType: midiaFinalTipo,
+                blob: midiaFile,
+              };
+            }
+          } catch {
+            // Falha de rede: salva mídia localmente no IndexedDB
+            const localBlobUrl = URL.createObjectURL(midiaFile);
+            midiaUrl = localBlobUrl;
+            midiaFinalTipo = midiaFile.type.startsWith('video/') ? 'video' : 'image';
+            pendingMediaAttachment = {
+              fileName: midiaFile.name,
+              fileType: midiaFinalTipo,
+              blob: midiaFile,
+            };
+          } finally {
+            setUploadingMidia(false);
+          }
         } else {
-          console.error('[diario] Falha no upload de mídia.');
-          toastError('Falha ao anexar a foto/vídeo. Registro será salvo sem mídia.');
+          // Explicitamente offline: cria visualização local e anexa à fila IndexedDB
+          const localBlobUrl = URL.createObjectURL(midiaFile);
+          midiaUrl = localBlobUrl;
+          midiaFinalTipo = midiaFile.type.startsWith('video/') ? 'video' : 'image';
+          pendingMediaAttachment = {
+            fileName: midiaFile.name,
+            fileType: midiaFinalTipo,
+            blob: midiaFile,
+          };
         }
-        setUploadingMidia(false);
       }
 
       const responsaveisStr = currentEtapaResponsaveis.join(', ');
@@ -1352,6 +1403,41 @@ export default function DiarioCampoTimelinePage() {
         midiaTipo: midiaFinalTipo,
       };
 
+      // Se há mídia pendente de upload OU estamos offline, salva localmente com garantia total
+      if (pendingMediaAttachment || !isOnline()) {
+        const tempId = `temp-${Date.now()}`;
+        const tempLog: RegistroDiarioCampo = {
+          id: tempId,
+          ...payloadDiario,
+          midiaUrl,
+          midiaTipo: midiaFinalTipo,
+        };
+        await enqueueOfflineMutation(
+          '/api/diario-logs',
+          'POST',
+          {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...payloadDiario,
+              midiaUrl: '',
+              midiaTipo: midiaFinalTipo,
+            }),
+          },
+          pendingMediaAttachment,
+          tempId
+        );
+        await idbSaveLocalDiarioLog(tempLog);
+        setRegistros(prev => [tempLog, ...prev]);
+        setObservacoes('');
+        clearMidia();
+        success(
+          pendingMediaAttachment
+            ? 'Registro e foto salvos no aparelho! A sincronização com a nuvem ocorrerá automaticamente quando houver sinal.'
+            : 'Sem conexão: registro salvo no dispositivo e será sincronizado automaticamente.'
+        );
+        return;
+      }
+
       const res = await offlineFetch('/api/diario-logs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1361,12 +1447,12 @@ export default function DiarioCampoTimelinePage() {
       if (res.ok) {
         const resData = await res.json().catch(() => null);
         if (resData?.offlineQueued) {
-          // Sem conexão: registro salvo no dispositivo + otimista na tela,
-          // sincroniza automaticamente quando a conexão voltar
+          // Sem conexão: registro salvo no dispositivo + otimista na tela
           const tempLog: RegistroDiarioCampo = {
             id: `temp-${Date.now()}`,
             ...payloadDiario,
           };
+          await idbSaveLocalDiarioLog(tempLog);
           setRegistros(prev => [tempLog, ...prev]);
           setObservacoes('');
           clearMidia();
@@ -1391,10 +1477,16 @@ export default function DiarioCampoTimelinePage() {
     }
   };
 
-  // Excluir log (offline: fica na fila e sincroniza depois)
+  // Excluir log (offline: remove do armazenamento local e enfileira exclusão)
   const handleDeleteLog = async (id: string) => {
     if (!confirm('Deseja excluir este registro do diário?')) return;
     try {
+      if (id.startsWith('temp-')) {
+        await idbRemoveLocalDiarioLog(id);
+        setRegistros(prev => prev.filter(r => r.id !== id));
+        success('Registro local removido.');
+        return;
+      }
       const res = await offlineFetch(`/api/diario-logs?id=${id}`, { method: 'DELETE' });
       if (res.ok) {
         setRegistros(prev => prev.filter(r => r.id !== id));

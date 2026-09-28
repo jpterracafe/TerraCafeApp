@@ -28,7 +28,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../types';
-import { offlineFetch } from '@/lib/offline';
+import { offlineFetch, subscribe } from '@/lib/offline';
 import {
   parseResponsavelEmails,
   normalizeName,
@@ -156,6 +156,8 @@ export default function PainelOperacionalObrasPage() {
 
   useEffect(() => {
     loadData();
+    const unsub = subscribe(loadData);
+    return () => unsub();
   }, [loadData]);
 
   // Auto-refresh a cada 30 segundos

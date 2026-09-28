@@ -9,6 +9,7 @@ import {
   Check, Clock
 } from 'lucide-react';
 import { exportToCSV } from '@/lib/export-csv';
+import { offlineFetch } from '@/lib/offline';
 
 interface FaseAcaoItem {
   id: string;
@@ -76,9 +77,9 @@ function RelatorioContent() {
     setLoadError('');
     try {
       const [resFases, resLogs, resLojas] = await Promise.all([
-        fetch('/api/fases'),
-        fetch('/api/diario-logs'),
-        fetch('/api/lojas'),
+        offlineFetch('/api/fases'),
+        offlineFetch('/api/diario-logs'),
+        offlineFetch('/api/lojas'),
       ]);
 
       if (!resFases.ok || !resLogs.ok) {
