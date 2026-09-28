@@ -3037,15 +3037,15 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: AJUSTAR DATA DE START DO PROJETO ── */}
       {isProjectStartModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-lg max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
-              <div className="flex items-center gap-2">
-                <Flag className="w-5 h-5 text-blue-500" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Data de Início do Projeto ({selectedProjeto})
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <Flag className="w-5 h-5 text-blue-500 shrink-0" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                  Data de Início • {extractProjectBaseName(selectedProjeto)}
                 </h3>
               </div>
-              <button onClick={() => setIsProjectStartModalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500">
+              <button onClick={() => setIsProjectStartModalOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 shrink-0">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -3092,17 +3092,17 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: NOVO PROJETO (CRIADO DIRETAMENTE NO DIÁRIO DE CAMPO) ── */}
       {isNewProjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-lg max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500 shrink-0">
                   <Plus className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
                     Novo Projeto de Irrigação
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                     Inicializa automaticamente as 6 fases oficiais
                   </p>
                 </div>
@@ -3110,7 +3110,7 @@ export default function DiarioCampoTimelinePage() {
               <button 
                 type="button"
                 onClick={() => setIsNewProjectModalOpen(false)} 
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3185,25 +3185,25 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: REGISTRAR JUSTIFICATIVA OFICIAL DE CAMPO (SUBSTITUI AJUSTE DE META) ── */}
       {isJustificativaModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-lg max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-auto">
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
                   <CloudRain className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
                     Registrar Justificativa de Campo
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 capitalize">
-                    {selectedProjeto} • Etapa: {selectedEtapa}
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 capitalize truncate">
+                    {extractProjectBaseName(selectedProjeto)} • Etapa: {selectedEtapa}
                   </p>
                 </div>
               </div>
               <button 
                 type="button"
                 onClick={() => setIsJustificativaModalOpen(false)} 
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3900,30 +3900,30 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: CONFIRMAR EXCLUSÃO DE PROJETO (→ LIXEIRA) ──────────── */}
       {isDeleteProjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
+          <div className="bg-white dark:bg-[#0d1527] border border-rose-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
             <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-rose-50 dark:bg-rose-950/20 shrink-0">
               <div className="p-2 rounded-xl bg-rose-500/15 shrink-0">
                 <Trash2 className="w-5 h-5 text-rose-600 dark:text-rose-400" />
               </div>
-              <div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white">Excluir Projeto</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">O projeto será movido para a Lixeira</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-black text-slate-900 dark:text-white truncate">Excluir Projeto</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">O projeto será movido para a Lixeira</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsDeleteProjectModalOpen(false)}
-                className="ml-auto p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500"
+                className="ml-auto p-1.5 rounded-lg hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-500 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 break-words [overflow-wrap:anywhere]">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words [overflow-wrap:anywhere]">
                 Tem certeza que deseja excluir o projeto{' '}
-                <strong className="text-slate-900 dark:text-white">
+                <strong className="text-slate-900 dark:text-white break-words">
                   &ldquo;{extractProjectBaseName(selectedProjeto)}&rdquo;
                 </strong>?
               </p>
@@ -3942,24 +3942,24 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setIsDeleteProjectModalOpen(false);
                   window.location.href = '/irrigacao/lixeira';
                 }}
-                className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1"
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1 shrink-0 order-2 sm:order-1"
               >
-                <Layers className="w-3.5 h-3.5" />
-                Ver Lixeira de Projetos
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span>Ver Lixeira de Projetos</span>
               </button>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto shrink-0 order-1 sm:order-2">
                 <button
                   type="button"
                   onClick={() => setIsDeleteProjectModalOpen(false)}
-                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors text-center"
+                  className="flex-1 sm:flex-none px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#111a30] transition-colors text-center shrink-0"
                 >
                   Cancelar
                 </button>
@@ -3967,12 +3967,12 @@ export default function DiarioCampoTimelinePage() {
                   type="button"
                   onClick={handleExcluirProjeto}
                   disabled={excluindoProjeto}
-                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-sm font-black bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-rose-600 hover:bg-rose-500 text-white flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-rose-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                 >
                   {excluindoProjeto ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /><span>Excluindo...</span></>
+                    <><Loader2 className="w-4 h-4 animate-spin shrink-0" /><span>Excluindo...</span></>
                   ) : (
-                    <><Trash2 className="w-4 h-4" /><span>Mover para Lixeira</span></>
+                    <><Trash2 className="w-4 h-4 shrink-0" /><span>Mover para Lixeira</span></>
                   )}
                 </button>
               </div>
@@ -3984,30 +3984,30 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: CONFIRMAR CONCLUSÃO DE PROJETO (→ PROJETOS CONCLUÍDOS) ── */}
       {isConcluirProjetoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
+          <div className="bg-white dark:bg-[#0d1527] border border-emerald-500/40 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
             <div className="flex items-center gap-3 p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-emerald-50 dark:bg-emerald-950/20 shrink-0">
               <div className="p-2 rounded-xl bg-emerald-500/15 shrink-0">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <div>
-                <h3 className="text-base font-black text-slate-900 dark:text-white">Concluir Projeto</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">O projeto será movido para Projetos Concluídos</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-black text-slate-900 dark:text-white truncate">Concluir Projeto</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">O projeto será movido para Projetos Concluídos</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsConcluirProjetoModalOpen(false)}
-                className="ml-auto p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/40 text-slate-500"
+                className="ml-auto p-1.5 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-950/40 text-slate-500 shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body */}
-            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
-              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 break-words [overflow-wrap:anywhere]">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed break-words [overflow-wrap:anywhere]">
                 Tem certeza que deseja concluir o projeto{' '}
-                <strong className="text-slate-900 dark:text-white">
+                <strong className="text-slate-900 dark:text-white break-words">
                   &ldquo;{extractProjectBaseName(selectedProjeto)}&rdquo;
                 </strong>?
               </p>
@@ -4050,24 +4050,24 @@ export default function DiarioCampoTimelinePage() {
             </div>
 
             {/* Footer */}
-            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 shrink-0">
+            <div className="bg-slate-50 dark:bg-[#0b1221] border-t border-slate-200 dark:border-[#1e293b] p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setIsConcluirProjetoModalOpen(false);
                   window.location.href = '/irrigacao/concluidos';
                 }}
-                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1"
+                className="text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center justify-center sm:justify-start gap-1.5 transition-colors py-1 shrink-0 order-2 sm:order-1"
               >
-                <Layers className="w-3.5 h-3.5" />
-                Ver Projetos Concluídos
+                <Layers className="w-3.5 h-3.5 shrink-0" />
+                <span>Ver Projetos Concluídos</span>
               </button>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 justify-end w-full sm:w-auto shrink-0 order-1 sm:order-2">
                 <button
                   type="button"
                   onClick={() => setIsConcluirProjetoModalOpen(false)}
-                  className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-[#0d1527] transition-colors text-center"
+                  className="flex-1 sm:flex-none px-4 py-2 sm:py-2.5 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#111a30] transition-colors text-center shrink-0"
                 >
                   Cancelar
                 </button>
@@ -4075,12 +4075,12 @@ export default function DiarioCampoTimelinePage() {
                   type="button"
                   onClick={handleConcluirProjeto}
                   disabled={concluindoProjeto}
-                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl text-sm font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 sm:flex-none px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
                 >
                   {concluindoProjeto ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /><span>Concluindo...</span></>
+                    <><Loader2 className="w-4 h-4 animate-spin shrink-0" /><span>Concluindo...</span></>
                   ) : (
-                    <><CheckCircle2 className="w-4 h-4" /><span>Concluir Projeto</span></>
+                    <><CheckCircle2 className="w-4 h-4 shrink-0" /><span>Concluir Projeto</span></>
                   )}
                 </button>
               </div>
@@ -4092,7 +4092,7 @@ export default function DiarioCampoTimelinePage() {
       {/* ── MODAL: ADICIONAR NOVO RESPONSÁVEL ─────────────────────────────── */}
       {isAddResponsavelModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92dvh] flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div className="flex items-center gap-2.5">
@@ -4148,8 +4148,8 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {selectedProjeto && (
-                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 text-xs text-emerald-700 dark:text-emerald-300">
-                  ✅ Será automaticamente vinculado à etapa <strong className="capitalize">{selectedEtapa}</strong> do projeto <strong>{selectedProjeto}</strong>.
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3 text-xs text-emerald-700 dark:text-emerald-300 break-words [overflow-wrap:anywhere]">
+                  ✅ Será automaticamente vinculado à etapa <strong className="capitalize">{selectedEtapa}</strong> do projeto <strong className="break-words">{selectedProjeto}</strong>.
                 </div>
               )}
             </div>
@@ -4167,12 +4167,12 @@ export default function DiarioCampoTimelinePage() {
                 type="button"
                 onClick={handleAdicionarResponsavel}
                 disabled={savingNovoResponsavel || !novoResponsavelNome.trim()}
-                className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 {savingNovoResponsavel ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /><span>Cadastrando...</span></>
+                  <><Loader2 className="w-4 h-4 animate-spin shrink-0" /><span>Cadastrando...</span></>
                 ) : (
-                  <><Plus className="w-4 h-4" /><span>Salvar Responsável</span></>
+                  <><Plus className="w-4 h-4 shrink-0" /><span>Salvar Responsável</span></>
                 )}
               </button>
             </div>

@@ -406,7 +406,7 @@ export default function PainelOperacionalObrasPage() {
   }, [projetosDaLoja, search, filtroProjeto, filtroEtapa, filtroSituacao]);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 p-4 md:p-8 font-sans transition-colors">
+    <div className="min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 p-3 sm:p-5 md:p-8 font-sans transition-colors">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* ── Topbar & Navegação ────────────────────────────────────────── */}

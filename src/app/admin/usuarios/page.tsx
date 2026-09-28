@@ -1184,19 +1184,19 @@ export default function AdminUsuariosPage() {
       )}
 
       {userToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Excluir usuário</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Remover <span className="font-medium text-slate-900 dark:text-white">{userToDelete.nome}</span> ({userToDelete.email}) do banco? Essa pessoa não conseguirá mais entrar no sistema.
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 sm:p-6 break-words [overflow-wrap:anywhere]">
+              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-2">Excluir usuário</h3>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed break-words [overflow-wrap:anywhere]">
+                Remover <span className="font-semibold text-slate-900 dark:text-white break-words">{userToDelete.nome}</span> ({userToDelete.email}) do banco? Essa pessoa não conseguirá mais entrar no sistema.
               </p>
             </div>
-            <div className="p-6 border-t border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] flex justify-end gap-3">
+            <div className="p-4 sm:p-6 border-t border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] flex justify-end gap-2.5 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setUserToDelete(null)}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors"
+                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#1e293b] transition-colors"
               >
                 Cancelar
               </button>
@@ -1204,7 +1204,7 @@ export default function AdminUsuariosPage() {
                 type="button"
                 onClick={handleConfirmDelete}
                 disabled={deletingId === userToDelete.id}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium bg-rose-600 hover:bg-rose-700 text-white transition-all disabled:opacity-60"
+                className="px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white transition-all disabled:opacity-60 whitespace-nowrap"
               >
                 {deletingId === userToDelete.id ? 'Excluindo...' : 'Excluir do banco'}
               </button>
