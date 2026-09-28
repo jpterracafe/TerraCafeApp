@@ -202,7 +202,7 @@ export default function AdminUsuariosPage() {
 
   const loadLojas = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/lojas');
+      const res = await fetch('/api/admin/lojas', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setLojas(data.lojas || []);
@@ -216,8 +216,8 @@ export default function AdminUsuariosPage() {
     setLoadingProjetosAdmin(true);
     try {
       const [resProj, resLojas] = await Promise.all([
-        fetch('/api/projetos'),
-        fetch('/api/lojas'),
+        fetch('/api/projetos', { cache: 'no-store' }),
+        fetch('/api/lojas', { cache: 'no-store' }),
       ]);
       if (resProj.ok) {
         const d = await resProj.json();
@@ -254,6 +254,12 @@ export default function AdminUsuariosPage() {
         });
         setSavedProjetoNome(projetoNome);
         setTimeout(() => setSavedProjetoNome(null), 2500);
+        try {
+          sessionStorage.removeItem('terracafe_projetos_lojas_cache');
+        } catch {}
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('terracafe_lojas_updated'));
+        }
       } else {
         alert('Erro ao atribuir loja ao projeto.');
       }
@@ -282,6 +288,12 @@ export default function AdminUsuariosPage() {
       }
       setLojas((prev) => [...prev, data.loja]);
       setNovoNomeLoja('');
+      try {
+        sessionStorage.removeItem('terracafe_lojas_cache');
+      } catch {}
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('terracafe_lojas_updated'));
+      }
     } catch {
       setLojaError('Erro de conexão ao criar loja.');
     } finally {
@@ -292,10 +304,18 @@ export default function AdminUsuariosPage() {
   const handleDeleteLoja = async (id: string) => {
     if (!confirm('Deseja realmente remover esta loja?')) return;
     setDeletingLojaId(id);
+    const cleanId = id.trim().toLowerCase();
     try {
       const res = await fetch(`/api/admin/lojas?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (res.ok) {
-        setLojas((prev) => prev.filter((l) => l.id !== id));
+        setLojas((prev) => prev.filter((l) => l.id.toLowerCase() !== cleanId && l.nome.trim().toLowerCase() !== cleanId));
+        try {
+          sessionStorage.removeItem('terracafe_lojas_cache');
+        } catch {}
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('terracafe_lojas_updated'));
+        }
+        loadProjetosAdmin();
       } else {
         const data = await res.json();
         alert(data.error || 'Erro ao excluir loja.');
@@ -325,6 +345,12 @@ export default function AdminUsuariosPage() {
       );
       setSavedLojaId(id);
       setTimeout(() => setSavedLojaId(null), 2500);
+      try {
+        sessionStorage.removeItem('terracafe_usuarios_lojas_cache');
+      } catch {}
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('terracafe_lojas_updated'));
+      }
       loadProjetosAdmin();
     } catch {
       alert('Erro de conexão ao atribuir loja.');

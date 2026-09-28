@@ -85,8 +85,8 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const loadLojasData = useCallback(async () => {
     try {
-      // Uma única requisição unificada e rápida
-      const res = await fetch("/api/lojas");
+      // Uma única requisição unificada e rápida sem cache defasado
+      const res = await fetch("/api/lojas", { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         const listaLojas = data.lojas || [];
@@ -115,6 +115,23 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       loadLojasData();
     }
   }, [status, loadLojasData]);
+
+  // Listener para sincronização instantânea quando uma loja for criada, editada ou excluída no admin
+  useEffect(() => {
+    const handleLojasUpdated = () => {
+      try {
+        sessionStorage.removeItem("terracafe_lojas_cache");
+      } catch {}
+      loadLojasData();
+    };
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("terracafe_lojas_updated", handleLojasUpdated);
+      return () => {
+        window.removeEventListener("terracafe_lojas_updated", handleLojasUpdated);
+      };
+    }
+  }, [loadLojasData]);
 
   // Inicializa a loja selecionada de acordo com o perfil
   useEffect(() => {

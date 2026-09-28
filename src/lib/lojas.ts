@@ -72,30 +72,10 @@ export function matchLojaNames(lojaA?: string | null, lojaB?: string | null): bo
   return false;
 }
 
-function mergeWithDefaultLojas(existing: Loja[]): { result: Loja[]; changed: boolean } {
-  const result: Loja[] = [...existing];
-  let changed = false;
-
-  for (const def of DEFAULT_LOJAS) {
-    const defNorm = normalizeLojaName(def.nome);
-    const found = result.some((l) => {
-      const lNorm = normalizeLojaName(l.nome);
-      return lNorm === defNorm;
-    });
-
-    if (!found) {
-      result.push(def);
-      changed = true;
-    }
-  }
-
-  return { result, changed };
-}
-
 /**
  * Retorna a lista de todas as lojas cadastradas no sistema.
- * Prioriza tabela `lojas` se existir, com fallback para `configuracoes_sistema`.
- * Garante automaticamente a presença das lojas oficiais Terra Café e DaTerra.
+ * Prioriza configuracoes_sistema (gerenciado pelo Admin) e mantém fallback/sincronia com a tabela lojas.
+ * Não restaura lojas deletadas pelo usuário.
  */
 export async function getLojas(): Promise<Loja[]> {
   if (cacheLojas && Date.now() < cacheLojas.expiresAt) {
@@ -105,22 +85,39 @@ export async function getLojas(): Promise<Loja[]> {
   const db = getSupabase();
   let loadedLojas: Loja[] | null = null;
 
-  // 1. Tenta buscar da tabela 'lojas' se ainda não determinamos que ela não existe
-  if (tableLojasAvailable !== false) {
+  // 1. Prioridade: configuracoes_sistema (onde o Admin salva e gerencia as lojas)
+  try {
+    const { data: configRow } = await db
+      .from("configuracoes_sistema")
+      .select("valor")
+      .eq("chave", CHAVE_LOJAS)
+      .maybeSingle();
+
+    if (configRow?.valor && Array.isArray(configRow.valor)) {
+      loadedLojas = configRow.valor as Loja[];
+    }
+  } catch (err) {
+    console.error("[getLojas] Erro ao buscar de configuracoes_sistema:", err);
+  }
+
+  // 2. Fallback: tabela 'lojas' se configuracoes_sistema ainda não foi inicializado
+  if (loadedLojas === null && tableLojasAvailable !== false) {
     try {
       const { data, error } = await db
         .from("lojas")
         .select("id, nome, ativo, created_at")
         .order("nome", { ascending: true });
 
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         tableLojasAvailable = true;
-        loadedLojas = data.map((d: any) => ({
-          id: String(d.id),
-          nome: String(d.nome),
-          ativo: d.ativo !== false,
-          createdAt: d.created_at || new Date().toISOString(),
-        }));
+        if (data.length > 0) {
+          loadedLojas = data.map((d: any) => ({
+            id: String(d.id),
+            nome: String(d.nome),
+            ativo: d.ativo !== false,
+            createdAt: d.created_at || new Date().toISOString(),
+          }));
+        }
       } else if (error) {
         tableLojasAvailable = false;
       }
@@ -129,34 +126,16 @@ export async function getLojas(): Promise<Loja[]> {
     }
   }
 
-  // 2. Fallback: configuracoes_sistema
-  if (!loadedLojas) {
-    try {
-      const { data: configRow } = await db
-        .from("configuracoes_sistema")
-        .select("valor")
-        .eq("chave", CHAVE_LOJAS)
-        .maybeSingle();
-
-      if (configRow?.valor && Array.isArray(configRow.valor) && configRow.valor.length > 0) {
-        loadedLojas = configRow.valor as Loja[];
-      }
-    } catch (err) {
-      console.error("[getLojas] Erro ao buscar de configuracoes_sistema:", err);
-    }
-  }
-
-  const { result: finalLojas, changed } = mergeWithDefaultLojas(loadedLojas || []);
-
-  // Se foram adicionadas lojas padrão que ainda não estavam salvas, persiste no Supabase
-  if (changed || !loadedLojas) {
-    saveLojas(finalLojas).catch((err) =>
+  // 3. Fallback inicial apenas se o banco NUNCA tiver sido configurado (primeira execução absoluta)
+  if (loadedLojas === null) {
+    loadedLojas = [...DEFAULT_LOJAS];
+    saveLojas(loadedLojas).catch((err) =>
       console.warn("[getLojas] Aviso ao sincronizar lojas padrão no banco:", err)
     );
   }
 
-  cacheLojas = { data: finalLojas, expiresAt: Date.now() + CACHE_TTL_MS };
-  return finalLojas;
+  cacheLojas = { data: loadedLojas, expiresAt: Date.now() + CACHE_TTL_MS };
+  return loadedLojas;
 }
 
 /**
@@ -166,6 +145,7 @@ export async function saveLojas(lojas: Loja[]): Promise<boolean> {
   invalidateLojasCache();
   const db = getSupabase();
   try {
+    // 1. Salva em configuracoes_sistema
     const { error } = await db
       .from("configuracoes_sistema")
       .upsert({
@@ -178,6 +158,37 @@ export async function saveLojas(lojas: Loja[]): Promise<boolean> {
       console.error("[saveLojas] Erro ao salvar em configuracoes_sistema:", error);
       return false;
     }
+
+    // 2. Sincroniza com a tabela 'lojas' (se existir)
+    if (tableLojasAvailable !== false) {
+      try {
+        const { data: dbLojas } = await db.from("lojas").select("id");
+        if (dbLojas && Array.isArray(dbLojas)) {
+          tableLojasAvailable = true;
+          const currentIds = new Set(lojas.map((l) => String(l.id)));
+          const idsToDelete = dbLojas
+            .map((d: any) => String(d.id))
+            .filter((id: string) => !currentIds.has(id));
+
+          for (const delId of idsToDelete) {
+            await db.from("lojas").delete().eq("id", delId);
+          }
+        }
+
+        if (lojas.length > 0) {
+          const rows = lojas.map((l) => ({
+            id: l.id,
+            nome: l.nome,
+            ativo: l.ativo !== false,
+            updated_at: new Date().toISOString(),
+          }));
+          await db.from("lojas").upsert(rows, { onConflict: "id" });
+        }
+      } catch {
+        // Ignora se tabela lojas não existir
+      }
+    }
+
     return true;
   } catch (err) {
     console.error("[saveLojas] Exceção ao salvar lojas:", err);
@@ -537,55 +548,66 @@ export async function renameLojaReferences(oldName: string, newName: string): Pr
  * - Limpa users.loja (best effort)
  * - Remove de tabela lojas (best effort)
  */
-export async function cleanupLojaReferences(lojaNome: string): Promise<void> {
+export async function cleanupLojaReferences(lojaNome: string, lojaId?: string): Promise<void> {
   invalidateLojasCache();
-  if (!lojaNome) return;
+  if (!lojaNome && !lojaId) return;
   const db = getSupabase();
-  const nomeLc = lojaNome.trim().toLowerCase();
+  const nomeLc = (lojaNome || "").trim().toLowerCase();
 
   try {
     // 1. Remover de usuários
-    const userMap = await getUserLojasMap();
-    let userChanged = false;
-    for (const [key, val] of Object.entries(userMap)) {
-      if (val && String(val).trim().toLowerCase() === nomeLc) {
-        delete userMap[key];
-        userChanged = true;
+    if (nomeLc) {
+      const userMap = await getUserLojasMap();
+      let userChanged = false;
+      for (const [key, val] of Object.entries(userMap)) {
+        if (val && String(val).trim().toLowerCase() === nomeLc) {
+          delete userMap[key];
+          userChanged = true;
+        }
       }
-    }
-    if (userChanged) {
-      await db.from("configuracoes_sistema").upsert({
-        chave: CHAVE_USUARIOS_LOJAS,
-        valor: userMap,
-        updated_at: new Date().toISOString(),
-      });
+      if (userChanged) {
+        await db.from("configuracoes_sistema").upsert({
+          chave: CHAVE_USUARIOS_LOJAS,
+          valor: userMap,
+          updated_at: new Date().toISOString(),
+        });
+      }
     }
 
     // 2. Remover de projetos
-    const projMap = await getProjectLojasMap();
-    let projChanged = false;
-    for (const [key, val] of Object.entries(projMap)) {
-      if (val && String(val).trim().toLowerCase() === nomeLc) {
-        delete projMap[key];
-        projChanged = true;
+    if (nomeLc) {
+      const projMap = await getProjectLojasMap();
+      let projChanged = false;
+      for (const [key, val] of Object.entries(projMap)) {
+        if (val && String(val).trim().toLowerCase() === nomeLc) {
+          delete projMap[key];
+          projChanged = true;
+        }
       }
-    }
-    if (projChanged) {
-      await db.from("configuracoes_sistema").upsert({
-        chave: CHAVE_PROJETOS_LOJAS,
-        valor: projMap,
-        updated_at: new Date().toISOString(),
-      });
+      if (projChanged) {
+        await db.from("configuracoes_sistema").upsert({
+          chave: CHAVE_PROJETOS_LOJAS,
+          valor: projMap,
+          updated_at: new Date().toISOString(),
+        });
+      }
     }
 
     // 3. Tabela users (best-effort)
-    try {
-      await db.from("users").update({ loja: null }).ilike("loja", lojaNome.trim());
-    } catch (_) {}
+    if (lojaNome) {
+      try {
+        await db.from("users").update({ loja: null }).ilike("loja", lojaNome.trim());
+      } catch (_) {}
+    }
 
     // 4. Tabela lojas (best-effort)
     try {
-      await db.from("lojas").delete().ilike("nome", lojaNome.trim());
+      if (lojaId) {
+        await db.from("lojas").delete().eq("id", lojaId.trim());
+      }
+      if (lojaNome) {
+        await db.from("lojas").delete().ilike("nome", lojaNome.trim());
+      }
     } catch (_) {}
   } catch (err) {
     console.error("[cleanupLojaReferences] Erro ao limpar referências:", err);

@@ -3,6 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getLojas, getProjectLojasMap, getUserLojasMap, setProjectLoja } from "@/lib/lojas";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -17,9 +26,7 @@ export async function GET() {
         },
         {
           status: 200,
-          headers: {
-            "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
-          },
+          headers: NO_CACHE_HEADERS,
         }
       );
     }
@@ -37,14 +44,12 @@ export async function GET() {
         usuariosLojas,
       },
       {
-        headers: {
-          "Cache-Control": "private, max-age=15, stale-while-revalidate=30",
-        },
+        headers: NO_CACHE_HEADERS,
       }
     );
   } catch (error) {
     console.error("[GET /api/lojas]", error);
-    return NextResponse.json({ error: "Erro ao carregar lojas." }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao carregar lojas." }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
 
