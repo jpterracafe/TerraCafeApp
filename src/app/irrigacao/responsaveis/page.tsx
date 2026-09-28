@@ -243,26 +243,26 @@ export default function ResponsaveisPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-3 sm:p-5 md:p-8 font-sans">
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 sm:mb-8 gap-3 sm:gap-4">
         <div>
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400 mb-2">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1.5 sm:mb-2">
             <BackButton />
-            <span>Portal</span><ChevronRight className="w-4 h-4" />
-            <span>Irrigação</span><ChevronRight className="w-4 h-4" />
+            <span>Portal</span><ChevronRight className="w-3.5 h-3.5" />
+            <span>Irrigação</span><ChevronRight className="w-3.5 h-3.5" />
             <span className="text-slate-900 dark:text-white font-medium">Responsáveis</span>
           </nav>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-3">
-            <Users className="w-6 h-6 text-blue-500" />Gestão de Equipe e Responsáveis
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5 sm:gap-3">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />Gestão de Equipe e Responsáveis
           </h1>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={loadResponsaveis} className="flex items-center justify-center gap-2 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-blue-500 text-slate-900 dark:text-white px-4 py-2 rounded-lg font-medium transition-all" title="Recarregar do banco">
-            <RefreshCw className="w-4 h-4" />Sincronizar Banco
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button onClick={loadResponsaveis} className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-blue-500 text-slate-900 dark:text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all shadow-xs" title="Recarregar do banco">
+            <RefreshCw className="w-3.5 h-3.5" /><span>Sincronizar Banco</span>
           </button>
-          <button onClick={() => setIsAddModalOpen(true)} className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20">
-            <Plus className="w-4 h-4" />Novo Responsável Manual
+          <button onClick={() => setIsAddModalOpen(true)} className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md shadow-blue-900/20 active:scale-95">
+            <Plus className="w-3.5 h-3.5" /><span>Novo Responsável Manual</span>
           </button>
         </div>
       </div>
@@ -293,8 +293,98 @@ export default function ResponsaveisPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-sm text-left">
+        {/* Visualização em Cards para Dispositivos Móveis (Celulares) */}
+        <div className="md:hidden divide-y divide-slate-100 dark:divide-[#1e293b]">
+          {loading && (
+            <div className="p-8 text-center text-slate-500 text-xs">
+              Carregando responsáveis do banco...
+            </div>
+          )}
+          {!loading && filtered.length === 0 && (
+            <div className="p-8 text-center text-slate-500 text-xs">
+              Nenhum responsável encontrado.
+            </div>
+          )}
+          {!loading && filtered.map(r => (
+            <div key={r.id} className="p-4 space-y-3 bg-white dark:bg-[#0d1527]">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300 text-xs shrink-0">
+                    {r.avatar}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-900 dark:text-white text-sm truncate">{r.nome}</span>
+                      {isDuplicateName(r.nome) && (
+                        <span className="text-[9px] uppercase font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                          Homônimo
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block">{r.cargo}</span>
+                  </div>
+                </div>
+
+                <div className="shrink-0">
+                  {r.origem === 'USUARIO' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">Você</span>
+                  ) : r.origem === 'BANCO_DADOS' ? (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20">Banco</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/10 text-slate-500 border border-slate-500/20">Manual</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                {r.temLogin ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <ShieldCheck className="w-3 h-3" /> Agricultor
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <UserPlus className="w-3 h-3" /> Sem Login
+                  </span>
+                )}
+
+                {(r.totalProjetos ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                    <Link2 className="w-3 h-3" /> {r.totalProjetos} {r.totalProjetos === 1 ? 'projeto' : 'projetos'}
+                  </span>
+                )}
+              </div>
+
+              {r.loginEmail && (
+                <p className="text-[11px] text-slate-400 truncate">Login: {r.loginEmail}</p>
+              )}
+
+              {/* Ações Mobile com toque generoso */}
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80 justify-end">
+                {isAdminView && !r.temLogin && r.origem !== 'USUARIO' && r.id !== 'self' && (
+                  <button
+                    onClick={() => openCriarLogin(r)}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 shadow-sm"
+                  >
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Criar login</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => openDelete(r)}
+                  disabled={r.origem === 'BANCO_DADOS' && userRole !== 'Desenvolvedor' || r.origem === 'USUARIO'}
+                  className="p-2 sm:p-2.5 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-rose-500/20 disabled:opacity-40"
+                  title="Remover Responsável"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Visualização em Tabela para Tablets e Desktops */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full min-w-[900px] text-sm text-left">
             <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-[#0b1329] border-b border-slate-200 dark:border-[#1e293b]">
               <tr>
                 <th className="px-6 py-4 font-medium">Nome do Responsável</th>
@@ -382,7 +472,6 @@ export default function ResponsaveisPage() {
                   </td>
                 </tr>
               ))}
-              {!loading && filtered.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-500">Nenhum responsável encontrado.</td></tr>}
             </tbody>
           </table>
         </div>

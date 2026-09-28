@@ -170,31 +170,31 @@ export default function LixeiraPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-3 sm:p-5 md:p-8 font-sans">
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 sm:mb-8 gap-3 sm:gap-4">
         <div>
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400 mb-2">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1.5 sm:mb-2">
             <BackButton />
-            <span>Portal</span><ChevronRight className="w-4 h-4" />
-            <span>Irrigação</span><ChevronRight className="w-4 h-4" />
+            <span>Portal</span><ChevronRight className="w-3.5 h-3.5" />
+            <span>Irrigação</span><ChevronRight className="w-3.5 h-3.5" />
             <span className="text-rose-600 dark:text-rose-400 font-medium">Lixeira</span>
           </nav>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
-            <Trash2 className="w-7 h-7 text-rose-500" />Lixeira de Projetos
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5 sm:gap-3">
+            <Trash2 className="w-6 h-6 sm:w-7 sm:h-7 text-rose-500" />Lixeira de Projetos
           </h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-xs sm:text-sm">
             Projetos removidos do painel. Restaure o projeto inteiro ou exclua permanentemente.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <LojaSelector />
           <button
             onClick={handleEmptyTrash}
             disabled={deletedFases.length === 0}
-            className="w-full md:w-auto flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-rose-900/20 text-sm"
+            className="flex items-center justify-center gap-1.5 sm:gap-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 sm:px-4 py-2 rounded-xl font-bold transition-all shadow-md shadow-rose-900/20 text-xs sm:text-sm active:scale-95 shrink-0"
           >
-            <AlertTriangle className="w-4 h-4" />Esvaziar Lixeira
+            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" /><span>Esvaziar Lixeira</span>
           </button>
         </div>
       </div>
@@ -223,45 +223,47 @@ export default function LixeiraPage() {
             <div key={nomeProjeto} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl overflow-hidden shadow-lg shadow-black/10">
 
               {/* Cabeçalho do projeto */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-5">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
-                  <Briefcase className="w-5 h-5 text-rose-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
-                    {projetosLojas[nomeProjeto] && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                        🏪 {projetosLojas[nomeProjeto]}
-                      </span>
-                    )}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 sm:p-5">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center shrink-0">
+                    <Briefcase className="w-5 h-5 text-rose-400" />
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {fasesDoProjeto.length} fase{fasesDoProjeto.length !== 1 ? 's' : ''} removida{fasesDoProjeto.length !== 1 ? 's' : ''}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                      {projetosLojas[nomeProjeto] && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                          🏪 {projetosLojas[nomeProjeto]}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {fasesDoProjeto.length} fase{fasesDoProjeto.length !== 1 ? 's' : ''} removida{fasesDoProjeto.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Ações do projeto */}
-                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                   <button
                     onClick={() => handleRestoreProjeto(nomeProjeto)}
                     disabled={isLoadingProjeto}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors font-medium text-xs border border-emerald-200 dark:border-emerald-800 disabled:opacity-50"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors font-bold text-xs border border-emerald-200 dark:border-emerald-800 disabled:opacity-50 active:scale-95"
                   >
                     <RefreshCcw className={`w-3.5 h-3.5 ${isLoadingProjeto ? 'animate-spin' : ''}`} />
-                    Restaurar Projeto
+                    <span>Restaurar Projeto</span>
                   </button>
                   <button
                     onClick={() => handleHardDeleteProjeto(nomeProjeto)}
                     disabled={isLoadingProjeto}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors font-medium text-xs border border-rose-200 dark:border-rose-800 disabled:opacity-50"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors font-bold text-xs border border-rose-200 dark:border-rose-800 disabled:opacity-50 active:scale-95"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Excluir Permanentemente
+                    <span>Excluir Permanentemente</span>
                   </button>
                   <button
                     onClick={() => toggleExpand(nomeProjeto)}
-                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#1e293b] text-slate-400 transition-colors"
+                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#1e293b] text-slate-400 transition-colors border border-slate-200 dark:border-slate-800 sm:border-transparent shrink-0"
                     title={isExpanded ? 'Recolher fases' : 'Ver fases'}
                   >
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}

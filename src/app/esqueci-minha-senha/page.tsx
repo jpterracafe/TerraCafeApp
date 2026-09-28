@@ -59,7 +59,7 @@ export default function EsqueciMinhaSenhaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] flex items-center justify-center p-4 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] flex items-center justify-center p-3 sm:p-4 relative overflow-hidden font-sans">
 
       <div className="absolute top-4 right-4 z-50"><ThemeToggle /></div>
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none opacity-30">
@@ -67,7 +67,7 @@ export default function EsqueciMinhaSenhaPage() {
         <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-emerald-600 rounded-full blur-[120px]"></div>
       </div>
 
-      <div className="w-full max-w-md bg-white dark:bg-[#0d1527]/80 backdrop-blur-xl border border-slate-200 dark:border-[#1e293b] rounded-2xl shadow-2xl z-10 p-8 sm:p-10">
+      <div className="w-full max-w-md bg-white dark:bg-[#0d1527]/80 backdrop-blur-xl border border-slate-200 dark:border-[#1e293b] rounded-2xl shadow-2xl z-10 p-5 sm:p-8 md:p-10">
 
         <div className="flex flex-col items-center mb-8 text-center">
           <div className="w-14 h-14 bg-blue-600/10 border border-blue-500/20 rounded-2xl flex items-center justify-center mb-4 shadow-inner">

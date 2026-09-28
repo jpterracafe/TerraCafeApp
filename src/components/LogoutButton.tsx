@@ -24,12 +24,13 @@ export default function LogoutButton() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="p-3 rounded-full border bg-white dark:bg-[#0d1527] border-slate-200 dark:border-[#1e293b] text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-sm disabled:opacity-60"
+      className="p-2 sm:p-2.5 rounded-xl border bg-white dark:bg-[#0d1527] border-slate-200 dark:border-[#1e293b] text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors shadow-xs disabled:opacity-60 shrink-0"
       title="Sair do Sistema"
+      aria-label="Sair do Sistema"
     >
       {loading
-        ? <span className="w-5 h-5 border-2 border-rose-300 border-t-rose-500 rounded-full animate-spin block" />
-        : <LogOut className="w-5 h-5" />
+        ? <span className="w-4 h-4 sm:w-4.5 sm:h-4.5 border-2 border-rose-300 border-t-rose-500 rounded-full animate-spin block" />
+        : <LogOut className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
       }
     </button>
   );

@@ -510,40 +510,40 @@ export default function AdminUsuariosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-4 md:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-3 sm:p-5 md:p-8 font-sans">
       
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 sm:mb-8 gap-3 sm:gap-4">
         <div>
-          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 dark:text-slate-400 mb-2">
+          <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1.5 sm:mb-2">
             <BackButton />
             <span>Portal</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
             <span>Administração</span>
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-slate-900 dark:text-white font-medium">Usuários do Sistema</span>
           </nav>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white flex items-center gap-3">
-            <Lock className="w-6 h-6 text-blue-500" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5 sm:gap-3">
+            <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
             Controle de Acesso (RBAC)
           </h1>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Link 
             href="/admin/importar"
-            className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-emerald-900/20"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md shadow-emerald-900/20 active:scale-95"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            Importar Dados (CSV)
+            <span>Importar CSV</span>
           </Link>
 
           <Link 
             href="/irrigacao/diario-campo"
-            className="flex items-center justify-center gap-2 bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1e293b] px-4 py-2 rounded-lg font-medium transition-all"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-slate-100 dark:bg-[#111a30] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#1e293b] px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all"
           >
             <LayoutDashboard className="w-4 h-4" />
-            Acessar Plataforma
+            <span>Diário de Campo</span>
           </Link>
 
           <button 
@@ -552,28 +552,28 @@ export default function AdminUsuariosPage() {
               setIsLojasModalOpen(true);
               loadProjetosAdmin();
             }}
-            className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-semibold px-4 py-2 rounded-lg transition-all shadow-md shadow-amber-900/20"
+            className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm transition-all shadow-md shadow-amber-900/20 active:scale-95"
             title="Adicionar lojas ou atribuir projetos a filiais"
           >
             <Store className="w-4 h-4" />
-            Lojas & Projetos ({lojas.length})
+            <span>Lojas & Projetos ({lojas.length})</span>
           </button>
 
           <button 
             onClick={() => setIsInviteModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-slate-900 dark:text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 sm:gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-md shadow-blue-900/20 active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            Convidar Novo Usuário
+            <span>Convidar Usuário</span>
           </button>
         </div>
       </div>
 
       {/* FILTER & TABLE */}
-      <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl shadow-xl shadow-black/30 overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-900/10 dark:hover:shadow-blue-500/10">
+      <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl shadow-xl shadow-black/20 overflow-hidden transition-all duration-300">
         
         {/* TOOLBAR */}
-        <div className="p-5 border-b border-slate-200 dark:border-[#1e293b] flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-[#1e293b] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
           <div className="relative w-full sm:w-80">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input 
@@ -581,17 +581,216 @@ export default function AdminUsuariosPage() {
               placeholder="Buscar por nome, email ou cargo..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
+              className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 transition-colors"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-500/10 px-4 py-2 rounded-lg border border-blue-500/20">
+          <div className="flex items-center gap-2 text-xs text-blue-400 bg-blue-500/10 px-3.5 py-1.5 rounded-xl border border-blue-500/20 self-start sm:self-auto font-medium">
             <ShieldAlert className="w-4 h-4" />
             <span>Acesso Restrito: Desenvolvedores</span>
           </div>
         </div>
 
-        {/* TABLE */}
-        <div className="overflow-x-auto">
+        {/* MOBILE CARDS VIEW (md:hidden) */}
+        <div className="md:hidden divide-y divide-slate-200 dark:divide-[#1e293b]">
+          {loadingList && (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              Carregando usuários do banco...
+            </div>
+          )}
+          {!loadingList && listError && (
+            <div className="p-4 text-center text-rose-400 text-sm">
+              {listError}
+            </div>
+          )}
+          {!loadingList && filtered.length === 0 && !listError && (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              Nenhum usuário cadastrado no banco ainda. Use Convidar Novo Usuário.
+            </div>
+          )}
+          {!loadingList && filtered.map((u) => {
+            const senhaVisivel = senhasVisiveis.has(u.id);
+            const temSenha = !!u.senhaGerada;
+            return (
+              <div key={u.id} className="p-4 space-y-3.5 hover:bg-slate-50/50 dark:hover:bg-[#111a30]/50 transition-colors">
+                {/* Header: Avatar, Name, Email, Status */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-10 h-10 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${
+                      u.cargo === 'Desenvolvedor' ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' : 'bg-slate-200 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}>
+                      {u.avatar}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-slate-900 dark:text-white font-semibold text-sm truncate">{u.nome}</div>
+                      <div className="text-xs text-slate-500 truncate">{u.email}</div>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
+                    {getStatusBadge(u.status)}
+                  </div>
+                </div>
+
+                {/* Cargo and Loja selectors */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Nível de Acesso</label>
+                    {u.cargo === 'Desenvolvedor' ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 w-full">
+                        💻 Desenvolvedor (Master)
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={u.cargo}
+                          disabled={updatingRoleId === u.id}
+                          onChange={(e) => handleUpdateRole(u.id, e.target.value as RoleSistema)}
+                          aria-label={`Nível de acesso para ${u.nome}`}
+                          className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-2 focus:outline-none focus:border-blue-500 transition-colors disabled:opacity-60"
+                        >
+                          <option value="Montador">🛠️ Montador</option>
+                          <option value="Gerente">🏢 Gerente</option>
+                          <option value="Coordenador">📊 Coordenador</option>
+                          <option value="Diretor">👔 Diretor</option>
+                          <option value="Admin">🛡️ Admin</option>
+                        </select>
+                        {updatingRoleId === u.id && (
+                          <span className="w-3.5 h-3.5 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin shrink-0" />
+                        )}
+                        {savedRoleId === u.id && (
+                          <span className="text-[11px] text-emerald-500 font-bold shrink-0 animate-pulse">✓</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Loja / Filial</label>
+                    {u.cargo === 'Desenvolvedor' ? (
+                      <span className="inline-flex items-center px-2.5 py-1.5 rounded-lg text-xs text-slate-400 italic bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] w-full">
+                        Todas as Lojas
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={u.loja || ''}
+                          disabled={updatingLojaId === u.id}
+                          onChange={(e) => handleUpdateLoja(u.id, e.target.value)}
+                          aria-label={`Loja ou filial para ${u.nome}`}
+                          className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-lg px-2.5 py-2 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-60"
+                        >
+                          <option value="">— Sem Loja —</option>
+                          {lojas.map((l) => (
+                            <option key={l.id} value={l.nome}>
+                              🏬 {l.nome}
+                            </option>
+                          ))}
+                        </select>
+                        {updatingLojaId === u.id && (
+                          <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin shrink-0" />
+                        )}
+                        {savedLojaId === u.id && (
+                          <span className="text-[11px] text-emerald-500 font-bold shrink-0 animate-pulse">✓</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Password & Last Login */}
+                <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-100/70 dark:bg-[#070c18] border border-slate-200/60 dark:border-[#1e293b]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[11px] text-slate-400 font-medium shrink-0">Senha:</span>
+                    {temSenha ? (
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <code className={`font-mono text-xs tracking-wider transition-all select-all font-semibold ${senhaVisivel ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-400'}`}>
+                          {senhaVisivel ? u.senhaGerada : '••••••••'}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => toggleSenha(u.id)}
+                          className="p-1 rounded text-slate-400 hover:text-blue-500 transition-colors"
+                          title={senhaVisivel ? 'Ocultar senha' : 'Revelar senha'}
+                        >
+                          {senhaVisivel ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copySenha(u.id, u.senhaGerada!)}
+                          className={`p-1 rounded transition-colors ${copiedSenhaId === u.id ? 'text-emerald-500' : 'text-slate-400 hover:text-emerald-500'}`}
+                          title="Copiar senha"
+                        >
+                          {copiedSenhaId === u.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center gap-1.5">
+                        <span className="text-xs text-amber-500/90 font-medium italic">Não definida</span>
+                        <button
+                          type="button"
+                          onClick={() => handleResetSenha(u)}
+                          disabled={resettingId === u.id}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                        >
+                          {resettingId === u.id ? (
+                            <span className="w-2.5 h-2.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                          ) : (
+                            <Key className="w-2.5 h-2.5" />
+                          )}
+                          Gerar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] text-slate-400">
+                    Login: {u.ultimoLogin ? new Date(u.ultimoLogin).toLocaleDateString('pt-BR') : 'Nunca'}
+                  </div>
+                </div>
+
+                {/* Actions row */}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditSenhaUser(u);
+                      setEditSenhaInput(u.senhaGerada || '');
+                      setEditSenhaError('');
+                    }}
+                    className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium text-blue-500 bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 transition-colors flex items-center justify-center gap-1"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    Alterar Senha
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResetSenha(u)}
+                    disabled={resettingId === u.id}
+                    className="py-1.5 px-2.5 rounded-lg text-xs font-medium text-amber-500 bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    {resettingId === u.id ? (
+                      <span className="w-3.5 h-3.5 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5" />
+                    )}
+                    Resetar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUserToDelete(u)}
+                    disabled={deletingId === u.id}
+                    className="py-1.5 px-2.5 rounded-lg text-xs font-medium text-rose-500 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Excluir
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* DESKTOP TABLE (hidden md:block) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[800px] text-sm text-left">
             <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-[#0b1329] border-b border-slate-200 dark:border-[#1e293b]">
               <tr>
@@ -829,11 +1028,11 @@ export default function AdminUsuariosPage() {
 
       {/* MODAL - CONVIDAR USUÁRIO */}
       {isInviteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl shadow-black overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl shadow-black overflow-hidden animate-in zoom-in-95 duration-200">
             
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Convidar Novo Usuário</h3>
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Convidar Novo Usuário</h3>
               <button 
                 onClick={closeInviteModal}
                 className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:text-white transition-colors"
@@ -842,7 +1041,7 @@ export default function AdminUsuariosPage() {
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
               {!inviteLink ? (
                 <form id="invite-form" onSubmit={handleCreateInvite} className="space-y-4">
                   <div>
@@ -1016,15 +1215,15 @@ export default function AdminUsuariosPage() {
 
       {/* MODAL - ALTERAR SENHA DO USUÁRIO */}
       {editSenhaUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl w-full max-w-md shadow-2xl shadow-black overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-md max-h-[92dvh] flex flex-col shadow-2xl shadow-black overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#0b1329] shrink-0">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                   <Key className="w-5 h-5 text-blue-500" />
                   Alterar Senha do Usuário
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-[240px] sm:max-w-none">
                   {editSenhaUser.nome} ({editSenhaUser.email})
                 </p>
               </div>
@@ -1040,7 +1239,7 @@ export default function AdminUsuariosPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveCustomSenha} className="p-6 space-y-4">
+            <form onSubmit={handleSaveCustomSenha} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-2">
                   Nova Senha
@@ -1099,15 +1298,15 @@ export default function AdminUsuariosPage() {
 
       {/* MODAL: GERENCIAR LOJAS & ATRIBUIR PROJETOS */}
       {isLojasModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-            <div className="p-6 border-b border-slate-200 dark:border-[#1e293b] flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl w-full max-w-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-[#1e293b] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-500/10 text-amber-500 rounded-xl">
+                <div className="p-2 sm:p-2.5 bg-amber-500/10 text-amber-500 rounded-xl">
                   <Store className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Gerenciar Lojas & Filiais</h2>
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Gerenciar Lojas & Filiais</h2>
                   <p className="text-xs text-slate-400">Cadastre filiais e atribua projetos a cada uma</p>
                 </div>
               </div>
@@ -1123,17 +1322,17 @@ export default function AdminUsuariosPage() {
             </div>
 
             {/* ABAS DO MODAL */}
-            <div className="flex border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] px-6">
+            <div className="flex border-b border-slate-200 dark:border-[#1e293b] bg-slate-50 dark:bg-[#070c18] px-3 sm:px-6 shrink-0 overflow-x-auto no-scrollbar">
               <button
                 type="button"
                 onClick={() => setActiveLojasTab('lojas')}
-                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center gap-1.5 sm:gap-2 transition-all whitespace-nowrap ${
                   activeLojasTab === 'lojas'
                     ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                     : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
-                <Store className="w-4 h-4" />
+                <Store className="w-4 h-4 shrink-0" />
                 <span>Filiais / Lojas ({lojas.length})</span>
               </button>
               <button
@@ -1142,18 +1341,18 @@ export default function AdminUsuariosPage() {
                   setActiveLojasTab('projetos');
                   loadProjetosAdmin();
                 }}
-                className={`py-3 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
+                className={`py-3 px-3 sm:px-4 text-xs font-bold border-b-2 flex items-center gap-1.5 sm:gap-2 transition-all whitespace-nowrap ${
                   activeLojasTab === 'projetos'
                     ? 'border-amber-500 text-amber-600 dark:text-amber-400'
                     : 'border-transparent text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
-                <Briefcase className="w-4 h-4" />
-                <span>Atribuir Projetos às Lojas ({projetosList.length})</span>
+                <Briefcase className="w-4 h-4 shrink-0" />
+                <span>Atribuir Projetos ({projetosList.length})</span>
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
               {activeLojasTab === 'lojas' ? (
                 <>
                   {/* Formulário de Adicionar Nova Loja (Apenas o nome) */}

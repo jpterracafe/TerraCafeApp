@@ -1063,55 +1063,55 @@ export default function DashboardPage() {
         </div>
 
         {/* Controles de Período e Abas */}
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
           {/* Período */}
-          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs" title="O período filtra rendimento, ritmo e apontamentos. Situação atual das obras e cronograma usam sempre os dados mais recentes.">
-            <span className="text-slate-400 px-2 text-[10px] uppercase font-bold">Período:</span>
+          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 text-xs overflow-x-auto no-scrollbar touch-pan-x" title="O período filtra rendimento, ritmo e apontamentos. Situação atual das obras e cronograma usam sempre os dados mais recentes.">
+            <span className="text-slate-400 px-1.5 sm:px-2 text-[10px] uppercase font-bold shrink-0">Período:</span>
             {(['7d', '15d', '30d', 'tudo'] as const).map(p => (
               <button
                 key={p}
                 onClick={() => setPeriodoFilter(p)}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
+                className={`px-2 sm:px-2.5 py-1 rounded-lg font-semibold transition-all shrink-0 ${
                   periodoFilter === p
                     ? 'bg-white dark:bg-[#1e293b] text-blue-600 dark:text-blue-400 shadow-sm'
                     : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {p === 'tudo' ? 'Tudo' : `${p.replace('d', '')} dias`}
+                {p === 'tudo' ? 'Tudo' : `${p.replace('d', '')}d`}
               </button>
             ))}
           </div>
 
           {/* Alternância de Abas */}
-          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-lg p-1 text-xs">
+          <div className="flex items-center bg-slate-100 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 text-xs w-full sm:w-auto justify-between sm:justify-start">
             <button
               onClick={() => setActiveTab('campo')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${
                 activeTab === 'campo'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Wrench className="w-3.5 h-3.5" />
-              Operação de Campo & Irrigação
+              <Wrench className="w-3.5 h-3.5 shrink-0" />
+              <span><span className="hidden sm:inline">Operação de </span>Campo</span>
             </button>
             <button
               onClick={() => setActiveTab('cronograma')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-semibold transition-all ${
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold transition-all text-xs ${
                 activeTab === 'cronograma'
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Calendar className="w-3.5 h-3.5" />
-              Cronograma & Prazos das 6 Fases
+              <Calendar className="w-3.5 h-3.5 shrink-0" />
+              <span>Cronograma<span className="hidden sm:inline"> & Prazos</span></span>
             </button>
           </div>
         </div>
       </div>
 
       {/* ── PLACAR DE KPIS DO DIRETOR (Cards de Destaque) ────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3.5 mb-6">
         
         {/* KPI 1: Obras Ativas */}
         <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-4 shadow-sm relative overflow-hidden">

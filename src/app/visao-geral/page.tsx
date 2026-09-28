@@ -601,17 +601,17 @@ export default function VisaoGeralDiretorPage() {
     <div
       ref={scrollContainerRef}
       className={`min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 font-sans transition-colors ${
-        modoTV ? 'overflow-y-auto' : 'p-4 md:p-8'
+        modoTV ? 'overflow-y-auto' : 'p-3 sm:p-5 md:p-8'
       }`}
     >
       {/* Barra de Topo Integrada do Modo TV (substitui a barra padrão com layout dedicado para telões, sem conflitos) */}
       {modoTV && (
-        <header className="sticky top-0 z-50 bg-[#0d1527]/95 backdrop-blur-md border-b border-[#1e293b] px-4 md:px-6 py-3 flex items-center justify-between shadow-xl mb-4">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-50 bg-[#0d1527]/95 backdrop-blur-md border-b border-[#1e293b] px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 flex items-center justify-between shadow-xl mb-4">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src="/logo-terra-cafe-white.png"
               alt="TerraCafé Irrigação"
-              className="h-8 md:h-9 w-auto object-contain shrink-0"
+              className="h-7 sm:h-8 md:h-9 w-auto object-contain shrink-0"
             />
             <div className="h-6 w-px bg-slate-700/60 hidden sm:block" />
             <div className="flex items-center gap-2">
@@ -632,10 +632,10 @@ export default function VisaoGeralDiretorPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Seletor de Loja dedicado no Modo TV */}
-            <div className="flex items-center gap-1.5 bg-[#16203a] px-2.5 py-1 rounded-xl border border-[#1e293b]">
-              <span className="text-xs text-slate-400 font-medium">Filial:</span>
+            <div className="flex items-center gap-1.5 bg-[#16203a] px-2 sm:px-2.5 py-1 rounded-xl border border-[#1e293b]">
+              <span className="text-xs text-slate-400 font-medium hidden sm:inline">Filial:</span>
               <LojaSelector />
             </div>
 
@@ -647,7 +647,7 @@ export default function VisaoGeralDiretorPage() {
 
             <button
               onClick={toggleModoTV}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-500 text-white border border-rose-400/40 shadow-lg shadow-rose-900/30 flex items-center gap-1.5 transition-all active:scale-95"
+              className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-rose-600/90 hover:bg-rose-500 text-white border border-rose-400/40 shadow-lg shadow-rose-900/30 flex items-center gap-1.5 transition-all active:scale-95"
               title="Sair do Modo TV (ou pressione ESC)"
             >
               <Tv className="w-3.5 h-3.5" />
@@ -660,9 +660,9 @@ export default function VisaoGeralDiretorPage() {
       {!modoTV && (
         <>
         {/* Topbar Executiva & Controles (escondido no modo TV) */}
-        <header className="max-w-7xl mx-auto mb-6 bg-white/90 dark:bg-[#0d1527]/90 backdrop-blur-md p-4 md:p-5 rounded-2xl border border-slate-200 dark:border-[#1e293b] shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <header className="max-w-7xl mx-auto mb-4 sm:mb-6 bg-white/90 dark:bg-[#0d1527]/90 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl border border-slate-200 dark:border-[#1e293b] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                 {(session?.user as any)?.role === 'Gerente'
                   ? `🏢 Painel do Gerente · ${userAssignedLoja || 'Minha Cidade'}`
@@ -819,7 +819,7 @@ export default function VisaoGeralDiretorPage() {
         )}
 
         {/* ── Barra de controles: busca + filtro + toggle modo ──────────── */}
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           {/* Busca */}
           <div className="relative w-full sm:w-72">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -832,53 +832,55 @@ export default function VisaoGeralDiretorPage() {
             />
           </div>
 
-          {/* Filtro status */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 flex-shrink-0 max-w-full overflow-x-auto">
-            {([
-              { id: 'todos', label: 'Todas' },
-              { id: 'atrasado', label: '🚨 Atraso' },
-              { id: 'em_andamento', label: '⏳ Em Dia' },
-              { id: 'concluido', label: '✅ Concluídas' },
-            ] as const).map(f => (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setFiltroStatus(f.id)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  filtroStatus === f.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2 flex-1 flex-wrap sm:flex-nowrap">
+            {/* Filtro status com scroll horizontal no celular */}
+            <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 max-w-full overflow-x-auto no-scrollbar touch-pan-x shrink-0">
+              {([
+                { id: 'todos', label: 'Todas' },
+                { id: 'atrasado', label: '🚨 Atraso' },
+                { id: 'em_andamento', label: '⏳ Em Dia' },
+                { id: 'concluido', label: '✅ Concluídas' },
+              ] as const).map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setFiltroStatus(f.id)}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
+                    filtroStatus === f.id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Toggle Resumido / Detalhado */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 sm:ml-auto shrink-0">
-            <button
-              type="button"
-              onClick={() => setModoView('resumido')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                modoView === 'resumido' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title="Modo Resumido: cards compactos lado a lado"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              Resumido
-            </button>
-            <button
-              type="button"
-              onClick={() => setModoView('detalhado')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                modoView === 'detalhado' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
-              title="Modo Detalhado: tabela completa de fases"
-            >
-              <List className="w-3.5 h-3.5" />
-              Detalhado
-            </button>
+            {/* Toggle Resumido / Detalhado */}
+            <div className="flex items-center gap-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-1 sm:ml-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => setModoView('resumido')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  modoView === 'resumido' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Modo Resumido: cards compactos lado a lado"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                Resumido
+              </button>
+              <button
+                type="button"
+                onClick={() => setModoView('detalhado')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  modoView === 'detalhado' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+                title="Modo Detalhado: tabela completa de fases"
+              >
+                <List className="w-3.5 h-3.5" />
+                Detalhado
+              </button>
+            </div>
           </div>
         </div>
 

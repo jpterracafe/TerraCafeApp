@@ -110,7 +110,7 @@ export default function LoginPage() {
       </div>
 
       {/* Card Principal de Login */}
-      <div className="w-full max-w-md bg-white/95 dark:bg-[#0f1715]/90 backdrop-blur-2xl border border-slate-200/90 dark:border-emerald-900/40 rounded-3xl shadow-xl shadow-slate-300/50 dark:shadow-2xl dark:shadow-black/80 z-10 p-8 sm:p-10 relative transition-colors duration-200">
+      <div className="w-full max-w-md bg-white/95 dark:bg-[#0f1715]/90 backdrop-blur-2xl border border-slate-200/90 dark:border-emerald-900/40 rounded-3xl shadow-xl shadow-slate-300/50 dark:shadow-2xl dark:shadow-black/80 z-10 p-5 sm:p-8 md:p-10 relative transition-colors duration-200">
         
         {/* Detalhe superior em gradiente verde cafeeiro */}
         <div className="absolute top-0 left-10 right-10 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/60 to-transparent" />

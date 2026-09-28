@@ -15,12 +15,43 @@
 
 body {
   @apply bg-slate-50 dark:bg-[#070c18] text-slate-900 dark:text-white;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
-/* Custom Scrollbar Premium */
+/* Evita auto-zoom indesejado no Safari iOS em inputs/selects/textareas menores que 16px */
+@media screen and (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Utilitário no-scrollbar cross-browser para barras de navegação horizontal no celular */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+.no-scrollbar {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Suporte a Safe Area do iOS (Notch e barra home do iPhone) */
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+.pt-safe {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+
+/* Custom Scrollbar Premium Desktop */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;

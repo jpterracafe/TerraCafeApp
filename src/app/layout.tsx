@@ -1,10 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import NavigationDrawer from "@/components/NavigationDrawer";
 import Providers from "@/components/Providers";
 
 export const dynamic = 'force-dynamic';
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0b1329",
+};
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

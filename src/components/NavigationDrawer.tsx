@@ -55,30 +55,30 @@ export default function NavigationDrawer() {
   return (
     <>
       {/* Top Bar Unificada */}
-      <header className="sticky top-0 z-40 flex items-center justify-between h-16 px-3 sm:px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm transition-colors [.modo-tv-ativo_&]:hidden">
-        <div className="flex items-center min-w-0">
+      <header className="sticky top-0 z-40 flex items-center justify-between h-14 sm:h-16 px-2.5 sm:px-4 md:px-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-xs transition-colors [.modo-tv-ativo_&]:hidden">
+        <div className="flex items-center min-w-0 pr-1">
           <button 
             onClick={toggleDrawer}
-            className="p-2 -ml-1 sm:-ml-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
+            className="p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 shrink-0"
             aria-label="Abrir menu lateral"
           >
-            <Menu className="w-6 h-6" />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div className="ml-2 sm:ml-3 flex items-center min-w-0">
+          <div className="ml-1.5 sm:ml-3 flex items-center min-w-0">
             <img
               src="/logo-terra-cafe.png"
               alt="TerraCafé Irrigação"
-              className="h-6 sm:h-7 md:h-8 w-auto max-w-[140px] sm:max-w-[180px] object-contain dark:hidden shrink-0"
+              className="h-5 sm:h-7 md:h-8 w-auto max-w-[105px] sm:max-w-[150px] md:max-w-[180px] object-contain dark:hidden shrink-0"
             />
             <img
               src="/logo-terra-cafe-white.png"
               alt="TerraCafé Irrigação"
-              className="h-6 sm:h-7 md:h-8 w-auto max-w-[140px] sm:max-w-[180px] object-contain hidden dark:block shrink-0"
+              className="h-5 sm:h-7 md:h-8 w-auto max-w-[105px] sm:max-w-[150px] md:max-w-[180px] object-contain hidden dark:block shrink-0"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
           <LojaSelector />
           <ThemeToggle />
           <LogoutButton />
@@ -95,7 +95,7 @@ export default function NavigationDrawer() {
 
       {/* Drawer (Menu Lateral) */}
       <div 
-        className={`fixed top-0 left-0 h-full w-72 bg-white dark:bg-gray-900 shadow-2xl z-50 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col ${
+        className={`fixed top-0 left-0 h-full w-72 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl z-50 transform transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] flex flex-col pb-safe ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
