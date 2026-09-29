@@ -3,9 +3,21 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
-import { ChevronRight, RefreshCcw, Trash2, Archive, Briefcase, ChevronDown, ChevronUp, CalendarCheck } from 'lucide-react';
+import {
+  ChevronRight,
+  RefreshCcw,
+  Trash2,
+  Archive,
+  Briefcase,
+  ChevronDown,
+  ChevronUp,
+  CalendarCheck,
+  X,
+  AlertTriangle,
+  Loader2,
+} from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
-import { offlineFetch } from '@/lib/offline';
+import { offlineFetch, invalidateOfflineCache } from '@/lib/offline';
 import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
 
@@ -32,12 +44,16 @@ function formatConcluidoEm(value?: string | null): string {
 
 export default function ProjetosConcluidosPage() {
   const { success, error: toastError } = useToast();
-  const { isProjectInSelectedLoja, projetosLojas } = useLoja();
+  const { isProjectInSelectedLoja, projetosLojas, selectedLoja } = useLoja();
   const [projetosInfo, setProjetosInfo] = useState<ProjetoConcluido[]>([]);
   const [fasesConcluidas, setFasesConcluidas] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+
+  // Modal in-app para mover para a lixeira com segurança
+  const [projectToTrashModal, setProjectToTrashModal] = useState<string | null>(null);
 
   const loadConcluidos = useCallback(async () => {
     setLoading(true);
@@ -52,7 +68,7 @@ export default function ProjetosConcluidosPage() {
         const data = await resProjetos.json();
         const lista = (data?.projetos || []) as ProjetoConcluido[];
         setProjetosInfo(lista);
-        lista.forEach(p => nomesConcluidos.add(p.nome));
+        lista.forEach((p) => nomesConcluidos.add(p.nome));
       } else {
         setProjetosInfo([]);
       }
@@ -61,7 +77,7 @@ export default function ProjetosConcluidosPage() {
         const { fases } = await resFases.json();
         setFasesConcluidas(
           (fases as FaseAcao[]).filter(
-            f => !f.isDeleted && f.projetoCliente && nomesConcluidos.has(f.projetoCliente)
+            (f) => !f.isDeleted && f.projetoCliente && nomesConcluidos.has(f.projetoCliente)
           )
         );
       } else {
@@ -74,17 +90,21 @@ export default function ProjetosConcluidosPage() {
     }
   }, []);
 
-  useEffect(() => { loadConcluidos(); }, [loadConcluidos]);
+  useEffect(() => {
+    loadConcluidos();
+  }, [loadConcluidos]);
 
-  // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade ─────────
+  // ── Auto-refresh: polling 30s + recarga ao focar/visibilidade (protegido contra concorrência) ──
   useEffect(() => {
     let timerId: ReturnType<typeof setInterval> | null = null;
     const REFRESH_MS = 30 * 1000;
 
+    const canRefresh = () => !loading && !actionInProgress;
+
     const startPolling = () => {
       if (timerId) return;
       timerId = setInterval(() => {
-        if (!loading) loadConcluidos();
+        if (canRefresh()) loadConcluidos();
       }, REFRESH_MS);
     };
 
@@ -97,7 +117,7 @@ export default function ProjetosConcluidosPage() {
 
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
-        if (!loading) loadConcluidos();
+        if (canRefresh()) loadConcluidos();
         startPolling();
       } else {
         stopPolling();
@@ -105,7 +125,7 @@ export default function ProjetosConcluidosPage() {
     };
 
     const onFocus = () => {
-      if (!loading) loadConcluidos();
+      if (canRefresh()) loadConcluidos();
     };
 
     startPolling();
@@ -117,11 +137,11 @@ export default function ProjetosConcluidosPage() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [loadConcluidos, loading]);
+  }, [loadConcluidos, loading, actionInProgress]);
 
   const fasesPorProjeto = useMemo(() => {
     const mapa: Record<string, FaseAcao[]> = {};
-    fasesConcluidas.forEach(f => {
+    fasesConcluidas.forEach((f) => {
       const key = f.projetoCliente?.trim() || '(Sem projeto)';
       if (!isProjectInSelectedLoja(key, (f as any).criadoPorEmail || (f as any).criado_por_email)) return;
       if (!mapa[key]) mapa[key] = [];
@@ -131,18 +151,20 @@ export default function ProjetosConcluidosPage() {
   }, [fasesConcluidas, isProjectInSelectedLoja]);
 
   const toggleExpand = (nome: string) => {
-    setExpandedProjects(prev => {
+    setExpandedProjects((prev) => {
       const s = new Set(prev);
-      if (s.has(nome)) s.delete(nome); else s.add(nome);
+      if (s.has(nome)) s.delete(nome);
+      else s.add(nome);
       return s;
     });
   };
 
-  // Reabre o projeto (volta para a lista ativa de projetos)
+  // Reabre o projeto (volta para a lista ativa de projetos em andamento)
   const handleReabrirProjeto = async (nomeProjeto: string) => {
     const fasesDoProjeto = fasesPorProjeto[nomeProjeto] || [];
-    const ids = fasesDoProjeto.map(f => f.id);
-    setLoadingIds(prev => new Set([...prev, ...(ids.length ? ids : [nomeProjeto])]));
+    const ids = fasesDoProjeto.map((f) => f.id);
+    setActionInProgress(`reabrir-${nomeProjeto}`);
+    setLoadingIds((prev) => new Set([...prev, ...(ids.length ? ids : [nomeProjeto])]));
     try {
       const res = await offlineFetch('/api/projetos', {
         method: 'PUT',
@@ -151,64 +173,76 @@ export default function ProjetosConcluidosPage() {
       });
       if (!res.ok) throw new Error('Erro na API ao reabrir projeto.');
 
-      setFasesConcluidas(prev => prev.filter(f => f.projetoCliente !== nomeProjeto));
-      setProjetosInfo(prev => prev.filter(p => p.nome !== nomeProjeto));
+      invalidateOfflineCache();
+      setFasesConcluidas((prev) => prev.filter((f) => f.projetoCliente !== nomeProjeto));
+      setProjetosInfo((prev) => prev.filter((p) => p.nome !== nomeProjeto));
       success(`Projeto "${nomeProjeto}" reaberto e voltou para a lista ativa.`);
     } catch (e) {
       console.error('[concluidos] Erro ao reabrir projeto:', e);
       toastError('Erro ao reabrir o projeto.');
     } finally {
-      setLoadingIds(prev => {
+      setActionInProgress(null);
+      setLoadingIds((prev) => {
         const s = new Set(prev);
-        (ids.length ? ids : [nomeProjeto]).forEach(id => s.delete(id));
+        (ids.length ? ids : [nomeProjeto]).forEach((id) => s.delete(id));
         return s;
       });
     }
   };
 
   // Envia para a lixeira (soft delete). O projeto continua na lixeira até ser restaurado/excluído.
-  const handleEnviarLixeira = async (nomeProjeto: string) => {
-    if (!confirm(`Deseja enviar o projeto concluído "${nomeProjeto}" para a Lixeira de Projetos? Ele pode ser restaurado depois.`)) return;
+  const confirmEnviarLixeira = async () => {
+    if (!projectToTrashModal) return;
+    const nomeProjeto = projectToTrashModal;
+    setProjectToTrashModal(null);
 
     const fasesDoProjeto = fasesPorProjeto[nomeProjeto] || [];
-    const ids = fasesDoProjeto.map(f => f.id);
-    setLoadingIds(prev => new Set([...prev, ...(ids.length ? ids : [nomeProjeto])]));
+    const ids = fasesDoProjeto.map((f) => f.id);
+    setActionInProgress(`lixeira-${nomeProjeto}`);
+    setLoadingIds((prev) => new Set([...prev, ...(ids.length ? ids : [nomeProjeto])]));
+
     try {
-      const res = await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, { method: 'DELETE' });
+      const res = await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, {
+        method: 'DELETE',
+      });
       if (!res.ok) throw new Error('Erro na API ao mover para a lixeira.');
 
-      setFasesConcluidas(prev => prev.filter(f => f.projetoCliente !== nomeProjeto));
-      setProjetosInfo(prev => prev.filter(p => p.nome !== nomeProjeto));
+      invalidateOfflineCache();
+      setFasesConcluidas((prev) => prev.filter((f) => f.projetoCliente !== nomeProjeto));
+      setProjetosInfo((prev) => prev.filter((p) => p.nome !== nomeProjeto));
       success(`Projeto "${nomeProjeto}" movido para a Lixeira de Projetos.`);
     } catch (e) {
       console.error('[concluidos] Erro ao enviar para lixeira:', e);
       toastError('Erro ao mover o projeto para a lixeira.');
     } finally {
-      setLoadingIds(prev => {
+      setActionInProgress(null);
+      setLoadingIds((prev) => {
         const s = new Set(prev);
-        (ids.length ? ids : [nomeProjeto]).forEach(id => s.delete(id));
+        (ids.length ? ids : [nomeProjeto]).forEach((id) => s.delete(id));
         return s;
       });
     }
   };
 
   const projetosFiltrados = useMemo(() => {
-    return projetosInfo.filter(p => isProjectInSelectedLoja(p.nome, p.criador?.email));
+    return projetosInfo.filter((p) => isProjectInSelectedLoja(p.nome, p.criador?.email));
   }, [projetosInfo, isProjectInSelectedLoja]);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-600 dark:text-slate-300 p-3 sm:p-5 md:p-8 font-sans">
-
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-5 sm:mb-8 gap-3 sm:gap-4">
         <div>
           <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1.5 sm:mb-2">
             <BackButton />
-            <span>Portal</span><ChevronRight className="w-3.5 h-3.5" />
-            <span>Irrigação</span><ChevronRight className="w-3.5 h-3.5" />
+            <span>Portal</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+            <span>Irrigação</span>
+            <ChevronRight className="w-3.5 h-3.5" />
             <span className="text-emerald-600 dark:text-emerald-400 font-medium">Projetos Concluídos</span>
           </nav>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2.5 sm:gap-3">
-            <Archive className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-500" />Projetos Concluídos
+            <Archive className="w-6 h-6 sm:w-7 sm:h-7 text-emerald-500" />
+            Projetos Concluídos
           </h1>
           <p className="text-slate-500 dark:text-slate-400 mt-0.5 text-xs sm:text-sm">
             Projetos finalizados. Reabra o projeto se alguma fase precisar voltar ao acompanhamento.
@@ -223,7 +257,7 @@ export default function ProjetosConcluidosPage() {
         {loading && (
           <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-12 text-center text-slate-500">
             <span className="inline-block w-6 h-6 border-2 border-slate-300 border-t-emerald-500 rounded-full animate-spin mb-3" />
-            <p className="text-sm">Carregando projetos concluídos...</p>
+            <p className="text-sm font-medium">Carregando projetos concluídos...</p>
           </div>
         )}
 
@@ -231,115 +265,181 @@ export default function ProjetosConcluidosPage() {
           <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl p-16 text-center text-slate-500 dark:text-slate-400">
             <Archive className="w-16 h-16 mx-auto mb-4 opacity-20" />
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Nenhum projeto concluído</h3>
-            <p className="text-sm mt-1">Quando finalizar todas as fases, use o botão &quot;Concluir Projeto&quot; no Diário de Campo.</p>
+            <p className="text-sm mt-1">
+              Quando finalizar todas as fases, use o botão &quot;Concluir Projeto&quot; no Diário de Campo.
+            </p>
           </div>
         )}
 
-        {!loading && projetosFiltrados.map(projeto => {
-          const nomeProjeto = projeto.nome;
-          const isExpanded = expandedProjects.has(nomeProjeto);
-          const fasesDoProjeto = fasesPorProjeto[nomeProjeto] || [];
-          const isLoadingProjeto = fasesDoProjeto.some(f => loadingIds.has(f.id)) || loadingIds.has(nomeProjeto);
+        {!loading &&
+          projetosFiltrados.map((projeto) => {
+            const nomeProjeto = projeto.nome;
+            const isExpanded = expandedProjects.has(nomeProjeto);
+            const fasesDoProjeto = fasesPorProjeto[nomeProjeto] || [];
+            const isLoadingProjeto =
+              fasesDoProjeto.some((f) => loadingIds.has(f.id)) ||
+              loadingIds.has(nomeProjeto) ||
+              actionInProgress === `reabrir-${nomeProjeto}` ||
+              actionInProgress === `lixeira-${nomeProjeto}`;
 
-          return (
-            <div key={nomeProjeto} className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl overflow-hidden shadow-lg shadow-black/5">
-
-              {/* Cabeçalho do projeto */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 sm:p-5">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <Briefcase className="w-5 h-5 text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
-                      {projetosLojas[nomeProjeto] && (
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                          🏪 {projetosLojas[nomeProjeto]}
-                        </span>
-                      )}
+            return (
+              <div
+                key={nomeProjeto}
+                className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-xl overflow-hidden shadow-lg shadow-black/5 transition-all"
+              >
+                {/* Cabeçalho do projeto */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 sm:p-5">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+                      <Briefcase className="w-5 h-5 text-emerald-500 dark:text-emerald-400" />
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                      <span className="inline-flex items-center gap-1">
-                        <CalendarCheck className="w-3 h-3" />
-                        Concluído em {formatConcluidoEm(projeto.concluidoEm)}
-                      </span>
-                      {projeto.prazoFinal && (
-                        <span>
-                          Prazo final: <strong className="text-slate-500 dark:text-slate-300">{formatData(projeto.prazoFinal)}</strong>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
+                        {projetosLojas[nomeProjeto] && (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                            🏪 {projetosLojas[nomeProjeto]}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                          <CalendarCheck className="w-3.5 h-3.5" />
+                          Concluído em {formatConcluidoEm(projeto.concluidoEm)}
                         </span>
-                      )}
-                      {projeto.criador?.nome && (
-                        <span>Criador: {projeto.criador.nome}</span>
-                      )}
-                    </p>
+                        {projeto.prazoFinal && (
+                          <span>
+                            Prazo final:{' '}
+                            <strong className="text-slate-600 dark:text-slate-300">
+                              {formatData(projeto.prazoFinal)}
+                            </strong>
+                          </span>
+                        )}
+                        {projeto.criador?.nome && <span>Criador: {projeto.criador.nome}</span>}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Ações do projeto */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
+                    <button
+                      onClick={() => handleReabrirProjeto(nomeProjeto)}
+                      disabled={isLoadingProjeto}
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors font-bold text-xs border border-emerald-200 dark:border-emerald-800 disabled:opacity-50 active:scale-95"
+                    >
+                      <RefreshCcw className={`w-3.5 h-3.5 ${actionInProgress === `reabrir-${nomeProjeto}` ? 'animate-spin' : ''}`} />
+                      <span>Reabrir Projeto</span>
+                    </button>
+                    <button
+                      onClick={() => setProjectToTrashModal(nomeProjeto)}
+                      disabled={isLoadingProjeto}
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors font-bold text-xs border border-rose-200 dark:border-rose-800 disabled:opacity-50 active:scale-95"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Enviar à Lixeira</span>
+                    </button>
+                    <button
+                      onClick={() => toggleExpand(nomeProjeto)}
+                      className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#1e293b] text-slate-400 transition-colors border border-slate-200 dark:border-slate-800 sm:border-transparent shrink-0"
+                      title={isExpanded ? 'Recolher fases' : 'Ver fases'}
+                    >
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
-                {/* Ações do projeto */}
-                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
-                  <button
-                    onClick={() => handleReabrirProjeto(nomeProjeto)}
-                    disabled={isLoadingProjeto}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors font-bold text-xs border border-emerald-200 dark:border-emerald-800 disabled:opacity-50 active:scale-95"
-                  >
-                    <RefreshCcw className={`w-3.5 h-3.5 ${isLoadingProjeto ? 'animate-spin' : ''}`} />
-                    <span>Reabrir Projeto</span>
-                  </button>
-                  <button
-                    onClick={() => handleEnviarLixeira(nomeProjeto)}
-                    disabled={isLoadingProjeto}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors font-bold text-xs border border-rose-200 dark:border-rose-800 disabled:opacity-50 active:scale-95"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Enviar à Lixeira</span>
-                  </button>
-                  <button
-                    onClick={() => toggleExpand(nomeProjeto)}
-                    className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#1e293b] text-slate-400 transition-colors border border-slate-200 dark:border-slate-800 sm:border-transparent shrink-0"
-                    title={isExpanded ? 'Recolher fases' : 'Ver fases'}
-                  >
-                    {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Fases do projeto (expandível) */}
-              {isExpanded && (
-                <div className="border-t border-slate-100 dark:border-[#1e293b] overflow-x-auto">
-                  <table className="w-full text-sm min-w-[560px]">
-                    <thead className="bg-slate-50 dark:bg-[#0b1329]">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Fase</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Responsável</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Prazo</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-[#1e293b]">
-                      {fasesDoProjeto.map(fase => (
-                        <tr key={fase.id}>
-                          <td className="px-6 py-3 text-slate-700 dark:text-slate-300 capitalize">{fase.gabarito}</td>
-                          <td className="px-6 py-3 text-slate-500">{fase.responsavel}</td>
-                          <td className="px-6 py-3 text-slate-500">{fase.status}</td>
-                          <td className="px-6 py-3 text-slate-500">{formatData(fase.prazoLimite)}</td>
-                        </tr>
-                      ))}
-                      {fasesDoProjeto.length === 0 && (
+                {/* Fases do projeto (expandível) */}
+                {isExpanded && (
+                  <div className="border-t border-slate-100 dark:border-[#1e293b] overflow-x-auto">
+                    <table className="w-full text-sm min-w-[560px]">
+                      <thead className="bg-slate-50 dark:bg-[#0b1329]">
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 text-center text-xs text-slate-400">
-                            Nenhuma fase encontrada para este projeto.
-                          </td>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                            Fase
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                            Responsável
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                            Prazo
+                          </th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-[#1e293b]">
+                        {fasesDoProjeto.map((fase) => (
+                          <tr key={fase.id}>
+                            <td className="px-6 py-3 text-slate-700 dark:text-slate-300 capitalize font-medium">
+                              {fase.gabarito}
+                            </td>
+                            <td className="px-6 py-3 text-slate-500">{fase.responsavel}</td>
+                            <td className="px-6 py-3 text-slate-500">{fase.status}</td>
+                            <td className="px-6 py-3 text-slate-500">{formatData(fase.prazoLimite)}</td>
+                          </tr>
+                        ))}
+                        {fasesDoProjeto.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-4 text-center text-xs text-slate-400">
+                              Nenhuma fase encontrada para este projeto.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </div>
+
+      {/* Modal in-app para confirmação de envio à Lixeira */}
+      {projectToTrashModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl relative text-left">
+            <button
+              onClick={() => setProjectToTrashModal(null)}
+              className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center mb-4 text-rose-500">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">
+              Enviar à Lixeira de Projetos?
+            </h3>
+
+            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4 leading-relaxed">
+              Deseja mover o projeto concluído{' '}
+              <strong className="text-slate-900 dark:text-white">&quot;{projectToTrashModal}&quot;</strong> para a Lixeira?
+              Ele sairá desta listagem, mas continuará salvo na lixeira onde poderá ser restaurado caso necessário.
+            </p>
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setProjectToTrashModal(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-semibold transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmEnviarLixeira}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold shadow-md shadow-rose-900/30 transition-all active:scale-95"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Mover para a Lixeira</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

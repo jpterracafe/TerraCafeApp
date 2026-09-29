@@ -9,10 +9,12 @@ import {
   UserPlus, Copy, CheckCircle2, Link2
 } from 'lucide-react';
 import { Responsavel } from './mockResponsaveis';
-import { offlineFetch } from '@/lib/offline';
+import { offlineFetch, invalidateOfflineCache } from '@/lib/offline';
+import { useToast } from '@/components/Toast';
 
 export default function ResponsaveisPage() {
   const { data: session } = useSession();
+  const { success, error: toastError } = useToast();
   const userRole = (session?.user as { role?: string } | undefined)?.role ?? '';
   const isAdminView = ['Admin', 'Diretor', 'Desenvolvedor'].includes(userRole);
 
@@ -193,12 +195,17 @@ export default function ResponsaveisPage() {
             ...prev,
           ]);
         }
+        invalidateOfflineCache();
         setNovoNome('');
         setNovoCargo('');
         setIsAddModalOpen(false);
+        success('Responsável cadastrado com sucesso.');
+      } else {
+        toastError('Não foi possível cadastrar o responsável.');
       }
     } catch (e) {
       console.error('[responsaveis] Erro ao criar:', e);
+      toastError('Erro ao cadastrar o responsável.');
     } finally {
       setSaving(false);
     }
@@ -232,10 +239,17 @@ export default function ResponsaveisPage() {
         ));
       }
       // Deleta o responsável (offline: fica na fila e sincroniza depois)
-      await offlineFetch(`/api/responsaveis?id=${selectedToDelete.id}`, { method: 'DELETE' });
-      setResponsaveis(prev => prev.filter(r => r.id !== selectedToDelete.id));
+      const resDel = await offlineFetch(`/api/responsaveis?id=${selectedToDelete.id}`, { method: 'DELETE' });
+      if (resDel.ok) {
+        invalidateOfflineCache();
+        setResponsaveis(prev => prev.filter(r => r.id !== selectedToDelete.id));
+        success(`Responsável "${selectedToDelete.nome}" removido.`);
+      } else {
+        toastError('Erro ao remover o responsável no servidor.');
+      }
     } catch (e) {
       console.error('[responsaveis] Erro ao deletar:', e);
+      toastError('Erro de conexão ao deletar responsável.');
     } finally {
       setIsDeleteModalOpen(false);
       setSelectedToDelete(null);

@@ -1280,6 +1280,7 @@ export default function DiarioCampoTimelinePage() {
         return cp;
       });
 
+      invalidateOfflineCache();
       setIsDeleteProjectModalOpen(false);
       setSelectedProjeto('');
       await loadProjetos();
@@ -1307,6 +1308,7 @@ export default function DiarioCampoTimelinePage() {
       });
       if (!res.ok) throw new Error('Erro na API ao concluir.');
 
+      invalidateOfflineCache();
       setIsConcluirProjetoModalOpen(false);
       setSelectedProjeto('');
       await loadProjetos();

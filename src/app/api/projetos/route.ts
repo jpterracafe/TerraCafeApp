@@ -480,6 +480,25 @@ export async function PATCH(req: Request) {
       if (r.error) throw r.error;
     } catch (_) { /* ignora */ }
 
+    // Desmarca também o status de concluído para que o projeto restaurado volte ativo à lista
+    try {
+      const { data: rowStatus } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_status_v1")
+        .maybeSingle();
+
+      if (rowStatus?.valor && typeof rowStatus.valor === "object" && rowStatus.valor[nome]) {
+        const mapStatus = { ...rowStatus.valor };
+        delete mapStatus[nome];
+        await db.from("configuracoes_sistema").upsert({
+          chave: "diario_projetos_status_v1",
+          valor: mapStatus,
+          updated_at: agora,
+        });
+      }
+    } catch (_) { /* ignora */ }
+
     return NextResponse.json({ ok: true, restaurado: true, projeto: nome });
   } catch (e) {
     console.error("[PATCH /api/projetos]", e);
