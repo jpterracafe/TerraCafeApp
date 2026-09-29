@@ -23,6 +23,7 @@ import { useLoja } from '@/contexts/LojaContext';
 import { compressImage } from '@/lib/image-compress';
 import { exportToCSV } from '@/lib/export-csv';
 import InstallAppButton from '@/components/InstallPWA';
+import { getLocalISODate } from '@/lib/date-utils';
 
 interface DiarioUser { 
   id: string; 
@@ -252,7 +253,7 @@ export default function DiarioCampoTimelinePage() {
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [configEtapas, setConfigEtapas] = useState<Record<string, EtapaConfig>>({});
   const [tempMetaDias, setTempMetaDias] = useState(40);
-  const [tempDataInicio, setTempDataInicio] = useState(new Date().toISOString().split('T')[0]);
+  const [tempDataInicio, setTempDataInicio] = useState(getLocalISODate());
   const [tempMotivoAjuste, setTempMotivoAjuste] = useState('');
 
   // ── Prazos Finais Fixos (Imutáveis) e Justificativas de Campo ──────────────
@@ -719,7 +720,7 @@ export default function DiarioCampoTimelinePage() {
       const datas = logsProjeto.map(l => l.data).sort();
       return datas[0];
     }
-    return new Date().toISOString().split('T')[0];
+    return getLocalISODate();
   }, [projetoStartDates, selectedProjeto, registros]);
 
   const diaAtualDoProjeto = useMemo(() => {
@@ -740,7 +741,7 @@ export default function DiarioCampoTimelinePage() {
   const handleSaveProjectStartModal = () => {
     const updated = {
       ...projetoStartDates,
-      [selectedProjeto]: tempProjectStartDate || new Date().toISOString().split('T')[0],
+      [selectedProjeto]: tempProjectStartDate || getLocalISODate(),
     };
     saveProjectStartsToStorage(updated);
     setIsProjectStartModalOpen(false);
@@ -821,12 +822,12 @@ export default function DiarioCampoTimelinePage() {
   }, [currentEtapaConfig]);
 
   const handleOpenIniciarEtapaModal = () => {
-    setIniciarEtapaDataInicio(currentEtapaConfig.dataInicio || new Date().toISOString().split('T')[0]);
+    setIniciarEtapaDataInicio(currentEtapaConfig.dataInicio || getLocalISODate());
     let defaultPrazo = currentEtapaConfig.prazoLimite || '';
     if (!defaultPrazo) {
-      const d = new Date(`${currentEtapaConfig.dataInicio || new Date().toISOString().split('T')[0]}T00:00:00`);
+      const d = new Date(`${currentEtapaConfig.dataInicio || getLocalISODate()}T00:00:00`);
       d.setDate(d.getDate() + (currentEtapaConfig.metaDias || 20));
-      defaultPrazo = d.toISOString().split('T')[0];
+      defaultPrazo = getLocalISODate(d);
     }
     setIniciarEtapaPrazoLimite(defaultPrazo);
     setIniciarEtapaMetaDias(currentEtapaConfig.metaDias || 20);
@@ -865,7 +866,7 @@ export default function DiarioCampoTimelinePage() {
     saveEtapaConfigToStorage(updated);
 
     // ── Registra aviso no histórico sobre mudança de datas ─────────────────
-    const hojeStr = new Date().toISOString().split('T')[0];
+    const hojeStr = getLocalISODate();
     const antigo = configEtapas[currentConfigKey];
     const mudouInicio = antigo?.dataInicio && antigo.dataInicio !== iniciarEtapaDataInicio;
     const mudouPrazo  = antigo?.prazoLimite && antigo.prazoLimite !== iniciarEtapaPrazoLimite;
@@ -914,7 +915,7 @@ export default function DiarioCampoTimelinePage() {
     setConcluindoFase(true);
     try {
       const chaveEtapa = `${selectedProjeto}::${selectedEtapa}`;
-      const hojeStr = new Date().toISOString().split('T')[0];
+      const hojeStr = getLocalISODate();
       const responsaveisStr = currentEtapaResponsaveis.join(', ');
 
       // 1. Salvar progresso 100% via API (offline: fica na fila e sincroniza depois)
@@ -1100,13 +1101,13 @@ export default function DiarioCampoTimelinePage() {
     const faseFoiIniciada = prev.hasStarted === true;
     const novaMetaDias = Math.max(1, tempMetaDias);
     const novaDataInicio = faseFoiIniciada
-      ? (tempDataInicio || prev.dataInicio || new Date().toISOString().split('T')[0])
+      ? (tempDataInicio || prev.dataInicio || getLocalISODate())
       : ''; // NÃO INICIADA → SEM DATA
     const novoPrazoLimite = (() => {
       if (!faseFoiIniciada || !novaDataInicio) return ''; // NÃO INICIADA → SEM PRAZO
       const d = new Date(`${novaDataInicio}T00:00:00`);
       d.setDate(d.getDate() + (novaMetaDias - 1));
-      return d.toISOString().split('T')[0];
+      return getLocalISODate(d);
     })();
 
     const updated = {
@@ -1127,7 +1128,7 @@ export default function DiarioCampoTimelinePage() {
 
     if (motivo || alterouDias || alterouData) {
       try {
-        const hojeStr = new Date().toISOString().split('T')[0];
+        const hojeStr = getLocalISODate();
         const respEtapaStr = currentEtapaResponsaveis.join(', ') || (session?.user?.name || '');
         const obsAjuste = `⏱️ Ajuste de Meta para ${tempMetaDias} dias (início: ${new Date(`${tempDataInicio}T00:00:00`).toLocaleDateString('pt-BR')}).${motivo ? ` Motivo: ${motivo}` : ''}`;
 
@@ -1172,7 +1173,7 @@ export default function DiarioCampoTimelinePage() {
 
     setCreatingProject(true);
     try {
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = getLocalISODate();
       // (offline: fica na fila e sincroniza depois)
       const res = await offlineFetch('/api/projetos', {
         method: 'POST',
@@ -1325,7 +1326,7 @@ export default function DiarioCampoTimelinePage() {
 
     setSavingJustificativa(true);
     try {
-      const hojeStr = new Date().toISOString().split('T')[0];
+      const hojeStr = getLocalISODate();
       const responsavelStr = currentEtapaResponsaveis.join(', ') || (session?.user?.name || '');
       const novaJust = {
         id: `just_${Date.now()}`,
@@ -1461,7 +1462,7 @@ export default function DiarioCampoTimelinePage() {
       }
 
       const responsaveisStr = currentEtapaResponsaveis.join(', ');
-      const hojeStr = new Date().toISOString().split('T')[0];
+      const hojeStr = getLocalISODate();
 
       const payloadDiario = {
         data: hojeStr,
@@ -1634,7 +1635,7 @@ export default function DiarioCampoTimelinePage() {
       (log.observacoes || '').replace(/\r?\n/g, ' '),
     ]);
 
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = getLocalISODate();
     const projSlug = (selectedProjeto || 'geral').toLowerCase().replace(/[^a-z0-9_-]/g, '_');
     exportToCSV(`diario-campo-${projSlug}-${hoje}.csv`, headers, rows);
     success('Planilha Excel (CSV) baixada com sucesso!');
@@ -3101,7 +3102,7 @@ export default function DiarioCampoTimelinePage() {
                       const Icon = conf.icon;
                       const isConfigUpdate = (log.status || '').toLowerCase().includes('configuração') || (log.status || '').toLowerCase().includes('atualizada');
                       const dateObj = new Date(`${log.data}T00:00:00`);
-                      const isToday = log.data === new Date().toISOString().split('T')[0];
+                      const isToday = log.data === getLocalISODate();
                       const dataFormatada = isToday 
                         ? 'Hoje' 
                         : dateObj.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });

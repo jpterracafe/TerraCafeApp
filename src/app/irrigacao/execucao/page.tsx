@@ -36,6 +36,7 @@ import {
   TERMOS_GENERICOS_RESPONSAVEL,
 } from '@/lib/responsaveis';
 import { useLoja } from '@/contexts/LojaContext';
+import { getLocalISODate } from '@/lib/date-utils';
 import InstallAppButton from '@/components/InstallPWA';
 import LojaSelector from '@/components/LojaSelector';
 
@@ -347,7 +348,7 @@ export default function PainelOperacionalObrasPage() {
 
   // Estatísticas e KPIs Operacionais (calculados sobre os projetos visíveis da loja)
   const kpis = useMemo(() => {
-    const hojeStr = new Date().toISOString().split('T')[0];
+    const hojeStr = getLocalISODate();
     const nomesDaLoja = new Set(projetosDaLoja.map(p => p.nome));
     const totalLogsHoje = diarioLogs.filter(l => l.data === hojeStr && (!l.projetoCliente || nomesDaLoja.has(l.projetoCliente))).length;
     const totalLogsGeral = diarioLogs.filter(l => !l.projetoCliente || nomesDaLoja.has(l.projetoCliente)).length;

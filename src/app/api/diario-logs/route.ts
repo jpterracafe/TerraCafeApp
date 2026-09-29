@@ -25,15 +25,32 @@ function mapLog(l: any) {
   };
 }
 
-// ── GET /api/diario-logs ───────────────────────────────────────────────────────
-export async function GET() {
+// ── GET /api/diario-logs?projeto=X ───────────────────────────────────────────
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const err = requireSession(session);
     if (err) return err;
 
+    const { searchParams } = new URL(req.url);
+    const projetoParam = searchParams.get("projeto")?.trim() || "";
+
     const db = getSupabase();
     const LOG_COLS = "id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, is_deleted, created_at";
+
+    let logsQuery = db
+      .from("diario_logs")
+      .select(LOG_COLS)
+      .eq("is_deleted", false);
+
+    if (projetoParam) {
+      logsQuery = logsQuery.eq("projeto_cliente", projetoParam);
+    }
+
+    logsQuery = logsQuery
+      .order("data", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1500);
 
     // Executa busca de acesso, fases e logs em paralelo para performance máxima
     const [access, fasesRes, attempt] = await Promise.all([
@@ -44,13 +61,7 @@ export async function GET() {
           .select("projeto_cliente, responsavel")
           .eq("is_deleted", false)
       ).catch(() => ({ data: null })),
-      db
-        .from("diario_logs")
-        .select(LOG_COLS)
-        .eq("is_deleted", false)
-        .order("data", { ascending: false })
-        .order("created_at", { ascending: false })
-        .limit(200),
+      logsQuery,
     ]);
 
     // Busca fases para verificar responsabilidades
@@ -66,12 +77,16 @@ export async function GET() {
 
     let data: LogRow[] | null = null;
     if (attempt.error && (attempt.error.code === "PGRST204" || attempt.error.message?.includes("is_deleted"))) {
-      const fb = await db
+      let fbQuery = db
         .from("diario_logs")
-        .select("id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, created_at")
+        .select("id, data, responsavel, atividade, status, observacoes, projeto_cliente, midia_url, midia_tipo, created_at");
+      if (projetoParam) {
+        fbQuery = fbQuery.eq("projeto_cliente", projetoParam);
+      }
+      const fb = await fbQuery
         .order("data", { ascending: false })
         .order("created_at", { ascending: false })
-        .limit(200);
+        .limit(1500);
       if (fb.error) throw fb.error;
       data = fb.data ?? [];
     } else {

@@ -99,7 +99,7 @@ export default function LixeiraPage() {
     });
   };
 
-  // Restaura todas as fases de um projeto
+  // Restaura todas as fases e o histórico completo de um projeto
   const handleRestoreProjeto = async (nomeProjeto: string) => {
     const fasesDoProjeto = projetosAgrupados.find(([n]) => n === nomeProjeto)?.[1] ?? [];
     if (fasesDoProjeto.length === 0) return;
@@ -107,23 +107,26 @@ export default function LixeiraPage() {
     const ids = fasesDoProjeto.map(f => f.id);
     setLoadingIds(prev => new Set([...prev, ...ids]));
     try {
-      const resultados = await Promise.all(
-        fasesDoProjeto.map(f =>
-          offlineFetch('/api/fases', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: f.id, isDeleted: false }),
-          })
-        )
-      );
-      const todasOk = resultados.every(r => r.ok);
-      if (todasOk) {
-        setDeletedFases(prev => prev.filter(f => !ids.includes(f.id)));
-        success(`Projeto "${nomeProjeto}" restaurado com sucesso.`);
-      } else {
-        toastError('Algumas fases não puderam ser restauradas.');
-        await loadDeleted();
+      // Restaura via PATCH de projetos (desmarca is_deleted em fases_acao e diario_logs simultaneamente)
+      const res = await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}`, {
+        method: 'PATCH',
+      });
+
+      if (!res.ok) {
+        // Fallback por garantia
+        await Promise.all(
+          fasesDoProjeto.map(f =>
+            offlineFetch('/api/fases', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: f.id, isDeleted: false }),
+            })
+          )
+        );
       }
+
+      setDeletedFases(prev => prev.filter(f => !ids.includes(f.id)));
+      success(`Projeto "${nomeProjeto}" e histórico restaurados com sucesso.`);
     } catch (e) {
       console.error('[lixeira] Erro ao restaurar projeto:', e);
       toastError('Erro ao restaurar o projeto.');

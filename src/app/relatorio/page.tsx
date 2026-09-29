@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { exportToCSV } from '@/lib/export-csv';
 import { offlineFetch } from '@/lib/offline';
+import { getLocalISODate } from '@/lib/date-utils';
 
 interface FaseAcaoItem {
   id: string;
@@ -191,7 +192,7 @@ function RelatorioContent() {
       (f.observacoes || '').replace(/\r?\n/g, ' ')
     ]);
 
-    const hojeStr = new Date().toISOString().split('T')[0];
+    const hojeStr = getLocalISODate();
     const slug = nomeProjeto.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
     exportToCSV(`relatorio-executivo-${slug}-${hojeStr}.csv`, headers, [...rowsLogs, ...rowsFases]);
   };

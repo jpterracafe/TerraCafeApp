@@ -19,6 +19,7 @@ import {
   idbSaveLocalDiarioLog,
   idbGetLocalDiarioLogs,
   idbRemoveLocalDiarioLog,
+  idbClearCache,
   OfflineQueueItem,
 } from "./idb";
 
@@ -231,6 +232,15 @@ const MEM_CACHE_TTL_MS = 5000;
 export function invalidateOfflineCache(urlPrefix?: string) {
   if (!urlPrefix) {
     memCache.clear();
+    idbClearCache().catch(() => {});
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem("visao_geral_cache_v1");
+        sessionStorage.removeItem("admin_dashboard_cache_v1");
+      } catch {
+        // noop
+      }
+    }
   } else {
     for (const key of memCache.keys()) {
       if (key.startsWith(urlPrefix)) {
