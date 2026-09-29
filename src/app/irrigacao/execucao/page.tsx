@@ -269,7 +269,7 @@ export default function PainelOperacionalObrasPage() {
         if (!prazoLimiteFase && hasStarted && dataInicioFase) {
           const dIni = new Date(`${dataInicioFase}T00:00:00`);
           dIni.setDate(dIni.getDate() + metaDiasFase);
-          prazoLimiteFase = dIni.toISOString().split('T')[0];
+          prazoLimiteFase = getLocalISODate(dIni);
         }
 
         let diasRestantesFase = 0;

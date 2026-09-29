@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 import { getUserAssignedLoja, setProjectLoja, matchLojaNames } from "@/lib/lojas";
 import { purgeProjectData } from "@/lib/project-purge";
+import { getLocalISODate } from "@/lib/date-utils";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -228,7 +229,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const nome = String(body?.nome ?? "").trim();
     const prazoFinal = String(body?.prazoFinal ?? "").trim();
-    const dataInicio = String(body?.dataInicio ?? new Date().toISOString().split("T")[0]).trim();
+    const dataInicio = String(body?.dataInicio ?? getLocalISODate()).trim();
 
     if (!nome) {
       return NextResponse.json({ error: "O nome do projeto é obrigatório." }, { status: 400 });

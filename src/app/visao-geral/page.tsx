@@ -20,6 +20,7 @@ import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
 import InstallAppButton from '@/components/InstallPWA';
 import { offlineFetch } from '@/lib/offline';
+import { getLocalISODate } from '@/lib/date-utils';
 
 interface JustificativaItem {
   id: string;
@@ -387,7 +388,7 @@ export default function VisaoGeralDiretorPage() {
         if (!prazoLimiteFase && hasStarted && dataInicioFase) {
           const dIni = new Date(`${dataInicioFase}T00:00:00`);
           dIni.setDate(dIni.getDate() + metaDiasFase);
-          prazoLimiteFase = dIni.toISOString().split('T')[0];
+          prazoLimiteFase = getLocalISODate(dIni);
         }
 
         // ── CÁLCULO DE PROGRESSO (%) ─────────────────────────────────────

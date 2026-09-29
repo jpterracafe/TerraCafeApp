@@ -137,41 +137,32 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
     if (!session?.user) return;
 
     const saved = localStorage.getItem("terracafe_selected_loja");
+    let target = "TODAS";
 
     if (isDiretor || isCoordenador) {
       // Diretor e Coordenador: visão executiva geral, pode alternar entre todas as filiais
       const userLoja = (session.user as any)?.loja;
       if (saved && saved !== "TODAS") {
-        setSelectedLojaState(saved);
+        target = saved;
       } else if (userLoja) {
-        setSelectedLojaState(userLoja);
+        target = userLoja;
       } else {
-        setSelectedLojaState("TODAS");
+        target = "TODAS";
       }
     } else if (isAdmin) {
       // Admin/Master: pode ver todas por padrão ou usar a salva
-      if (saved) {
-        setSelectedLojaState(saved);
-      } else {
-        setSelectedLojaState("TODAS");
-      }
+      target = saved || "TODAS";
     } else if (isGerente) {
       // Gerente: fixado na sua loja atribuída (acesso a todas as obras da sua cidade)
       const userLoja = (session.user as any)?.loja;
-      if (userLoja) {
-        setSelectedLojaState(userLoja);
-      } else {
-        setSelectedLojaState("TODAS");
-      }
+      target = userLoja || "TODAS";
     } else {
       // Montador / Colaborador: fixado na sua loja se tiver, ou TODAS
       const userLoja = (session.user as any)?.loja;
-      if (userLoja) {
-        setSelectedLojaState(userLoja);
-      } else {
-        setSelectedLojaState("TODAS");
-      }
+      target = userLoja || "TODAS";
     }
+
+    setSelectedLojaState((curr) => (curr !== target ? target : curr));
   }, [session, isDiretor, isCoordenador, isGerente, isAdmin]);
 
   const setSelectedLoja = useCallback((loja: string) => {

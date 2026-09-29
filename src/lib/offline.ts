@@ -16,7 +16,6 @@ import {
   idbRetainFailedItem,
   idbSetCache,
   idbGetCache,
-  idbSaveLocalDiarioLog,
   idbGetLocalDiarioLogs,
   idbRemoveLocalDiarioLog,
   idbClearCache,
@@ -49,7 +48,6 @@ export interface FlushResult {
 }
 
 const LEGACY_QUEUE_KEY = "offline_sync_queue_v1";
-const LEGACY_CACHE_KEY = "offline_http_cache_v1";
 const MAX_ATTEMPTS = 15;
 
 type OfflineListener = () => void;

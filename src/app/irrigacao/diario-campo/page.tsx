@@ -798,7 +798,7 @@ export default function DiarioCampoTimelinePage() {
     if (!prazoLimiteFase) {
       const dFim = new Date(inicio);
       dFim.setDate(dFim.getDate() + (currentEtapaConfig.metaDias || 20));
-      prazoLimiteFase = dFim.toISOString().split('T')[0];
+      prazoLimiteFase = getLocalISODate(dFim);
     }
     const dPrazoFim = new Date(`${prazoLimiteFase}T00:00:00`);
     dPrazoFim.setHours(0, 0, 0, 0);
