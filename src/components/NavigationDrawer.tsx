@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Menu, X, LayoutDashboard, BarChart2, Calendar, Layers, Users, Trash2, ShieldCheck,
   ExternalLink, Archive
@@ -11,6 +11,8 @@ import ThemeToggle from '@/components/ThemeToggle';
 import LogoutButton from '@/components/LogoutButton';
 import LojaSelector from '@/components/LojaSelector';
 import { isMasterDevSession } from '@/lib/client-roles';
+import { triggerHaptic } from '@/lib/haptic';
+import { isOnline, getPendingCount, subscribe } from '@/lib/offline';
 
 export default function NavigationDrawer() {
   const [isOpen, setIsOpen] = useState(false);
@@ -19,9 +21,33 @@ export default function NavigationDrawer() {
   const { data: session } = useSession();
 
   const isAuthRoute = ['/login', '/esqueci-minha-senha', '/redefinir-senha', '/convite'].includes(pathname || '');
+  
+  const [onlineStatus, setOnlineStatus] = useState({ online: true, pending: 0 });
+
+  useEffect(() => {
+    const updateStatus = () => {
+      setOnlineStatus({
+        online: isOnline(),
+        pending: getPendingCount(),
+      });
+    };
+    updateStatus();
+    const unsub = subscribe(updateStatus);
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    return () => {
+      unsub();
+      window.removeEventListener('online', updateStatus);
+      window.removeEventListener('offline', updateStatus);
+    };
+  }, []);
+
   if (isAuthRoute) return null;
 
-  const toggleDrawer = () => setIsOpen(!isOpen);
+  const toggleDrawer = () => {
+    triggerHaptic('light');
+    setIsOpen(!isOpen);
+  };
 
   // Mesma regra da página /admin/usuarios: só Desenvolvedor/master vê o link
   // (a página redireciona quem não é master para /irrigacao/diario-campo).
@@ -162,7 +188,20 @@ export default function NavigationDrawer() {
 
         <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <p className="text-[11px] text-gray-400">TerraCafé v2.0</p>
-          <span className="w-2 h-2 rounded-full bg-emerald-500" title="Online" />
+          <div className="flex items-center gap-1.5" title={onlineStatus.online ? (onlineStatus.pending > 0 ? `${onlineStatus.pending} pendência(s) local` : 'Online') : 'Offline'}>
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${
+                !onlineStatus.online
+                  ? 'bg-slate-400'
+                  : onlineStatus.pending > 0
+                  ? 'bg-amber-400 animate-pulse'
+                  : 'bg-emerald-500'
+              }`}
+            />
+            <span className="text-[10px] font-medium text-slate-400">
+              {!onlineStatus.online ? 'Offline' : onlineStatus.pending > 0 ? `${onlineStatus.pending} salvo` : 'Online'}
+            </span>
+          </div>
         </div>
       </div>
     </>

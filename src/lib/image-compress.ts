@@ -61,6 +61,10 @@ export async function compressImage(
 
       canvas.toBlob(
         (blob) => {
+          // Libera buffer de GPU/RAM em celulares após processamento do canvas
+          canvas.width = 0;
+          canvas.height = 0;
+
           if (!blob || blob.size >= file.size) {
             // Se o arquivo resultante ficou maior que o original, mantém o original
             resolve(file);

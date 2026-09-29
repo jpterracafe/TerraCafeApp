@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
@@ -10,10 +10,11 @@ import {
   ChevronRight, Calendar, Plus, User, Clock, Briefcase,
   CheckCircle2, AlertCircle, CloudRain, Wrench, Search, Trash2, Filter,
   Paperclip, X, Video, Loader2, TrendingUp, TrendingDown, Settings2,
-  Users, Check, Droplets, Layers, ChevronDown, PlayCircle, Flag,
+  Users, Check, Droplets, Layers, ChevronDown, ChevronUp, PlayCircle, Flag,
   FileText, Printer, Copy, CheckSquare, Square, Share2, Info, Building2,
   FileSpreadsheet, CloudOff, ExternalLink, Camera
 } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptic';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
 import { offlineFetch, isOnline, enqueueOfflineMutation, subscribe } from '@/lib/offline';
@@ -163,10 +164,13 @@ export default function DiarioCampoTimelinePage() {
   // Responsáveis mapeados por Etapa: { [projeto::etapa]: string[] }
   const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
 
-  // Filtros de busca
+  // Filtros de busca com useDeferredValue para digitação fluida
   const [searchProjeto, setSearchProjeto] = useState('');
+  const deferredSearchProjeto = useDeferredValue(searchProjeto);
   const [buscaLog, setBuscaLog] = useState('');
+  const deferredBuscaLog = useDeferredValue(buscaLog);
   const [filtroModoHistorico, setFiltroModoHistorico] = useState<'etapa' | 'todos'>('etapa');
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Estados de carregamento
   const [loadingProjetos, setLoadingProjetos] = useState(true);
@@ -177,6 +181,53 @@ export default function DiarioCampoTimelinePage() {
   const [statusRapido, setStatusRapido] = useState<'Dentro do programado' | 'Acima' | 'Abaixo'>('Dentro do programado');
   const [observacoes, setObservacoes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Monitora rolagem para exibir botão sutil de voltar ao topo
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Restauração silenciosa de rascunho de observações
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedProjeto || !selectedEtapa) return;
+    try {
+      const draftKey = `terracafe_draft_obs_${selectedProjeto}_${selectedEtapa}`;
+      const savedDraft = sessionStorage.getItem(draftKey);
+      if (savedDraft && !observacoes) {
+        setObservacoes(savedDraft);
+      }
+    } catch {
+      // noop
+    }
+  }, [selectedProjeto, selectedEtapa]);
+
+  const handleObservacoesChange = (val: string) => {
+    setObservacoes(val);
+    if (typeof window === 'undefined' || !selectedProjeto || !selectedEtapa) return;
+    try {
+      const draftKey = `terracafe_draft_obs_${selectedProjeto}_${selectedEtapa}`;
+      if (val.trim()) {
+        sessionStorage.setItem(draftKey, val);
+      } else {
+        sessionStorage.removeItem(draftKey);
+      }
+    } catch {
+      // noop
+    }
+  };
+
+  const clearDraft = useCallback(() => {
+    if (typeof window === 'undefined' || !selectedProjeto || !selectedEtapa) return;
+    try {
+      sessionStorage.removeItem(`terracafe_draft_obs_${selectedProjeto}_${selectedEtapa}`);
+    } catch {
+      // noop
+    }
+  }, [selectedProjeto, selectedEtapa]);
 
   // Mídia
   const [midiaFile, setMidiaFile] = useState<File | null>(null);
@@ -1430,6 +1481,8 @@ export default function DiarioCampoTimelinePage() {
         setRegistros(prev => [tempLog, ...prev]);
         setObservacoes('');
         clearMidia();
+        clearDraft();
+        triggerHaptic('success');
         success(
           pendingMediaAttachment
             ? 'Registro e foto salvos no aparelho! A sincronização com a nuvem ocorrerá automaticamente quando houver sinal.'
@@ -1456,11 +1509,15 @@ export default function DiarioCampoTimelinePage() {
           setRegistros(prev => [tempLog, ...prev]);
           setObservacoes('');
           clearMidia();
+          clearDraft();
+          triggerHaptic('success');
           success('Sem conexão: registro salvo no dispositivo e será sincronizado automaticamente.');
         } else if (resData?.log) {
           setRegistros(prev => [resData.log, ...prev]);
           setObservacoes('');
           clearMidia();
+          clearDraft();
+          triggerHaptic('success');
           success(`Registro em "${selectedEtapa}" salvo no diário!`);
         } else {
           toastError('Erro ao registrar no diário.');
@@ -1517,7 +1574,7 @@ export default function DiarioCampoTimelinePage() {
   // Logs filtrados
   const filteredLogs = useMemo(() => {
     if (!selectedProjeto) return [];
-    const q = buscaLog.toLowerCase().trim();
+    const q = deferredBuscaLog.toLowerCase().trim();
 
     return registros
       .filter(r => {
@@ -1538,7 +1595,7 @@ export default function DiarioCampoTimelinePage() {
         return matchEtapa && matchBusca;
       })
       .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
-  }, [registros, selectedProjeto, selectedEtapa, filtroModoHistorico, buscaLog, projetosDeletados]);
+  }, [registros, selectedProjeto, selectedEtapa, filtroModoHistorico, deferredBuscaLog, projetosDeletados]);
 
   // Exportar dados do histórico para planilha Excel (CSV UTF-8 BOM)
   const handleExportCSV = useCallback(() => {
@@ -1763,9 +1820,9 @@ export default function DiarioCampoTimelinePage() {
         return isProjectInSelectedLoja(p, criadorEmail);
       });
     }
-    if (!searchProjeto.trim()) return list;
-    return list.filter(p => p.toLowerCase().includes(searchProjeto.toLowerCase()));
-  }, [projetos, selectedLoja, isProjectInSelectedLoja, projetosCriadores, searchProjeto]);
+    if (!deferredSearchProjeto.trim()) return list;
+    return list.filter(p => p.toLowerCase().includes(deferredSearchProjeto.toLowerCase()));
+  }, [projetos, selectedLoja, isProjectInSelectedLoja, projetosCriadores, deferredSearchProjeto]);
 
   // Sincroniza projeto selecionado com a lista filtrada por filial
   useEffect(() => {
@@ -2322,7 +2379,10 @@ export default function DiarioCampoTimelinePage() {
                       <button
                         key={etapa.key}
                         type="button"
-                        onClick={() => setSelectedEtapa(etapa.key)}
+                        onClick={() => {
+                          triggerHaptic('tap');
+                          setSelectedEtapa(etapa.key);
+                        }}
                         className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium text-xs sm:text-sm transition-all border relative ${
                           isActive
                             ? etapaFaseConcluida
@@ -2718,7 +2778,12 @@ export default function DiarioCampoTimelinePage() {
                     {/* Botão: Dentro do programado */}
                     <button
                       type="button"
-                      onClick={() => !isFaseConcluida && setStatusRapido('Dentro do programado')}
+                      onClick={() => {
+                        if (!isFaseConcluida) {
+                          triggerHaptic('tap');
+                          setStatusRapido('Dentro do programado');
+                        }
+                      }}
                       disabled={isFaseConcluida}
                       className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
@@ -2744,7 +2809,12 @@ export default function DiarioCampoTimelinePage() {
                     {/* Botão: Acima */}
                     <button
                       type="button"
-                      onClick={() => !isFaseConcluida && setStatusRapido('Acima')}
+                      onClick={() => {
+                        if (!isFaseConcluida) {
+                          triggerHaptic('tap');
+                          setStatusRapido('Acima');
+                        }
+                      }}
                       disabled={isFaseConcluida}
                       className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
@@ -2770,7 +2840,12 @@ export default function DiarioCampoTimelinePage() {
                     {/* Botão: Abaixo */}
                     <button
                       type="button"
-                      onClick={() => !isFaseConcluida && setStatusRapido('Abaixo')}
+                      onClick={() => {
+                        if (!isFaseConcluida) {
+                          triggerHaptic('tap');
+                          setStatusRapido('Abaixo');
+                        }
+                      }}
                       disabled={isFaseConcluida}
                       className={`p-2.5 sm:p-4 rounded-xl border-2 text-left transition-all relative flex flex-col justify-between gap-1 sm:gap-2 active:scale-[0.98] ${
                         isFaseConcluida
@@ -2804,7 +2879,7 @@ export default function DiarioCampoTimelinePage() {
                     rows={2}
                     placeholder={isFaseConcluida ? "Campo desabilitado - fase concluída" : "Se desejar escrever algo específico sobre o dia de hoje, detalhe aqui (opcional)..."}
                     value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
+                    onChange={(e) => handleObservacoesChange(e.target.value)}
                     disabled={isFaseConcluida}
                     className={`w-full border rounded-xl p-3 text-sm transition-colors resize-none ${
                       isFaseConcluida
@@ -4415,6 +4490,22 @@ export default function DiarioCampoTimelinePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Botão flutuante sutil de Voltar ao Topo */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('tap');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className="fixed bottom-20 right-4 sm:bottom-8 sm:right-8 z-40 p-3 rounded-full bg-white/90 dark:bg-slate-800/90 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xl backdrop-blur-sm transition-all hover:scale-105 active:scale-95 flex items-center justify-center cursor-pointer"
+          aria-label="Voltar ao topo"
+          title="Voltar ao topo"
+        >
+          <ChevronUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        </button>
       )}
     </div>
   );

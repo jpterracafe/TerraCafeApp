@@ -80,12 +80,23 @@ export default function OfflineSyncIndicator() {
 
   useEffect(() => {
     const unsub = subscribe(refresh);
+    let onlineStabilizeTimer: ReturnType<typeof setTimeout> | null = null;
 
     const onOnline = () => {
       refresh();
-      handleFlush();
+      if (onlineStabilizeTimer) clearTimeout(onlineStabilizeTimer);
+      // Aguarda 1.5s para garantir que a rede móvel rural estabilizou
+      onlineStabilizeTimer = setTimeout(() => {
+        if (isOnline() && getPendingCount() > 0) {
+          handleFlush();
+        }
+      }, 1500);
     };
-    const onOffline = () => refresh();
+
+    const onOffline = () => {
+      if (onlineStabilizeTimer) clearTimeout(onlineStabilizeTimer);
+      refresh();
+    };
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -105,6 +116,7 @@ export default function OfflineSyncIndicator() {
 
     return () => {
       unsub();
+      if (onlineStabilizeTimer) clearTimeout(onlineStabilizeTimer);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
       document.removeEventListener("visibilitychange", onVisibility);

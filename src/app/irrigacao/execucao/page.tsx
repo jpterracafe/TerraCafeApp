@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
+import { triggerHaptic } from '@/lib/haptic';
 import { 
   Calendar, 
   Search, 
@@ -112,6 +113,7 @@ export default function PainelOperacionalObrasPage() {
 
   // Filtros
   const [search, setSearch] = useState('');
+  const deferredSearch = useDeferredValue(search);
   const [filtroProjeto, setFiltroProjeto] = useState<string>('todos');
   const [filtroEtapa, setFiltroEtapa] = useState<string>('todos');
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'em_andamento' | 'atrasado' | 'concluido' | 'nao_iniciado'>('todos');
@@ -192,6 +194,7 @@ export default function PainelOperacionalObrasPage() {
   }, [loadData, loading, refreshing]);
 
   const handleRefresh = () => {
+    triggerHaptic('light');
     setRefreshing(true);
     loadData();
   };
@@ -371,7 +374,7 @@ export default function PainelOperacionalObrasPage() {
 
   // Filtro inteligente de projetos e etapas
   const projetosFiltrados = useMemo(() => {
-    const q = search.toLowerCase().trim();
+    const q = deferredSearch.toLowerCase().trim();
 
     return projetosDaLoja
       .filter(p => {
@@ -405,7 +408,7 @@ export default function PainelOperacionalObrasPage() {
         }
         return p;
       });
-  }, [projetosDaLoja, search, filtroProjeto, filtroEtapa, filtroSituacao]);
+  }, [projetosDaLoja, deferredSearch, filtroProjeto, filtroEtapa, filtroSituacao]);
 
   return (
     <div className="min-h-screen bg-[#f8fafc] dark:bg-[#070c18] text-slate-900 dark:text-slate-100 p-3 sm:p-5 md:p-8 font-sans transition-colors">
