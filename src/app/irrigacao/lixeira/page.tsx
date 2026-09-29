@@ -6,6 +6,7 @@ import { useToast } from '@/components/Toast';
 import { AlertTriangle, ChevronRight, RefreshCcw, Trash2, Inbox, Briefcase, ChevronDown, ChevronUp } from 'lucide-react';
 import { FaseAcao } from '../execucao/mockFases';
 import { offlineFetch } from '@/lib/offline';
+import { idbRemoveProjectLogs } from '@/lib/idb';
 import { useLoja } from '@/contexts/LojaContext';
 import LojaSelector from '@/components/LojaSelector';
 
@@ -131,7 +132,7 @@ export default function LixeiraPage() {
     }
   };
 
-  // Apaga permanentemente todas as fases de um projeto
+  // Apaga permanentemente todas as fases e histórico de um projeto
   const handleHardDeleteProjeto = async (nomeProjeto: string) => {
     const fasesDoProjeto = projetosAgrupados.find(([n]) => n === nomeProjeto)?.[1] ?? [];
     if (fasesDoProjeto.length === 0) return;
@@ -140,11 +141,27 @@ export default function LixeiraPage() {
     const ids = fasesDoProjeto.map(f => f.id);
     setLoadingIds(prev => new Set([...prev, ...ids]));
     try {
-      await Promise.all(
-        fasesDoProjeto.map(f =>
-          offlineFetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })
-        )
-      );
+      // Exclui via API de projetos com hard=true (expurga fases_acao, diario_logs, configs e lojas)
+      const res = await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nomeProjeto)}&hard=true`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Falha ao excluir o projeto');
+
+      // Limpa dados locais residuais
+      await idbRemoveProjectLogs(nomeProjeto);
+      try {
+        ['diario_projeto_starts_v1', 'diario_projetos_prazo_final_v1', 'diario_etapas_config_v1', 'diario_responsaveis_por_etapa_v1'].forEach(k => {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            Object.keys(parsed).forEach(pk => {
+              if (pk === nomeProjeto || pk.startsWith(`${nomeProjeto}::`)) delete parsed[pk];
+            });
+            localStorage.setItem(k, JSON.stringify(parsed));
+          }
+        });
+      } catch (_) {}
+
       setDeletedFases(prev => prev.filter(f => !ids.includes(f.id)));
       success(`Projeto "${nomeProjeto}" excluído permanentemente.`);
     } catch (e) {
@@ -160,6 +177,14 @@ export default function LixeiraPage() {
     if (deletedFases.length === 0) return;
     if (!confirm(`Deseja esvaziar a lixeira inteira? Isso apagará permanentemente todos os ${projetosAgrupados.length} projeto${projetosAgrupados.length !== 1 ? 's' : ''} e ${deletedFases.length} ação${deletedFases.length !== 1 ? 'ões' : ''}. Esta ação não poderá ser desfeita.`)) return;
     try {
+      // Expurga cada projeto agrupado com hard=true
+      await Promise.all(
+        projetosAgrupados.map(async ([nome]) => {
+          await offlineFetch(`/api/projetos?nome=${encodeURIComponent(nome)}&hard=true`, { method: 'DELETE' });
+          await idbRemoveProjectLogs(nome);
+        })
+      );
+      // Apaga qualquer fase avulsa restante
       await Promise.all(deletedFases.map(f => offlineFetch(`/api/fases?id=${f.id}&hard=true`, { method: 'DELETE' })));
       setDeletedFases([]);
       success('Lixeira esvaziada.');

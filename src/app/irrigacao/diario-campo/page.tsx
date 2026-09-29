@@ -17,8 +17,8 @@ import {
 import { triggerHaptic } from '@/lib/haptic';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
 import { extractProjectBaseName, getProjectVersion } from '../execucao/page';
-import { offlineFetch, isOnline, enqueueOfflineMutation, subscribe } from '@/lib/offline';
-import { idbSaveLocalDiarioLog, idbGetLocalDiarioLogs, idbRemoveLocalDiarioLog } from '@/lib/idb';
+import { offlineFetch, isOnline, enqueueOfflineMutation, subscribe, invalidateOfflineCache } from '@/lib/offline';
+import { idbSaveLocalDiarioLog, idbGetLocalDiarioLogs, idbRemoveLocalDiarioLog, idbRemoveProjectLogs } from '@/lib/idb';
 import { useLoja } from '@/contexts/LojaContext';
 import { compressImage } from '@/lib/image-compress';
 import { exportToCSV } from '@/lib/export-csv';
@@ -1208,6 +1208,26 @@ export default function DiarioCampoTimelinePage() {
       if (lojaParaAtribuir) {
         atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
       }
+
+      // Limpa qualquer resquício local anterior de logs ou etapas desse nome
+      await idbRemoveProjectLogs(nomeLimpo);
+      invalidateOfflineCache();
+      setRegistros(prev => prev.filter(r => r.projetoCliente !== nomeLimpo));
+      setConfigEtapas(prev => {
+        const cp = { ...prev };
+        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeLimpo}::`)) delete cp[k]; });
+        return cp;
+      });
+      setResponsaveisPorEtapa(prev => {
+        const cp = { ...prev };
+        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeLimpo}::`)) delete cp[k]; });
+        return cp;
+      });
+      setProjetoJustificativas(prev => {
+        const cp = { ...prev };
+        delete cp[nomeLimpo];
+        return cp;
+      });
 
       await loadProjetos();
       setSelectedProjeto(nomeLimpo);

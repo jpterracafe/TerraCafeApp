@@ -4,6 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 import { getUserAssignedLoja, setProjectLoja, matchLojaNames } from "@/lib/lojas";
+import { purgeProjectData } from "@/lib/project-purge";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -238,6 +239,22 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
 
+    // Impede duplicação de projeto ATIVO com o mesmo nome
+    const { data: existingActive } = await db
+      .from("fases_acao")
+      .select("id")
+      .eq("projeto_cliente", nome)
+      .eq("is_deleted", false)
+      .limit(1);
+
+    if (existingActive && existingActive.length > 0) {
+      return NextResponse.json({ error: "Já existe um projeto ativo com este nome." }, { status: 400 });
+    }
+
+    // Se o projeto foi excluído no passado, estava na lixeira ou deixou dados órfãos,
+    // expurga 100% dos resquícios antigos (diario_logs, configs, progresso) para iniciar completamente limpo
+    await purgeProjectData(nome);
+
     // 6 Fases oficiais de campo
     const fasesIniciais = [
       { gabarito: "Valetas",                    acao: "Abertura e nivelamento de valas" },
@@ -401,48 +418,8 @@ export async function DELETE(req: Request) {
     const db = getSupabase();
 
     if (hard) {
-      // Hard delete permanente — apaga todas as fases e logs do projeto
-      await db.from("fases_acao").delete().eq("projeto_cliente", nome);
-      await db.from("diario_logs").delete().eq("projeto_cliente", nome);
-      // Remove das configurações salvas também
-      try {
-        const { data: prazosRow } = await db
-          .from("configuracoes_sistema")
-          .select("valor")
-          .eq("chave", "diario_projetos_prazo_final_v1")
-          .maybeSingle();
-        const prazos = { ...(prazosRow?.valor || {}) };
-        delete prazos[nome];
-        await db.from("configuracoes_sistema").upsert({
-          chave: "diario_projetos_prazo_final_v1", valor: prazos, updated_at: new Date().toISOString(),
-        });
-
-        const { data: startsRow } = await db
-          .from("configuracoes_sistema")
-          .select("valor")
-          .eq("chave", "diario_projeto_starts_v1")
-          .maybeSingle();
-        const starts = { ...(startsRow?.valor || {}) };
-        delete starts[nome];
-        await db.from("configuracoes_sistema").upsert({
-          chave: "diario_projeto_starts_v1", valor: starts, updated_at: new Date().toISOString(),
-        });
-
-        const { data: criadoresRow } = await db
-          .from("configuracoes_sistema")
-          .select("valor")
-          .eq("chave", "diario_projetos_criadores_v1")
-          .maybeSingle();
-        const criadores = { ...(criadoresRow?.valor || {}) };
-        delete criadores[nome];
-        await db.from("configuracoes_sistema").upsert({
-          chave: "diario_projetos_criadores_v1", valor: criadores, updated_at: new Date().toISOString(),
-        });
-
-        await db.from("user_projetos").delete().eq("projeto_nome", nome);
-        await setProjectLoja(nome, "");
-      } catch (_) { /* ignora falha de limpeza em configuracoes_sistema */ }
-
+      // Hard delete permanente — apaga todas as fases, logs e metadados do projeto
+      await purgeProjectData(nome);
       return NextResponse.json({ ok: true, hardDeleted: true });
     }
 

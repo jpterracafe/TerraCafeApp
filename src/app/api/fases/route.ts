@@ -12,6 +12,7 @@ import {
 } from "@/lib/validators";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 import { matchLojaNames } from "@/lib/lojas";
+import { purgeProjectData } from "@/lib/project-purge";
 
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET() {
@@ -432,7 +433,7 @@ export async function DELETE(req: Request) {
     }
 
     // Se for HARD DELETE (exclusão permanente da lixeira) e não restar mais nenhuma fase do projeto,
-    // limpa os registros correspondentes do diário de campo
+    // expurga permanentemente todos os registros, histórico e metadados restantes do projeto
     if (hard && projetoCliente && projetoCliente.trim() !== "") {
       const { data: fasesRestantes } = await db
         .from("fases_acao")
@@ -441,10 +442,7 @@ export async function DELETE(req: Request) {
         .limit(1);
 
       if (!fasesRestantes || fasesRestantes.length === 0) {
-        await db
-          .from("diario_logs")
-          .delete()
-          .eq("projeto_cliente", projetoCliente);
+        await purgeProjectData(projetoCliente);
       }
     }
 

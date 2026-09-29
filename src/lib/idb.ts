@@ -275,6 +275,26 @@ export async function idbRemoveLocalDiarioLog(id: string): Promise<void> {
   }
 }
 
+export async function idbRemoveProjectLogs(nomeProjeto: string): Promise<void> {
+  try {
+    const nome = (nomeProjeto || "").trim();
+    if (!nome) return;
+    const db = await getDB();
+    const logs = await idbGetLocalDiarioLogs();
+    const toRemove = logs.filter(
+      (l) => l.projetoCliente === nome || l.projeto_cliente === nome
+    );
+    if (toRemove.length === 0) return;
+    const tx = db.transaction("local_diario_logs", "readwrite");
+    const store = tx.objectStore("local_diario_logs");
+    for (const log of toRemove) {
+      if (log.id) store.delete(log.id);
+    }
+  } catch {
+    // noop
+  }
+}
+
 // ── Persistência de Armazenamento no Navegador ───────────────────────────────
 
 /**
