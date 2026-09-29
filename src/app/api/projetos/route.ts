@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
-import { getUserAssignedLoja, setProjectLoja, matchLojaNames } from "@/lib/lojas";
+import { getUserAssignedLoja, setProjectLoja, matchLojaNames, getProjectLojasMap } from "@/lib/lojas";
 import { purgeProjectData } from "@/lib/project-purge";
 import { getLocalISODate } from "@/lib/date-utils";
 
@@ -99,21 +99,10 @@ export async function GET(req: Request) {
     const isGerente = sessionRole === "Gerente";
     const emailAlvo = emailFiltro || (apenasMeus ? sessionEmail : "");
 
-    // Carrega mapa de projetos para lojas caso o usuário seja Gerente
+    // Carrega mapa de projetos para lojas caso o usuário seja Gerente (aproveita cache de servidor)
     let mapProjetosLojas: Record<string, string> = {};
     if (isGerente && sessionLoja) {
-      try {
-        const { data: plRow } = await db
-          .from("configuracoes_sistema")
-          .select("valor")
-          .eq("chave", "sistema_projetos_lojas_v1")
-          .maybeSingle();
-        if (plRow?.valor && typeof plRow.valor === "object") {
-          mapProjetosLojas = plRow.valor as Record<string, string>;
-        }
-      } catch {
-        // silent
-      }
+      mapProjetosLojas = await getProjectLojasMap();
     }
 
     const temAcessoAoProjeto = (nome: string): boolean => {

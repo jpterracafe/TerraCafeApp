@@ -11,7 +11,7 @@ import {
   normalizeStatusFase,
 } from "@/lib/validators";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
-import { matchLojaNames } from "@/lib/lojas";
+import { matchLojaNames, getProjectLojasMap } from "@/lib/lojas";
 import { purgeProjectData } from "@/lib/project-purge";
 
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export async function GET() {
     const isGerente = sessionRole === "Gerente";
 
     // Carrega mapa de criadores, fases e projetos-lojas em paralelo
-    const [criadoresRes, fasesRes, projLojasRes] = await Promise.all([
+    const [criadoresRes, fasesRes, mapProjetosLojas] = await Promise.all([
       db
         .from("configuracoes_sistema")
         .select("valor")
@@ -41,23 +41,12 @@ export async function GET() {
         .from("fases_acao")
         .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
         .order("created_at", { ascending: true }),
-      isGerente && sessionLoja
-        ? db
-            .from("configuracoes_sistema")
-            .select("valor")
-            .eq("chave", "sistema_projetos_lojas_v1")
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
+      isGerente && sessionLoja ? getProjectLojasMap() : Promise.resolve({} as Record<string, string>),
     ]);
 
     let mapCriadores: Record<string, { email: string }> = {};
     if (criadoresRes?.data?.valor) {
       mapCriadores = criadoresRes.data.valor;
-    }
-
-    let mapProjetosLojas: Record<string, string> = {};
-    if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
-      mapProjetosLojas = projLojasRes.data.valor as Record<string, string>;
     }
 
     const { data, error } = fasesRes;

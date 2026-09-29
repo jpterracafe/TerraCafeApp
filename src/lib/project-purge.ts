@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/supabase";
 import { invalidateLojasCache } from "@/lib/lojas";
+import { invalidateProjectAccessCache } from "@/lib/project-access";
 import fs from "fs";
 import path from "path";
 
@@ -127,6 +128,7 @@ export async function purgeMultipleProjects(
     }
 
     invalidateLojasCache();
+    invalidateProjectAccessCache();
     return { success: true, purgedCount };
   } catch (err) {
     console.error(`[purgeMultipleProjects] Erro ao expurgar lote de projetos:`, err);

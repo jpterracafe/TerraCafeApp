@@ -50,6 +50,21 @@ export interface LogRow {
   [key: string]: unknown;
 }
 
+interface ServerAccessCacheEntry {
+  data: ProjectAccessResult;
+  expiresAt: number;
+}
+const serverAccessCache = new Map<string, ServerAccessCacheEntry>();
+const ACCESS_CACHE_TTL_MS = 10 * 1000; // 10 segundos
+
+export function invalidateProjectAccessCache(email?: string) {
+  if (email) {
+    serverAccessCache.delete(email.toLowerCase().trim());
+  } else {
+    serverAccessCache.clear();
+  }
+}
+
 /**
  * Verifica quais projetos o usuário tem acesso baseado no role e criadores.
  * Retorna um Set com os nomes dos projetos permitidos e o mapa de criadores.
@@ -60,8 +75,13 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
   const sessionEmail = session?.user?.email?.trim().toLowerCase() ?? "";
   const sessionName = session?.user?.name?.trim() ?? "";
   const sessionRole = (session?.user as { role?: string } | undefined)?.role || "Colaborador";
-
   const sessionLoja = ((session?.user as any)?.loja || "").trim();
+
+  // Cache em memória de servidor (responde em 0ms para requisições paralelas do mesmo usuário)
+  const cached = serverAccessCache.get(sessionEmail);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.data;
+  }
 
   // Coordenador possui a mesma visão executiva do Diretor
   const isDiretorOuAdmin = ["Diretor", "Coordenador", "Desenvolvedor", "Admin"].includes(sessionRole);
@@ -73,64 +93,77 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
   const userProjetosPermitidos = new Set<string>();
 
   try {
-    const [criadoresRes, upRes, projLojasRes] = await Promise.all([
-      Promise.resolve(
-        db
-          .from("configuracoes_sistema")
-          .select("valor")
-          .eq("chave", "diario_projetos_criadores_v1")
-          .maybeSingle()
-      ).catch(() => ({ data: null })),
-      Promise.resolve(
-        db
-          .from("user_projetos")
-          .select("projeto_nome, user_email")
-      ).catch(() => ({ data: null })),
-      isGerente && sessionLoja
-        ? Promise.resolve(
-            db
-              .from("configuracoes_sistema")
-              .select("valor")
-              .eq("chave", "sistema_projetos_lojas_v1")
-              .maybeSingle()
-          ).catch(() => ({ data: null }))
-        : Promise.resolve({ data: null }),
-    ]);
+    // 👑 Diretor/Admin: precisa apenas do mapa de criadores (acesso universal sem precisar de user_projetos)
+    if (isDiretorOuAdmin) {
+      const criadoresRes = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_projetos_criadores_v1")
+        .maybeSingle();
 
-    if (criadoresRes?.data?.valor) {
-      mapCriadores = { ...(criadoresRes.data as CriadoresRow).valor };
-    }
+      if (criadoresRes?.data?.valor) {
+        mapCriadores = { ...(criadoresRes.data as CriadoresRow).valor };
+      }
+    } else {
+      // 👷 Colaborador / Gerente: busca criadores, user_projetos e filiais em paralelo
+      const [criadoresRes, upRes, projLojasRes] = await Promise.all([
+        Promise.resolve(
+          db
+            .from("configuracoes_sistema")
+            .select("valor")
+            .eq("chave", "diario_projetos_criadores_v1")
+            .maybeSingle()
+        ).catch(() => ({ data: null })),
+        Promise.resolve(
+          db
+            .from("user_projetos")
+            .select("projeto_nome, user_email")
+        ).catch(() => ({ data: null })),
+        isGerente && sessionLoja
+          ? Promise.resolve(
+              db
+                .from("configuracoes_sistema")
+                .select("valor")
+                .eq("chave", "sistema_projetos_lojas_v1")
+                .maybeSingle()
+            ).catch(() => ({ data: null }))
+          : Promise.resolve({ data: null }),
+      ]);
 
-    const upRows = upRes?.data;
-    if (upRows && Array.isArray(upRows)) {
-      for (const up of upRows as UserProjetosRow[]) {
-        const pNome = up.projeto_nome;
-        const uEmail = up.user_email?.trim().toLowerCase();
-        if (pNome && uEmail) {
-          if (!mapCriadores[pNome]) {
-            mapCriadores[pNome] = { email: uEmail };
+      if (criadoresRes?.data?.valor) {
+        mapCriadores = { ...(criadoresRes.data as CriadoresRow).valor };
+      }
+
+      const upRows = upRes?.data;
+      if (upRows && Array.isArray(upRows)) {
+        for (const up of upRows as UserProjetosRow[]) {
+          const pNome = up.projeto_nome;
+          const uEmail = up.user_email?.trim().toLowerCase();
+          if (pNome && uEmail) {
+            if (!mapCriadores[pNome]) {
+              mapCriadores[pNome] = { email: uEmail };
+            }
+            if (uEmail === sessionEmail) {
+              userProjetosPermitidos.add(pNome);
+            }
           }
-          if (uEmail === sessionEmail) {
+        }
+      }
+
+      // 🏢 Regra do Gerente: acesso a todas as obras da sua cidade/filial
+      if (isGerente && sessionLoja) {
+        if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
+          const mapLojas = projLojasRes.data.valor as Record<string, string>;
+          for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
+            if (lojaNome && matchLojaNames(lojaNome, sessionLoja)) {
+              userProjetosPermitidos.add(projNome);
+            }
+          }
+        }
+        for (const pNome of Object.keys(mapCriadores)) {
+          if (matchLojaNames(pNome, sessionLoja)) {
             userProjetosPermitidos.add(pNome);
           }
-        }
-      }
-    }
-
-    // 🏢 Regra do Gerente: acesso a todas as obras da sua cidade/filial
-    if (isGerente && sessionLoja) {
-      if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
-        const mapLojas = projLojasRes.data.valor as Record<string, string>;
-        for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
-          if (lojaNome && matchLojaNames(lojaNome, sessionLoja)) {
-            userProjetosPermitidos.add(projNome);
-          }
-        }
-      }
-      // Também inclui projetos cujo próprio nome cite a cidade da filial
-      for (const pNome of Object.keys(mapCriadores)) {
-        if (matchLojaNames(pNome, sessionLoja)) {
-          userProjetosPermitidos.add(pNome);
         }
       }
     }
@@ -138,7 +171,7 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
     // silent
   }
 
-  return {
+  const result: ProjectAccessResult = {
     allowedProjects: userProjetosPermitidos,
     mapCriadores,
     isDiretorOuAdmin,
@@ -147,6 +180,13 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
     sessionRole,
     sessionLoja,
   };
+
+  serverAccessCache.set(sessionEmail, {
+    data: result,
+    expiresAt: Date.now() + ACCESS_CACHE_TTL_MS,
+  });
+
+  return result;
 }
 
 /**

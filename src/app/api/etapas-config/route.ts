@@ -103,6 +103,28 @@ function saveLocalConfig(cfg: SystemConfig) {
   }
 }
 
+const CHAVES_CONFIG_ETAPAS = [
+  "diario_etapas_config_v1",
+  "diario_projeto_starts_v1",
+  "diario_responsaveis_por_etapa_v1",
+  "diario_projetos_prazo_final_v1",
+  "diario_projeto_justificativas_v1",
+  "diario_etapas_progresso_v1",
+  "diario_etapas_status_v1",
+];
+
+interface ConfigCacheEntry {
+  data: SystemConfig;
+  fasesPorProjeto: Map<string, any[]>;
+  expiresAt: number;
+}
+let serverConfigCache: ConfigCacheEntry | null = null;
+const CONFIG_CACHE_TTL_MS = 6 * 1000; // 6 segundos
+
+export function invalidateEtapasConfigCache() {
+  serverConfigCache = null;
+}
+
 // ── GET /api/etapas-config ───────────────────────────────────────────────────
 export async function GET() {
   try {
@@ -112,63 +134,80 @@ export async function GET() {
 
     const db = getSupabase();
 
-    // Executa busca de acesso, fases e configurações em paralelo para velocidade máxima
-    const [access, fasesRes, configRes] = await Promise.all([
-      getUserProjectAccess(),
-      Promise.resolve(
-        db
-          .from("fases_acao")
-          .select("projeto_cliente, responsavel")
-          .eq("is_deleted", false)
-      ).catch(() => ({ data: null })),
-      Promise.resolve(
-        db
-          .from("configuracoes_sistema")
-          .select("chave, valor")
-      ).catch(() => ({ data: null, error: true })),
-    ]);
+    let config: SystemConfig;
+    let fasesPorProjeto: Map<string, any[]>;
 
-    // Busca fases para verificar responsabilidades
-    let fasesPorProjeto = new Map<string, any[]>();
-    const fasesData = (fasesRes as any)?.data;
-    if (fasesData && Array.isArray(fasesData)) {
-      for (const f of fasesData) {
-        const pNome = f.projeto_cliente;
-        if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
-        fasesPorProjeto.get(pNome)!.push(f);
+    // Verifica se os dados brutos já estão no cache de servidor
+    if (serverConfigCache && Date.now() < serverConfigCache.expiresAt) {
+      config = JSON.parse(JSON.stringify(serverConfigCache.data));
+      fasesPorProjeto = serverConfigCache.fasesPorProjeto;
+    } else {
+      // Executa busca filtrada apenas das 7 chaves necessárias e fases ativas em paralelo
+      const [fasesRes, configRes] = await Promise.all([
+        Promise.resolve(
+          db
+            .from("fases_acao")
+            .select("projeto_cliente, responsavel")
+            .eq("is_deleted", false)
+        ).catch(() => ({ data: null })),
+        Promise.resolve(
+          db
+            .from("configuracoes_sistema")
+            .select("chave, valor")
+            .in("chave", CHAVES_CONFIG_ETAPAS)
+        ).catch(() => ({ data: null, error: true })),
+      ]);
+
+      fasesPorProjeto = new Map<string, any[]>();
+      const fasesData = (fasesRes as any)?.data;
+      if (fasesData && Array.isArray(fasesData)) {
+        for (const f of fasesData) {
+          const pNome = f.projeto_cliente;
+          if (!fasesPorProjeto.has(pNome)) fasesPorProjeto.set(pNome, []);
+          fasesPorProjeto.get(pNome)!.push(f);
+        }
       }
+
+      config = getLocalConfig();
+
+      const data = (configRes as any)?.data;
+      const error = (configRes as any)?.error;
+
+      if (!error && data && Array.isArray(data) && data.length > 0) {
+        data.forEach((row: { chave: string; valor: any }) => {
+          if (row.chave === "diario_etapas_config_v1" && row.valor) {
+            config.configEtapas = { ...config.configEtapas, ...row.valor };
+          }
+          if (row.chave === "diario_projeto_starts_v1" && row.valor) {
+            config.projetoStartDates = { ...config.projetoStartDates, ...row.valor };
+          }
+          if (row.chave === "diario_responsaveis_por_etapa_v1" && row.valor) {
+            config.responsaveisPorEtapa = { ...config.responsaveisPorEtapa, ...row.valor };
+          }
+          if (row.chave === "diario_projetos_prazo_final_v1" && row.valor) {
+            config.projetosPrazoFinal = { ...config.projetosPrazoFinal, ...row.valor };
+          }
+          if (row.chave === "diario_projeto_justificativas_v1" && row.valor) {
+            config.projetoJustificativas = { ...config.projetoJustificativas, ...row.valor };
+          }
+          if (row.chave === "diario_etapas_progresso_v1" && row.valor) {
+            config.etapasProgresso = { ...config.etapasProgresso, ...row.valor };
+          }
+          if (row.chave === "diario_etapas_status_v1" && row.valor) {
+            config.etapasStatus = { ...config.etapasStatus, ...row.valor };
+          }
+        });
+      }
+
+      serverConfigCache = {
+        data: JSON.parse(JSON.stringify(config)),
+        fasesPorProjeto,
+        expiresAt: Date.now() + CONFIG_CACHE_TTL_MS,
+      };
     }
 
-    let config = getLocalConfig();
-
-    const data = (configRes as any)?.data;
-    const error = (configRes as any)?.error;
-
-    if (!error && data && Array.isArray(data) && data.length > 0) {
-      data.forEach((row: { chave: string; valor: any }) => {
-        if (row.chave === "diario_etapas_config_v1" && row.valor) {
-          config.configEtapas = { ...config.configEtapas, ...row.valor };
-        }
-        if (row.chave === "diario_projeto_starts_v1" && row.valor) {
-          config.projetoStartDates = { ...config.projetoStartDates, ...row.valor };
-        }
-        if (row.chave === "diario_responsaveis_por_etapa_v1" && row.valor) {
-          config.responsaveisPorEtapa = { ...config.responsaveisPorEtapa, ...row.valor };
-        }
-        if (row.chave === "diario_projetos_prazo_final_v1" && row.valor) {
-          config.projetosPrazoFinal = { ...config.projetosPrazoFinal, ...row.valor };
-        }
-        if (row.chave === "diario_projeto_justificativas_v1" && row.valor) {
-          config.projetoJustificativas = { ...config.projetoJustificativas, ...row.valor };
-        }
-        if (row.chave === "diario_etapas_progresso_v1" && row.valor) {
-          config.etapasProgresso = { ...config.etapasProgresso, ...row.valor };
-        }
-        if (row.chave === "diario_etapas_status_v1" && row.valor) {
-          config.etapasStatus = { ...config.etapasStatus, ...row.valor };
-        }
-      });
-    }
+    // Busca permissões do usuário logado (com cache ultrarrápido)
+    const access = await getUserProjectAccess();
 
     // 🔒 FILTRAGEM POR ACESSO DO USUÁRIO — mantém apenas dados dos projetos permitidos
     config.configEtapas = filterConfigByAccess(config.configEtapas, access, fasesPorProjeto);
@@ -372,6 +411,7 @@ export async function POST(req: Request) {
       }
     }
 
+    invalidateEtapasConfigCache();
     return NextResponse.json({ ok: true, config: currentConfig });
   } catch (e) {
     console.error("[POST /api/etapas-config]", e);
