@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/supabase";
 import { invalidateLojasCache } from "@/lib/lojas";
 import { invalidateProjectAccessCache } from "@/lib/project-access";
+import { invalidateEtapasConfigCache } from "@/app/api/etapas-config/route";
 import fs from "fs";
 import path from "path";
 
@@ -10,7 +11,7 @@ const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
  * Expurgo em lote completo e definitivo de múltiplos projetos do sistema.
  * 
  * Executa deleções agrupadas em lote único nas tabelas relacionais e metadados,
- * prevenindo race conditions e 'tuple concurrently updated' no Supabase.
+ * prevenindo race conditions e ressurreição de dados antigos ao recriar projetos.
  */
 export async function purgeMultipleProjects(
   nomesProjetos: string[],
@@ -24,19 +25,50 @@ export async function purgeMultipleProjects(
   const purgedCount = lista.length;
 
   try {
-    // 1. Apaga do banco relacional (fases, diário de campo e vínculos de projetos)
     if (lista.length > 0) {
-      await Promise.allSettled([
-        Promise.resolve(db.from("fases_acao").delete().in("projeto_cliente", lista)),
-        Promise.resolve(db.from("diario_logs").delete().in("projeto_cliente", lista)),
-        Promise.resolve(db.from("user_projetos").delete().in("projeto_nome", lista)),
-      ]);
+      // 1.1 Limpa historico_fases vinculado primeiro para evitar violação de FK
+      try {
+        const { data: fasesExistentes } = await db
+          .from("fases_acao")
+          .select("id")
+          .in("projeto_cliente", lista);
+
+        if (fasesExistentes && fasesExistentes.length > 0) {
+          const faseIds = fasesExistentes.map((f) => f.id);
+          await db.from("historico_fases").delete().in("fase_id", faseIds);
+        }
+      } catch (errHist) {
+        console.warn("[purgeMultipleProjects] Aviso ao limpar historico_fases:", errHist);
+      }
+
+      // 1.2 Apaga do banco relacional (fases, diário de campo e vínculos)
+      // Executa deleção com .in e com .ilike para cobrir variações de espaçamento/caixa
+      for (const nome of lista) {
+        const nomeTrim = nome.trim();
+        await Promise.allSettled([
+          Promise.resolve(db.from("fases_acao").delete().eq("projeto_cliente", nomeTrim)),
+          Promise.resolve(db.from("fases_acao").delete().ilike("projeto_cliente", nomeTrim)),
+          Promise.resolve(db.from("diario_logs").delete().eq("projeto_cliente", nomeTrim)),
+          Promise.resolve(db.from("diario_logs").delete().ilike("projeto_cliente", nomeTrim)),
+          Promise.resolve(db.from("user_projetos").delete().eq("projeto_nome", nomeTrim)),
+          Promise.resolve(db.from("user_projetos").delete().ilike("projeto_nome", nomeTrim)),
+        ]);
+      }
     }
+
     if (options.apagarFasesOrfas) {
-      await Promise.allSettled([
-        Promise.resolve(db.from("fases_acao").delete().eq("is_deleted", true)),
-        Promise.resolve(db.from("diario_logs").delete().eq("is_deleted", true)),
-      ]);
+      try {
+        const { data: fasesOrfas } = await db
+          .from("fases_acao")
+          .select("id")
+          .eq("is_deleted", true);
+        if (fasesOrfas && fasesOrfas.length > 0) {
+          const orfasIds = fasesOrfas.map((f) => f.id);
+          await db.from("historico_fases").delete().in("fase_id", orfasIds);
+          await db.from("fases_acao").delete().in("id", orfasIds);
+        }
+        await db.from("diario_logs").delete().eq("is_deleted", true);
+      } catch (_) {}
     }
 
     // 2. Limpa todas as chaves de metadados em configuracoes_sistema de uma só vez
@@ -67,7 +99,14 @@ export async function purgeMultipleProjects(
 
           for (const k of Object.keys(map)) {
             for (const nome of lista) {
-              if (k === nome || k.startsWith(`${nome}::`)) {
+              const kNorm = k.trim().toLowerCase();
+              const nomeNorm = nome.trim().toLowerCase();
+              if (
+                kNorm === nomeNorm ||
+                kNorm.startsWith(`${nomeNorm}::`) ||
+                k === nome ||
+                k.startsWith(`${nome}::`)
+              ) {
                 delete map[k];
                 modified = true;
                 break;
@@ -108,7 +147,14 @@ export async function purgeMultipleProjects(
             if (cfg[campo] && typeof cfg[campo] === "object") {
               for (const k of Object.keys(cfg[campo])) {
                 for (const nome of lista) {
-                  if (k === nome || k.startsWith(`${nome}::`)) {
+                  const kNorm = k.trim().toLowerCase();
+                  const nomeNorm = nome.trim().toLowerCase();
+                  if (
+                    kNorm === nomeNorm ||
+                    kNorm.startsWith(`${nomeNorm}::`) ||
+                    k === nome ||
+                    k.startsWith(`${nome}::`)
+                  ) {
                     delete cfg[campo][k];
                     localModified = true;
                     break;
@@ -129,6 +175,7 @@ export async function purgeMultipleProjects(
 
     invalidateLojasCache();
     invalidateProjectAccessCache();
+    invalidateEtapasConfigCache();
     return { success: true, purgedCount };
   } catch (err) {
     console.error(`[purgeMultipleProjects] Erro ao expurgar lote de projetos:`, err);

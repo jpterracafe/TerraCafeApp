@@ -6,6 +6,7 @@ import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 import { getUserAssignedLoja, setProjectLoja, matchLojaNames, getProjectLojasMap } from "@/lib/lojas";
 import { purgeProjectData } from "@/lib/project-purge";
 import { getLocalISODate } from "@/lib/date-utils";
+import { invalidateEtapasConfigCache } from "@/app/api/etapas-config/route";
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -369,6 +370,8 @@ export async function POST(req: Request) {
       console.warn("[POST /api/projetos] Erro ao sincronizar metadados no configuracoes_sistema:", cfgErr);
     }
 
+    invalidateEtapasConfigCache();
+
     return NextResponse.json({
       ok: true,
       projeto: nome,
@@ -455,6 +458,45 @@ export async function PATCH(req: Request) {
 
     const db = getSupabase();
     const agora = new Date().toISOString();
+
+    const limparEquipe = searchParams.get("limparEquipe") === "true";
+    if (limparEquipe) {
+      // 1. Reseta coluna responsavel em fases_acao para 'Não atribuído'
+      await db
+        .from("fases_acao")
+        .update({ responsavel: "Não atribuído", updated_at: agora })
+        .eq("projeto_cliente", nome);
+
+      // 2. Remove as chaves desse projeto em diario_responsaveis_por_etapa_v1
+      const { data: rowResp } = await db
+        .from("configuracoes_sistema")
+        .select("valor")
+        .eq("chave", "diario_responsaveis_por_etapa_v1")
+        .maybeSingle();
+
+      if (rowResp?.valor && typeof rowResp.valor === "object") {
+        const map = { ...rowResp.valor };
+        let mod = false;
+        for (const k of Object.keys(map)) {
+          const kNorm = k.trim().toLowerCase();
+          const nNorm = nome.trim().toLowerCase();
+          if (kNorm === nNorm || kNorm.startsWith(`${nNorm}::`) || k === nome || k.startsWith(`${nome}::`)) {
+            delete map[k];
+            mod = true;
+          }
+        }
+        if (mod) {
+          await db.from("configuracoes_sistema").upsert({
+            chave: "diario_responsaveis_por_etapa_v1",
+            valor: map,
+            updated_at: agora,
+          });
+        }
+      }
+
+      invalidateEtapasConfigCache();
+      return NextResponse.json({ ok: true, equipeLimpa: true, projeto: nome });
+    }
 
     await db
       .from("fases_acao")

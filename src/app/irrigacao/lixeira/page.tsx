@@ -173,6 +173,66 @@ export default function LixeiraPage() {
     }
   };
 
+  // ── Função auxiliar: Limpa rigorosamente qualquer resquício local dos projetos ──
+  const purgeLocalProjectStorage = (nomeOuNomes: string | string[]) => {
+    const nomes = (Array.isArray(nomeOuNomes) ? nomeOuNomes : [nomeOuNomes])
+      .map(n => (n || '').trim())
+      .filter(Boolean);
+    if (nomes.length === 0) return;
+
+    const chavesStorage = [
+      'diario_projeto_starts_v1',
+      'diario_projetos_prazo_final_v1',
+      'diario_etapas_config_v1',
+      'diario_responsaveis_por_etapa_v1',
+      'diario_projeto_justificativas_v1',
+      'diario_etapas_progresso_v1',
+      'diario_etapas_status_v1',
+    ];
+
+    chavesStorage.forEach((chave) => {
+      try {
+        const raw = localStorage.getItem(chave);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            let mod = false;
+            nomes.forEach((nome) => {
+              const nomeLc = nome.toLowerCase();
+              Object.keys(parsed).forEach((k) => {
+                const kLc = k.trim().toLowerCase();
+                if (
+                  kLc === nomeLc ||
+                  kLc.startsWith(`${nomeLc}::`) ||
+                  k === nome ||
+                  k.startsWith(`${nome}::`)
+                ) {
+                  delete parsed[k];
+                  mod = true;
+                }
+              });
+            });
+            if (mod) {
+              localStorage.setItem(chave, JSON.stringify(parsed));
+            }
+          }
+        }
+      } catch (_) {}
+    });
+
+    try {
+      nomes.forEach((nome) => {
+        const nomeLc = nome.toLowerCase();
+        Object.keys(sessionStorage).forEach((sk) => {
+          const skLc = sk.toLowerCase();
+          if (skLc.includes(`_obs_${nomeLc}_`)) {
+            sessionStorage.removeItem(sk);
+          }
+        });
+      });
+    } catch (_) {}
+  };
+
   // Abre modal para confirmar exclusão permanente de um projeto
   const promptHardDeleteProjeto = (nomeProjeto: string) => {
     const fasesDoProjeto = projetosAgrupados.find(([n]) => n === nomeProjeto)?.[1] ?? [];
@@ -200,18 +260,7 @@ export default function LixeiraPage() {
 
       // Limpa dados locais residuais
       await idbRemoveProjectLogs(nomeProjeto);
-      try {
-        ['diario_projeto_starts_v1', 'diario_projetos_prazo_final_v1', 'diario_etapas_config_v1', 'diario_responsaveis_por_etapa_v1'].forEach((k) => {
-          const raw = localStorage.getItem(k);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            Object.keys(parsed).forEach((pk) => {
-              if (pk === nomeProjeto || pk.startsWith(`${nomeProjeto}::`)) delete parsed[pk];
-            });
-            localStorage.setItem(k, JSON.stringify(parsed));
-          }
-        });
-      } catch (_) {}
+      purgeLocalProjectStorage(nomeProjeto);
 
       invalidateOfflineCache();
       setDeletedFases((prev) => prev.filter((f) => !ids.includes(f.id)));
@@ -257,21 +306,8 @@ export default function LixeiraPage() {
       // Limpa logs locais de IndexedDB para cada projeto excluído
       await Promise.allSettled(nomesProjetos.map((nome) => idbRemoveProjectLogs(nome)));
 
-      // Limpa dados locais residuais em localStorage
-      try {
-        ['diario_projeto_starts_v1', 'diario_projetos_prazo_final_v1', 'diario_etapas_config_v1', 'diario_responsaveis_por_etapa_v1'].forEach((k) => {
-          const raw = localStorage.getItem(k);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            nomesProjetos.forEach((nome) => {
-              Object.keys(parsed).forEach((pk) => {
-                if (pk === nome || pk.startsWith(`${nome}::`)) delete parsed[pk];
-              });
-            });
-            localStorage.setItem(k, JSON.stringify(parsed));
-          }
-        });
-      } catch (_) {}
+      // Limpa dados locais residuais em localStorage e sessionStorage
+      purgeLocalProjectStorage(nomesProjetos);
 
       // Invalida cache de dados offline
       invalidateOfflineCache();

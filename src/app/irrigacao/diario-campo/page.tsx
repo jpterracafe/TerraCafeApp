@@ -1210,18 +1210,27 @@ export default function DiarioCampoTimelinePage() {
         atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
       }
 
+      // Limpa rigorosamente do localStorage qualquer resquício de metadados deste nome
+      purgeLocalProjectStorage(nomeLimpo);
+
       // Limpa qualquer resquício local anterior de logs ou etapas desse nome
       await idbRemoveProjectLogs(nomeLimpo);
       invalidateOfflineCache();
-      setRegistros(prev => prev.filter(r => r.projetoCliente !== nomeLimpo));
+      setRegistros(prev => prev.filter(r => (r.projetoCliente || '').trim().toLowerCase() !== nomeLimpo.toLowerCase()));
       setConfigEtapas(prev => {
         const cp = { ...prev };
-        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeLimpo}::`)) delete cp[k]; });
+        Object.keys(cp).forEach(k => {
+          const kLc = k.trim().toLowerCase();
+          if (kLc === nomeLimpo.toLowerCase() || kLc.startsWith(`${nomeLimpo.toLowerCase()}::`)) delete cp[k];
+        });
         return cp;
       });
       setResponsaveisPorEtapa(prev => {
         const cp = { ...prev };
-        Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeLimpo}::`)) delete cp[k]; });
+        Object.keys(cp).forEach(k => {
+          const kLc = k.trim().toLowerCase();
+          if (kLc === nomeLimpo.toLowerCase() || kLc.startsWith(`${nomeLimpo.toLowerCase()}::`)) delete cp[k];
+        });
         return cp;
       });
       setProjetoJustificativas(prev => {
@@ -1243,6 +1252,89 @@ export default function DiarioCampoTimelinePage() {
     }
   };
 
+  // ── Função auxiliar: Limpa rigorosamente qualquer resquício local de um projeto ──
+  const purgeLocalProjectStorage = (nome: string) => {
+    const nomeLimpo = (nome || '').trim();
+    if (!nomeLimpo) return;
+    const nomeLc = nomeLimpo.toLowerCase();
+
+    const chavesStorage = [
+      'diario_projeto_starts_v1',
+      'diario_projetos_prazo_final_v1',
+      'diario_etapas_config_v1',
+      'diario_responsaveis_por_etapa_v1',
+      'diario_projeto_justificativas_v1',
+      'diario_etapas_progresso_v1',
+      'diario_etapas_status_v1',
+    ];
+
+    chavesStorage.forEach((chave) => {
+      try {
+        const raw = localStorage.getItem(chave);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            let mod = false;
+            Object.keys(parsed).forEach((k) => {
+              const kLc = k.trim().toLowerCase();
+              if (
+                kLc === nomeLc ||
+                kLc.startsWith(`${nomeLc}::`) ||
+                k === nomeLimpo ||
+                k.startsWith(`${nomeLimpo}::`)
+              ) {
+                delete parsed[k];
+                mod = true;
+              }
+            });
+            if (mod) {
+              localStorage.setItem(chave, JSON.stringify(parsed));
+            }
+          }
+        }
+      } catch (_) {}
+    });
+
+    try {
+      Object.keys(sessionStorage).forEach((sk) => {
+        const skLc = sk.toLowerCase();
+        if (skLc.includes(`_obs_${nomeLc}_`)) {
+          sessionStorage.removeItem(sk);
+        }
+      });
+    } catch (_) {}
+  };
+
+  // ── Desvincular Todos os Responsáveis de Todas as 6 Etapas do Projeto ───────
+  const handleLimparEquipeTodasEtapas = async () => {
+    if (!selectedProjeto) return;
+    const nomeBase = extractProjectBaseName(selectedProjeto);
+    if (!confirm(`Deseja remover todos os responsáveis de todas as 6 etapas do projeto "${nomeBase}"? As fases voltarão a ficar limpas sem colaboradores atribuídos.`)) return;
+
+    try {
+      // 1. Limpa state e localStorage local
+      const updated = { ...responsaveisPorEtapa };
+      const pLc = selectedProjeto.trim().toLowerCase();
+      Object.keys(updated).forEach(k => {
+        const kLc = k.trim().toLowerCase();
+        if (kLc.startsWith(`${pLc}::`)) delete updated[k];
+      });
+      setResponsaveisPorEtapa(updated);
+      try {
+        localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(updated));
+      } catch (_) {}
+
+      // 2. Chama API para limpar no backend e nas fases_acao
+      await offlineFetch(`/api/projetos?nome=${encodeURIComponent(selectedProjeto)}&limparEquipe=true`, {
+        method: 'PATCH',
+      });
+      invalidateOfflineCache();
+      success(`Equipe de todas as 6 fases do projeto "${nomeBase}" foi desvinculada com sucesso.`);
+    } catch (e) {
+      toastError('Erro ao limpar equipe do projeto.');
+    }
+  };
+
   // ── Excluir Projeto (Enviar para Lixeira - Soft Delete) ────────────────────
   const handleExcluirProjeto = async () => {
     if (!selectedProjeto) return;
@@ -1256,27 +1348,27 @@ export default function DiarioCampoTimelinePage() {
       });
       if (!res.ok) throw new Error('Erro na API ao excluir.');
 
+      // Limpa rigorosamente do localStorage e sessionStorage
+      purgeLocalProjectStorage(nomeProjeto);
+      await idbRemoveProjectLogs(nomeProjeto);
+
       // Limpa cache local do projeto excluído
       setProjetoStartDates(prev => {
         const cp = { ...prev }; delete cp[nomeProjeto];
-        try { localStorage.setItem('diario_projeto_starts_v1', JSON.stringify(cp)); } catch (_) {}
         return cp;
       });
       setProjetosPrazoFinal(prev => {
         const cp = { ...prev }; delete cp[nomeProjeto];
-        try { localStorage.setItem('diario_projetos_prazo_final_v1', JSON.stringify(cp)); } catch (_) {}
         return cp;
       });
       setConfigEtapas(prev => {
         const cp = { ...prev };
         Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeProjeto}::`)) delete cp[k]; });
-        try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(cp)); } catch (_) {}
         return cp;
       });
       setResponsaveisPorEtapa(prev => {
         const cp = { ...prev };
         Object.keys(cp).forEach(k => { if (k.startsWith(`${nomeProjeto}::`)) delete cp[k]; });
-        try { localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(cp)); } catch (_) {}
         return cp;
       });
 
@@ -2334,10 +2426,20 @@ export default function DiarioCampoTimelinePage() {
                         type="button"
                         onClick={clearResponsaveisNaEtapa}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                        title="Limpar responsáveis apenas desta etapa selecionada"
                       >
-                        Limpar
+                        Limpar Etapa
                       </button>
-                      </div>
+                      <span className="text-slate-300 dark:text-slate-600">•</span>
+                      <button 
+                        type="button"
+                        onClick={handleLimparEquipeTodasEtapas}
+                        className="text-rose-500 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 font-medium"
+                        title="Desvincular responsáveis de todas as 6 etapas deste projeto de uma só vez"
+                      >
+                        Desvincular Toda a Equipe
+                      </button>
+                    </div>
                   </div>
 
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">

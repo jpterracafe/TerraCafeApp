@@ -56,4 +56,5 @@ export interface RegistroDiarioCampo {
   projetoCliente?: string;
   midiaUrl?: string;
   midiaTipo?: string; // 'image' | 'video'
+  is_deleted?: boolean;
 }

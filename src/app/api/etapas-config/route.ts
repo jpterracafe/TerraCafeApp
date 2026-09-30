@@ -199,6 +199,42 @@ export async function GET() {
         });
       }
 
+      // 🧹 SANEAMENTO AUTOMÁTICO DE RESÍDUOS ÓRFÃOS DE EQUIPES:
+      // Se a fase na tabela fases_acao está com 'Não atribuído' ou o projeto não existe ativo,
+      // expurga resquícios antigos em responsaveisPorEtapa para não ressuscitar vínculos antigos
+      let cleanedOrphans = false;
+      for (const chave of Object.keys(config.responsaveisPorEtapa)) {
+        const [projNome, etapaKey] = chave.split("::", 2);
+        if (!projNome || !etapaKey) continue;
+        const fasesDoProj = fasesPorProjeto.get(projNome);
+        if (!fasesDoProj || fasesDoProj.length === 0) {
+          delete config.responsaveisPorEtapa[chave];
+          cleanedOrphans = true;
+          continue;
+        }
+        const fase = fasesDoProj.find(f =>
+          f.gabarito && (
+            f.gabarito.trim().toLowerCase() === etapaKey.trim().toLowerCase() ||
+            f.gabarito.trim().toLowerCase().includes(etapaKey.trim().toLowerCase()) ||
+            etapaKey.trim().toLowerCase().includes(f.gabarito.trim().toLowerCase())
+          )
+        );
+        if (fase && (!fase.responsavel || fase.responsavel.trim() === "Não atribuído")) {
+          delete config.responsaveisPorEtapa[chave];
+          cleanedOrphans = true;
+        }
+      }
+
+      if (cleanedOrphans) {
+        Promise.resolve(
+          db.from("configuracoes_sistema").upsert({
+            chave: "diario_responsaveis_por_etapa_v1",
+            valor: config.responsaveisPorEtapa,
+            updated_at: new Date().toISOString(),
+          })
+        ).catch(() => {});
+      }
+
       serverConfigCache = {
         data: JSON.parse(JSON.stringify(config)),
         fasesPorProjeto,

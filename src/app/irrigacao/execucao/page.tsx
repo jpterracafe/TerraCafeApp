@@ -237,10 +237,13 @@ export default function PainelOperacionalObrasPage() {
         const pctProgresso = config.etapasProgresso[chaveEtapa] ?? 0;
         somaProgresso += pctProgresso;
 
+        const hasStarted = cfgFase?.hasStarted === true;
+
         // Logs específicos desta etapa e projeto
         const logsEtapa = diarioLogs.filter(l =>
+          !l.is_deleted &&
           l.projetoCliente &&
-          l.projetoCliente.trim() === nomeProjeto.trim() &&
+          l.projetoCliente.trim().toLowerCase() === nomeProjeto.trim().toLowerCase() &&
           l.atividade &&
           (l.atividade.toLowerCase() === et.key.toLowerCase() ||
            l.atividade.toLowerCase().includes(et.key.toLowerCase()) ||
@@ -249,17 +252,18 @@ export default function PainelOperacionalObrasPage() {
 
         const ultimoLog = logsEtapa[0] || null;
 
-        // // Responsáveis da etapa (Config + Logs)
+        // Responsáveis da etapa (Config + Logs somente se fase iniciada ou com progresso)
         const respConfig = config.responsaveisPorEtapa[chaveEtapa] || [];
-        const respLogs = logsEtapa
-          .flatMap(l => parseResponsavelEmails(l.responsavel))
-          .filter(Boolean);
+        const respLogs = (hasStarted || pctProgresso > 0)
+          ? logsEtapa
+              .flatMap(l => parseResponsavelEmails(l.responsavel))
+              .filter(Boolean)
+          : [];
 
         let todosResp = Array.from(new Set([...respConfig, ...respLogs])).filter(Boolean);
         const respReais = todosResp.filter(r => !TERMOS_GENERICOS_RESPONSAVEL.has(normalizeName(r)));
         todosResp = respReais.length > 0 ? respReais : [];
 
-        const hasStarted = cfgFase?.hasStarted === true;
         const dataInicioFase = hasStarted
           ? cfgFase?.dataInicio || ''
           : '';

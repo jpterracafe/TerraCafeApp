@@ -337,7 +337,7 @@ export default function VisaoGeralDiretorPage() {
         const respFasesAcao = fases.filter(f =>
           !f.isDeleted &&
           f.projetoCliente &&
-          f.projetoCliente.trim() === nomeProjeto.trim() &&
+          f.projetoCliente.trim().toLowerCase() === nomeProjeto.trim().toLowerCase() &&
           f.gabarito &&
           (f.gabarito.trim().toLowerCase() === et.key.toLowerCase() ||
            f.gabarito.trim().toLowerCase().includes(et.key.toLowerCase()) ||
@@ -352,8 +352,9 @@ export default function VisaoGeralDiretorPage() {
         const nomesReaisFases = respFasesAcao.flat();
 
         const logsEtapa = diarioLogs.filter(l =>
+          !l.is_deleted &&
           l.projetoCliente &&
-          l.projetoCliente.trim() === nomeProjeto.trim() &&
+          l.projetoCliente.trim().toLowerCase() === nomeProjeto.trim().toLowerCase() &&
           l.atividade &&
           (l.atividade.trim().toLowerCase() === et.key.toLowerCase() ||
            l.atividade.trim().toLowerCase().includes(et.key.toLowerCase()) ||
