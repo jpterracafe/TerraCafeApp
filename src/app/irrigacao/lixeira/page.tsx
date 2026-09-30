@@ -44,7 +44,8 @@ export default function LixeiraPage() {
   const loadDeleted = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await offlineFetch('/api/fases');
+      invalidateOfflineCache();
+      const res = await offlineFetch(`/api/fases?_t=${Date.now()}`);
       if (res.ok) {
         const { fases } = await res.json();
         setDeletedFases((fases as FaseAcao[]).filter((f) => f.isDeleted));
@@ -263,8 +264,12 @@ export default function LixeiraPage() {
       purgeLocalProjectStorage(nomeProjeto);
 
       invalidateOfflineCache();
-      setDeletedFases((prev) => prev.filter((f) => !ids.includes(f.id)));
+      const nomeLc = nomeProjeto.trim().toLowerCase();
+      setDeletedFases((prev) =>
+        prev.filter((f) => (f.projetoCliente || '').trim().toLowerCase() !== nomeLc && !ids.includes(f.id))
+      );
       success(`Projeto "${nomeProjeto}" excluído permanentemente.`);
+      await loadDeleted();
     } catch (e) {
       console.error('[lixeira] Erro ao deletar projeto:', e);
       toastError('Erro ao excluir o projeto.');
@@ -293,7 +298,7 @@ export default function LixeiraPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projetos: nomesProjetos,
-          todos: selectedLoja === 'TODAS',
+          todos: !selectedLoja || selectedLoja === 'TODAS' || selectedLoja === 'all',
           loja: selectedLoja,
         }),
       });
@@ -312,8 +317,15 @@ export default function LixeiraPage() {
       // Invalida cache de dados offline
       invalidateOfflineCache();
 
-      // Remove do estado local apenas os projetos que foram expurgados
-      setDeletedFases((prev) => prev.filter((f) => !nomesProjetos.includes(f.projetoCliente?.trim() || '')));
+      // Remove do estado local imediatamente
+      if (!selectedLoja || selectedLoja === 'TODAS' || selectedLoja === 'all') {
+        setDeletedFases([]);
+      } else {
+        const nomesProjetosLc = nomesProjetos.map((n) => n.trim().toLowerCase());
+        setDeletedFases((prev) =>
+          prev.filter((f) => !nomesProjetosLc.includes((f.projetoCliente || '').trim().toLowerCase()))
+        );
+      }
 
       success(
         selectedLoja && selectedLoja !== 'TODAS'
@@ -355,6 +367,16 @@ export default function LixeiraPage() {
         </div>
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
           <LojaSelector />
+          <button
+            type="button"
+            onClick={() => loadDeleted()}
+            disabled={loading || clearingTrash || !!actionInProgress}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-all active:scale-95 shrink-0"
+            title="Recarregar projetos da lixeira"
+          >
+            <RefreshCcw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </button>
           <button
             onClick={() => setShowEmptyModal(true)}
             disabled={projetosAgrupados.length === 0 || clearingTrash || !!actionInProgress}

@@ -116,11 +116,12 @@ export async function GET() {
         observacoes: f.observacoes ?? "",
         projetoCliente: f.projeto_cliente ?? "",
         isDeleted: f.is_deleted ?? false,
+        criadoPorEmail: mapCriadores[f.projeto_cliente]?.email ?? "",
       }));
 
     return NextResponse.json({ fases }, {
       headers: {
-        "Cache-Control": "private, max-age=5, stale-while-revalidate=15",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
   } catch (e) {

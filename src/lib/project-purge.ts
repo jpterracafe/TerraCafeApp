@@ -26,31 +26,30 @@ export async function purgeMultipleProjects(
 
   try {
     if (lista.length > 0) {
-      // 1.1 Limpa historico_fases vinculado primeiro para evitar violação de FK
-      try {
-        const { data: fasesExistentes } = await db
-          .from("fases_acao")
-          .select("id")
-          .in("projeto_cliente", lista);
-
-        if (fasesExistentes && fasesExistentes.length > 0) {
-          const faseIds = fasesExistentes.map((f) => f.id);
-          await db.from("historico_fases").delete().in("fase_id", faseIds);
-        }
-      } catch (errHist) {
-        console.warn("[purgeMultipleProjects] Aviso ao limpar historico_fases:", errHist);
-      }
-
-      // 1.2 Apaga do banco relacional (fases, diário de campo e vínculos)
-      // Executa deleção com .in e com .ilike para cobrir variações de espaçamento/caixa
       for (const nome of lista) {
         const nomeTrim = nome.trim();
+        try {
+          // 1.1 Localiza todas as fases associadas a este projeto (case-insensitive)
+          const { data: fasesProj } = await db
+            .from("fases_acao")
+            .select("id")
+            .ilike("projeto_cliente", nomeTrim);
+
+          const ids = (fasesProj || []).map((f) => f.id);
+          if (ids.length > 0) {
+            // 1.2 Apaga histórico de fases antes para eliminar risco de violação de FK
+            await db.from("historico_fases").delete().in("fase_id", ids);
+            // 1.3 Apaga fases diretamente por ID
+            await db.from("fases_acao").delete().in("id", ids);
+          }
+        } catch (errFases) {
+          console.warn(`[purgeMultipleProjects] Aviso ao expurgar fases por ID para "${nomeTrim}":`, errFases);
+        }
+
+        // 1.4 Limpeza adicional por projeto_cliente e vínculos
         await Promise.allSettled([
-          Promise.resolve(db.from("fases_acao").delete().eq("projeto_cliente", nomeTrim)),
           Promise.resolve(db.from("fases_acao").delete().ilike("projeto_cliente", nomeTrim)),
-          Promise.resolve(db.from("diario_logs").delete().eq("projeto_cliente", nomeTrim)),
           Promise.resolve(db.from("diario_logs").delete().ilike("projeto_cliente", nomeTrim)),
-          Promise.resolve(db.from("user_projetos").delete().eq("projeto_nome", nomeTrim)),
           Promise.resolve(db.from("user_projetos").delete().ilike("projeto_nome", nomeTrim)),
         ]);
       }

@@ -36,15 +36,21 @@ export async function DELETE(req: Request) {
     }
 
     const { searchParams } = new URL(req.url);
-    const todos = body?.todos === true || searchParams.get("todos") === "true";
     const lojaFiltro = (body?.loja || searchParams.get("loja") || "").trim();
+    const isTodasLojas =
+      !lojaFiltro ||
+      lojaFiltro.toLowerCase() === "all" ||
+      lojaFiltro.toLowerCase() === "todas" ||
+      lojaFiltro.toLowerCase() === "todas as lojas";
+
+    const todos = body?.todos === true || searchParams.get("todos") === "true" || isTodasLojas;
     let projetosRecebidos: string[] = Array.isArray(body?.projetos) ? body.projetos : [];
 
     const db = getSupabase();
 
-    // Se "todos=true" ou se a lista de projetos não foi explicitamente fornecida,
+    // Se "todos=true", "isTodasLojas" ou se a lista de projetos não foi explicitamente fornecida,
     // busca do banco todos os projetos com fases na lixeira
-    if (todos || projetosRecebidos.length === 0) {
+    if (todos || isTodasLojas || projetosRecebidos.length === 0) {
       const { data: fasesDeletadas, error: fasesErr } = await db
         .from("fases_acao")
         .select("projeto_cliente")
@@ -60,12 +66,12 @@ export async function DELETE(req: Request) {
         )
       );
 
-      projetosRecebidos = nomesUnicos;
+      projetosRecebidos = Array.from(new Set([...projetosRecebidos, ...nomesUnicos]));
     }
 
-    // Carrega mapa de projetos-lojas para filtrar permissões caso necessário
+    // Carrega mapa de projetos-lojas para filtrar permissões caso uma filial ESPECÍFICA esteja selecionada
     let mapProjetosLojas: Record<string, string> = {};
-    if (!isDiretorOuAdmin || lojaFiltro) {
+    if (!isTodasLojas || (isGerente && !isDiretorOuAdmin)) {
       try {
         const { data: plRow } = await db
           .from("configuracoes_sistema")
@@ -85,8 +91,8 @@ export async function DELETE(req: Request) {
     const projetosParaApagar = projetosRecebidos.filter((nome) => {
       const lojaDoProj = mapProjetosLojas[nome] || mapProjetosLojas[nome.trim()] || "";
 
-      // Filtro de loja explícito na requisição
-      if (lojaFiltro && lojaFiltro !== "all") {
+      // Filtro de loja explícito na requisição (só filtra se NÃO for TODAS)
+      if (!isTodasLojas) {
         if (!matchLojaNames(lojaDoProj, lojaFiltro) && !matchLojaNames(nome, lojaFiltro)) {
           return false;
         }
@@ -102,7 +108,7 @@ export async function DELETE(req: Request) {
       return true;
     });
 
-    const podeExpurgarOrfas = isDiretorOuAdmin && (!lojaFiltro || lojaFiltro === "all");
+    const podeExpurgarOrfas = isDiretorOuAdmin || isTodasLojas;
 
     const result = await purgeMultipleProjects(projetosParaApagar, {
       apagarFasesOrfas: podeExpurgarOrfas,
