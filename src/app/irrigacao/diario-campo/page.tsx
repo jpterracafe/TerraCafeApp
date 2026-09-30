@@ -23,6 +23,7 @@ import { useLoja } from '@/contexts/LojaContext';
 import { compressImage } from '@/lib/image-compress';
 import { exportToCSV } from '@/lib/export-csv';
 import InstallAppButton from '@/components/InstallPWA';
+import LojaSelector from '@/components/LojaSelector';
 import { getLocalISODate } from '@/lib/date-utils';
 
 interface DiarioUser { 
@@ -2134,8 +2135,25 @@ export default function DiarioCampoTimelinePage() {
           </div>
         </div>
 
-        {/* Botão Instalar App Estratégico no topo do Diário */}
-        <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+        {/* Controles de Loja, Sincronização e Instalação */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-center shrink-0">
+          <LojaSelector />
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('light');
+              invalidateOfflineCache();
+              refreshAll();
+            }}
+            disabled={loadingLogs || loadingProjetos}
+            className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#16203a] hover:bg-slate-200 dark:hover:bg-[#1f2d4e] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e293b] flex items-center gap-1.5 transition-all shadow-xs"
+            title="Sincronizar dados em tempo real com o servidor"
+          >
+            <RefreshCcw className={`w-3.5 h-3.5 ${loadingLogs || loadingProjetos ? 'animate-spin text-blue-500' : 'text-slate-500'}`} />
+            <span className="hidden xs:inline sm:inline">Sincronizar</span>
+          </button>
+
           <InstallAppButton />
         </div>
       </div>
@@ -2157,7 +2175,11 @@ export default function DiarioCampoTimelinePage() {
                 <ChevronDown className={`w-3.5 h-3.5 text-blue-500 transition-transform duration-200 ${isMobileProjectSelectorOpen ? 'rotate-180' : ''}`} />
               </div>
               <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
-                {selectedProjeto ? extractProjectBaseName(selectedProjeto) : 'Selecione uma obra'}
+                {selectedProjeto 
+                  ? extractProjectBaseName(selectedProjeto) 
+                  : (filteredProjetosList.length === 0 
+                      ? (selectedLoja !== 'TODAS' ? `Sem obras em ${selectedLoja}` : 'Nenhuma obra ativa')
+                      : 'Selecione uma obra')}
               </p>
             </div>
           </button>
@@ -2234,39 +2256,100 @@ export default function DiarioCampoTimelinePage() {
               />
             </div>
 
-            <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-              {filteredProjetosList.map(proj => {
-                const isSelected = selectedProjeto === proj;
-                const totalLogs = logsCountByProjeto[proj] || 0;
-                return (
+            {filteredProjetosList.length === 0 ? (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#070c18] border border-dashed border-slate-300 dark:border-[#1e293b] text-center space-y-2.5">
+                <Briefcase className="w-8 h-8 mx-auto text-slate-400 opacity-40" />
+                <p className="text-xs text-slate-600 dark:text-slate-400">
+                  {selectedLoja !== 'TODAS'
+                    ? `Nenhuma obra encontrada para a filial ${selectedLoja}.`
+                    : 'Nenhuma obra ativa encontrada no momento.'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {selectedLoja !== 'TODAS' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedLoja('TODAS');
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all"
+                    >
+                      🌐 Ver Todas as Filiais
+                    </button>
+                  )}
                   <button
-                    key={proj}
                     type="button"
                     onClick={() => {
-                      setSelectedProjeto(proj);
-                      setIsMobileProjectSelectorOpen(false);
+                      triggerHaptic('light');
+                      invalidateOfflineCache();
+                      refreshAll();
                     }}
-                    className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 border text-xs ${
-                      isSelected
-                        ? 'bg-blue-600 border-blue-500 text-white font-bold shadow-md'
-                        : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 active:bg-slate-100 dark:active:bg-[#111a30]'
-                    }`}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-200 dark:bg-[#16203a] hover:bg-slate-300 text-slate-800 dark:text-slate-200 transition-all flex items-center gap-1"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
-                        <span className="truncate font-semibold">{extractProjectBaseName(proj)}</span>
-                        <span className="text-[10px] opacity-75">[{getProjectVersion(proj)}]</span>
-                      </div>
-                      <span className={`text-[10px] block mt-0.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                        {totalLogs} registro{totalLogs !== 1 ? 's' : ''} no diário
-                      </span>
-                    </div>
-                    {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                    <RefreshCcw className="w-3 h-3" />
+                    <span>Sincronizar</span>
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
+                {filteredProjetosList.map(proj => {
+                  const isSelected = selectedProjeto === proj;
+                  const totalLogs = logsCountByProjeto[proj] || 0;
+                  const lojaDoProj = projetosLojas[proj] || projetosLojas[proj.trim()];
+                  return (
+                    <button
+                      key={proj}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProjeto(proj);
+                        setIsMobileProjectSelectorOpen(false);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-2 border text-xs ${
+                        isSelected
+                          ? 'bg-blue-600 border-blue-500 text-white font-bold shadow-md'
+                          : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 active:bg-slate-100 dark:active:bg-[#111a30]'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-500'}`} />
+                          <span className="truncate font-semibold">{extractProjectBaseName(proj)}</span>
+                          <span className="text-[10px] opacity-75">[{getProjectVersion(proj)}]</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-[10px] block ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                            {totalLogs} registro{totalLogs !== 1 ? 's' : ''} no diário
+                          </span>
+                          {lojaDoProj && (
+                            <span className={`text-[9px] px-1 py-0.2 rounded font-medium truncate border ${
+                              isSelected
+                                ? 'bg-white/20 text-white border-white/30'
+                                : 'bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700'
+                            }`}>
+                              {lojaDoProj}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {isSelected && <Check className="w-4 h-4 text-white shrink-0" />}
+                    </button>
+                  );
+                })}
+
+                {selectedLoja !== 'TODAS' && (
+                  <div className="pt-2 border-t border-slate-100 dark:border-[#1e293b] flex items-center justify-between text-[11px] text-slate-500 px-1">
+                    <span>Filial: <strong>{selectedLoja}</strong></span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLoja('TODAS')}
+                      className="text-blue-600 dark:text-blue-400 font-bold hover:underline"
+                    >
+                      Ver Todas as Lojas
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -3569,13 +3652,40 @@ export default function DiarioCampoTimelinePage() {
               </div>
             </>
           ) : (
-            <div className="flex-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl flex items-center justify-center p-12 shadow-xl">
-              <div className="text-center text-slate-400 max-w-md">
-                <Briefcase className="w-14 h-14 mx-auto mb-3 opacity-25 text-blue-500" />
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white">Selecione um Projeto</h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Selecione um projeto de irrigação na barra lateral para ver as etapas, contadores e registrar o diário de campo com sua equipe.
+            <div className="flex-1 bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl flex items-center justify-center p-8 sm:p-12 shadow-xl">
+              <div className="text-center text-slate-400 max-w-md space-y-3">
+                <Briefcase className="w-14 h-14 mx-auto opacity-25 text-blue-500" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  {projetos.length === 0 ? 'Nenhuma Obra Ativa Encontrada' : 'Selecione uma Obra'}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {projetos.length === 0
+                    ? 'Não encontramos nenhuma obra ativa para o seu usuário ou filial no momento.'
+                    : 'Selecione uma obra acima para ver as etapas, contadores e registrar o diário de campo.'}
                 </p>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  {selectedLoja !== 'TODAS' && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLoja('TODAS')}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition-all"
+                    >
+                      🌐 Ver Todas as Filiais
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('light');
+                      invalidateOfflineCache();
+                      refreshAll();
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all"
+                  >
+                    <RefreshCcw className="w-3.5 h-3.5" />
+                    <span>Sincronizar Agora</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

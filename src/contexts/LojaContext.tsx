@@ -77,7 +77,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
   const isDiretor = userRole === "Diretor" || isCoordenador;
   const isGerente = userRole === "Gerente";
   const isAdmin = userRole === "Admin" || isMasterDev;
-  const canSwitchLoja = isDiretor || isCoordenador || isAdmin;
+  const canSwitchLoja = isDiretor || isCoordenador || isAdmin || isGerente;
 
   // Loja atribuída ao usuário na sessão ou no banco
   const userAssignedLoja = useMemo(() => {
@@ -238,7 +238,14 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         return true;
       }
 
-      // 4. Projetos sem nenhum vínculo com essa loja NÃO aparecem nessa filial
+      // 4. Se a obra NÃO possui nenhum vínculo com outra loja (sem filial direta nem filial do criador),
+      // ela pertence ao escopo geral da empresa e NÃO deve desaparecer no celular.
+      const criadorLoja = criadorEmail ? usuariosLojas[criadorEmail.toLowerCase().trim()] : null;
+      if (!lojaDireta && !criadorLoja) {
+        return true;
+      }
+
+      // Pertence comprovadamente a outra filial diferente da selecionada
       return false;
     },
     [selectedLoja, projetosLojas, usuariosLojas]

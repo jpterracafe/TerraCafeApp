@@ -119,7 +119,7 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
             .from("user_projetos")
             .select("projeto_nome, user_email")
         ).catch(() => ({ data: null })),
-        isGerente && sessionLoja
+        sessionLoja
           ? Promise.resolve(
               db
                 .from("configuracoes_sistema")
@@ -150,8 +150,8 @@ export async function getUserProjectAccess(): Promise<ProjectAccessResult> {
         }
       }
 
-      // 🏢 Regra do Gerente: acesso a todas as obras da sua cidade/filial
-      if (isGerente && sessionLoja) {
+      // 🏢 Regra de Loja: acesso a todas as obras da sua cidade/filial
+      if (sessionLoja) {
         if (projLojasRes?.data?.valor && typeof projLojasRes.data.valor === "object") {
           const mapLojas = projLojasRes.data.valor as Record<string, string>;
           for (const [projNome, lojaNome] of Object.entries(mapLojas)) {
@@ -204,12 +204,21 @@ export function hasProjectAccess(
     return true;
   }
 
-  // Gerente tem acesso a projetos da sua filial ou com a cidade no nome
-  if (sessionRole === "Gerente" && sessionLoja && matchLojaNames(projectName, sessionLoja)) {
+  // Acesso a projetos da sua filial ou com a cidade no nome
+  if (sessionLoja && matchLojaNames(projectName, sessionLoja)) {
     return true;
   }
 
-  const criador = mapCriadores[projectName];
+  let criador = mapCriadores[projectName] || mapCriadores[projectName.trim()];
+  if (!criador) {
+    const pNomeLc = projectName.trim().toLowerCase();
+    for (const [k, v] of Object.entries(mapCriadores)) {
+      if (k.trim().toLowerCase() === pNomeLc) {
+        criador = v;
+        break;
+      }
+    }
+  }
   const criadorEmail = criador?.email?.trim().toLowerCase();
   
   // Verifica acesso para projetos com OU sem criador definido
@@ -223,7 +232,17 @@ export function hasProjectAccess(
     
     // É responsável direto por alguma fase do projeto (por email ou nome)
     if (fasesPorProjeto) {
-      const fasesDoProj = fasesPorProjeto.get(projectName) || [];
+      let fasesDoProj = fasesPorProjeto.get(projectName) || fasesPorProjeto.get(projectName.trim()) || [];
+      if (fasesDoProj.length === 0) {
+        const pNomeLc = projectName.trim().toLowerCase();
+        for (const [k, v] of fasesPorProjeto.entries()) {
+          if (k.trim().toLowerCase() === pNomeLc) {
+            fasesDoProj = v;
+            break;
+          }
+        }
+      }
+
       const ehResponsavel = fasesDoProj.some(f => {
         const r = (f.responsavel || "").trim();
         const responsaveis = parseResponsavelEmails(r);
@@ -239,6 +258,13 @@ export function hasProjectAccess(
         return temEmail || temNome;
       });
       if (ehResponsavel) return true;
+
+      // Se todas as fases estão Não atribuído, permite acesso para a equipe operacional
+      const todasFasesNaoAtribuidas = fasesDoProj.length > 0 && fasesDoProj.every(f => {
+        const r = (f.responsavel || "").trim().toLowerCase();
+        return !r || r === "não atribuído" || r === "nao atribuido";
+      });
+      if (todasFasesNaoAtribuidas) return true;
     }
     
     // Pertence a outro usuário -> oculta (não tem criador nem permissão explícita)

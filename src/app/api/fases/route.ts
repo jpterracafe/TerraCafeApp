@@ -14,6 +14,9 @@ import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
 import { matchLojaNames, getProjectLojasMap } from "@/lib/lojas";
 import { purgeProjectData } from "@/lib/project-purge";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // ── GET /api/fases ─────────────────────────────────────────────────────────────
 export async function GET() {
   try {
@@ -41,7 +44,7 @@ export async function GET() {
         .from("fases_acao")
         .select("id, gabarito, responsavel, acao, prazo_limite, status, observacoes, projeto_cliente, is_deleted")
         .order("created_at", { ascending: true }),
-      isGerente && sessionLoja ? getProjectLojasMap() : Promise.resolve({} as Record<string, string>),
+      sessionLoja ? getProjectLojasMap() : Promise.resolve({} as Record<string, string>),
     ]);
 
     let mapCriadores: Record<string, { email: string }> = {};
@@ -65,8 +68,8 @@ export async function GET() {
         // 👑 Diretor, Coordenador, Admin e Desenvolvedor vêem todas as fases
         if (isDiretorOuAdmin) return true;
 
-        // 🏢 Gerente: vê todas as fases de projetos da sua cidade/filial
-        if (isGerente && sessionLoja) {
+        // 🏢 Vínculo por Loja: vê todas as fases de projetos da sua cidade/filial
+        if (sessionLoja) {
           let lojaDoProj = mapProjetosLojas[pNome] || mapProjetosLojas[pNome.trim()];
           if (!lojaDoProj) {
             const pNomeLc = pNome.trim().toLowerCase();
@@ -85,14 +88,20 @@ export async function GET() {
           }
         }
 
-        const criador = mapCriadores[pNome];
+        const criador = mapCriadores[pNome] || mapCriadores[pNome.trim()];
         const criadorEmail = criador?.email?.trim().toLowerCase();
 
         // Se o projeto tem criador cadastrado e NÃO é o montador logado:
         if (criadorEmail && criadorEmail !== sessionEmailLc) {
+          const respRaw = (f.responsavel || "").trim();
+          const respLc = respRaw.toLowerCase();
+          // Se a fase ainda não foi atribuída a ninguém, mantém visível para a equipe operacional
+          if (!respRaw || respLc === "não atribuído" || respLc === "nao atribuido") {
+            return true;
+          }
+
           // Verifica se o usuário é responsável pela fase (por email ou por nome, item a item)
-          const resp = (f.responsavel || "").trim();
-          const responsaveis = parseResponsavelEmails(resp);
+          const responsaveis = parseResponsavelEmails(respRaw);
           const ehResponsavelEmail = responsaveis.includes(sessionEmailLc);
           const nomeLc = normalizeName(sessionName);
           const ehResponsavelNome =

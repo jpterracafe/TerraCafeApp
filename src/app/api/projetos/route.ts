@@ -3,10 +3,20 @@ import { getServerSession } from "next-auth";
 import { getSupabase } from "@/lib/supabase";
 import { authOptions } from "@/lib/auth";
 import { parseResponsavelEmails, normalizeName } from "@/lib/responsaveis";
-import { getUserAssignedLoja, setProjectLoja, matchLojaNames, getProjectLojasMap } from "@/lib/lojas";
+import { getUserAssignedLoja, setProjectLoja, matchLojaNames, getProjectLojasMap, invalidateLojasCache } from "@/lib/lojas";
+import { invalidateProjectAccessCache } from "@/lib/project-access";
 import { purgeProjectData } from "@/lib/project-purge";
 import { getLocalISODate } from "@/lib/date-utils";
 import { invalidateEtapasConfigCache } from "@/app/api/etapas-config/route";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_CACHE_HEADERS = {
+  "Cache-Control": "private, no-cache, no-store, max-age=0, must-revalidate",
+  "Pragma": "no-cache",
+  "Expires": "0",
+};
 
 // ── GET /api/projetos?responsavel=Nome&lixeira=true&concluidos=true ───────────
 // Retorna nomes únicos de projetos ATIVOS por padrão (excluindo os concluídos).
@@ -108,9 +118,9 @@ export async function GET(req: Request) {
     const isGerente = sessionRole === "Gerente";
     const emailAlvo = emailFiltro || (apenasMeus ? sessionEmail : "");
 
-    // Carrega mapa de projetos para lojas caso o usuário seja Gerente (aproveita cache de servidor)
+    // Carrega mapa de projetos para lojas (aproveita cache de servidor)
     let mapProjetosLojas: Record<string, string> = {};
-    if (isGerente && sessionLoja) {
+    if (sessionLoja) {
       mapProjetosLojas = await getProjectLojasMap();
     }
 
@@ -120,8 +130,8 @@ export async function GET(req: Request) {
         return true;
       }
 
-      // 🏢 Gerente: tem acesso garantido a todas as obras da sua cidade/filial
-      if (isGerente && sessionLoja && !emailAlvo) {
+      // 🏢 Vínculo por Loja: se o usuário pertence a uma filial, tem acesso a todas as obras da sua filial
+      if (sessionLoja && !emailAlvo) {
         let lojaDoProj = mapProjetosLojas[nome] || mapProjetosLojas[nome.trim()];
         if (!lojaDoProj) {
           const nomeLc = nome.trim().toLowerCase();
@@ -140,7 +150,17 @@ export async function GET(req: Request) {
         }
       }
 
-      const criador = mapCriadores[nome];
+      let criador = mapCriadores[nome] || mapCriadores[nome.trim()];
+      if (!criador) {
+        const nomeLc = nome.trim().toLowerCase();
+        for (const [k, v] of Object.entries(mapCriadores)) {
+          if (k.trim().toLowerCase() === nomeLc) {
+            criador = v;
+            break;
+          }
+        }
+      }
+
       const criadorEmail = criador?.email?.trim().toLowerCase();
       const emailComparar = emailAlvo || sessionEmail;
 
@@ -149,11 +169,17 @@ export async function GET(req: Request) {
         if (criadorEmail === emailComparar) return true;
         if (userProjetosPermitidos.has(nome)) return true;
 
-        // É responsável direto por alguma fase do projeto.
-        // Mesma regra de /api/fases e project-access: igualdade por e-mail
-        // ou por nome normalizado (sem acento/caixa) — NUNCA substring
-        // ("Ana" não pode herdar acesso de "Mariana").
-        const fasesDoProj = fasesPorProjeto.get(nome) || [];
+        let fasesDoProj = fasesPorProjeto.get(nome) || fasesPorProjeto.get(nome.trim()) || [];
+        if (fasesDoProj.length === 0) {
+          const nomeLc = nome.trim().toLowerCase();
+          for (const [k, v] of fasesPorProjeto.entries()) {
+            if (k.trim().toLowerCase() === nomeLc) {
+              fasesDoProj = v;
+              break;
+            }
+          }
+        }
+
         const sessionEmailLc = sessionEmail.toLowerCase();
         const nomeLc = normalizeName(sessionName);
         const ehResponsavel = fasesDoProj.some(f => {
@@ -167,6 +193,16 @@ export async function GET(req: Request) {
         });
         if (ehResponsavel) return true;
 
+        // Se a obra acabou de ser criada e as fases estão "Não atribuído",
+        // permite visualização para que novos projetos não sumam no celular da equipe
+        const todasFasesNaoAtribuidas = fasesDoProj.length > 0 && fasesDoProj.every(f => {
+          const r = (f.responsavel || "").trim().toLowerCase();
+          return !r || r === "não atribuído" || r === "nao atribuido";
+        });
+        if (todasFasesNaoAtribuidas && !emailAlvo) {
+          return true;
+        }
+
         // Pertence a outro usuário -> oculta do montador/técnico
         return false;
       }
@@ -174,7 +210,6 @@ export async function GET(req: Request) {
       // Projeto legado (sem criador definido): acessível
       return true;
     };
-
 
     const condicaoConcluido = (n: string) => {
       if (todos) return true;
@@ -188,7 +223,7 @@ export async function GET(req: Request) {
         if (!temAcessoAoProjeto(n)) continue;
         if (!condicaoConcluido(n)) continue;
 
-        const criador = mapCriadores[n] || null;
+        const criador = mapCriadores[n] || mapCriadores[n.trim()] || null;
         if (!mapa.has(n)) {
           mapa.set(n, {
             nome: n,
@@ -205,7 +240,7 @@ export async function GET(req: Request) {
         }
       }
       const lista = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-      return NextResponse.json({ projetos: lista, criadores: mapCriadores });
+      return NextResponse.json({ projetos: lista, criadores: mapCriadores }, { headers: NO_CACHE_HEADERS });
     }
 
     let unicos = Array.from(
@@ -213,10 +248,10 @@ export async function GET(req: Request) {
     ).filter(n => temAcessoAoProjeto(n) && condicaoConcluido(n));
 
     unicos.sort();
-    return NextResponse.json({ projetos: unicos, criadores: mapCriadores });
+    return NextResponse.json({ projetos: unicos, criadores: mapCriadores }, { headers: NO_CACHE_HEADERS });
   } catch (e) {
     console.error("[GET /api/projetos]", e);
-    return NextResponse.json({ error: "Erro ao buscar projetos." }, { status: 500 });
+    return NextResponse.json({ error: "Erro ao buscar projetos." }, { status: 500, headers: NO_CACHE_HEADERS });
   }
 }
 
@@ -374,8 +409,9 @@ export async function POST(req: Request) {
         });
       }
 
-      // Atribui loja ao novo projeto: prioriza loja informada no body ou herda a loja vinculada ao criador
-      const lojaAtribuida = body?.lojaNome || await getUserAssignedLoja({ id: userId, email: userEmail });
+      // Atribui loja ao novo projeto: prioriza loja informada no body, sessão ou criador
+      const sessionLoja = ((session?.user as any)?.loja || "").trim();
+      const lojaAtribuida = body?.lojaNome || sessionLoja || await getUserAssignedLoja({ id: userId, email: userEmail });
       if (lojaAtribuida) {
         await setProjectLoja(nome, lojaAtribuida);
       }
@@ -384,6 +420,8 @@ export async function POST(req: Request) {
     }
 
     invalidateEtapasConfigCache();
+    invalidateLojasCache();
+    invalidateProjectAccessCache();
 
     return NextResponse.json({
       ok: true,

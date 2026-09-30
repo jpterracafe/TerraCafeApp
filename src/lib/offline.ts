@@ -228,6 +228,7 @@ const MEM_CACHE_TTL_MS = 5000;
 
 /** Invalida cache em memória imediatamente (ex: ao salvar dados) */
 export function invalidateOfflineCache(urlPrefix?: string) {
+  inFlightRequests.clear();
   if (!urlPrefix) {
     memCache.clear();
     idbClearCache().catch(() => {});
@@ -301,7 +302,16 @@ export async function offlineFetch(url: string, options: RequestInit = {}): Prom
   }
 
   const executeFetch = async (): Promise<{ status: number; body: string; ok: boolean }> => {
-    const res = await fetch(url, options);
+    const fetchOptions: RequestInit = {
+      ...options,
+      cache: options.cache || (isMutation ? "no-store" : "no-cache"),
+      headers: {
+        ...(options.headers || {}),
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+    };
+    const res = await fetch(url, fetchOptions);
     const body = await res.text();
     return { status: res.status, body, ok: res.ok };
   };

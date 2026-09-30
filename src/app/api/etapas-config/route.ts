@@ -8,6 +8,9 @@ import path from "path";
 import { getUserProjectAccess, filterConfigByAccess } from "@/lib/project-access";
 import { parseResponsavelEmails } from "@/lib/responsaveis";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
 
 interface SystemConfig {
