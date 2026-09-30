@@ -230,11 +230,11 @@ export async function POST(req: Request) {
 
     const db = getSupabase();
 
-    // Impede duplicação de projeto ATIVO com o mesmo nome
+    // Impede duplicação de projeto ATIVO com o mesmo nome (case-insensitive)
     const { data: existingActive } = await db
       .from("fases_acao")
       .select("id")
-      .eq("projeto_cliente", nome)
+      .ilike("projeto_cliente", nome.trim())
       .eq("is_deleted", false)
       .limit(1);
 
@@ -423,13 +423,13 @@ export async function DELETE(req: Request) {
     await db
       .from("fases_acao")
       .update({ is_deleted: true, updated_at: agora })
-      .eq("projeto_cliente", nome);
+      .ilike("projeto_cliente", nome.trim());
 
     try {
       const r = await db
         .from("diario_logs")
         .update({ is_deleted: true })
-        .eq("projeto_cliente", nome);
+        .ilike("projeto_cliente", nome.trim());
       if (r.error) throw r.error;
     } catch (_) { /* ignora se tabela diario_logs não tiver coluna is_deleted */ }
 
@@ -501,13 +501,13 @@ export async function PATCH(req: Request) {
     await db
       .from("fases_acao")
       .update({ is_deleted: false, updated_at: agora })
-      .eq("projeto_cliente", nome);
+      .ilike("projeto_cliente", nome.trim());
 
     try {
       const r = await db
         .from("diario_logs")
         .update({ is_deleted: false })
-        .eq("projeto_cliente", nome);
+        .ilike("projeto_cliente", nome.trim());
       if (r.error) throw r.error;
     } catch (_) { /* ignora */ }
 

@@ -409,7 +409,10 @@ export async function DELETE(req: Request) {
     const projetoCliente = faseData?.projeto_cliente ?? "";
 
     if (hard) {
-      // Hard delete — apaga linha permanentemente (requer explicitamente ?hard=true)
+      // Hard delete — apaga histórico primeiro para evitar violação de FK
+      try {
+        await db.from("historico_fases").delete().eq("fase_id", id);
+      } catch (_) {}
       const { error } = await db.from("fases_acao").delete().eq("id", id);
       if (error) throw error;
     } else {

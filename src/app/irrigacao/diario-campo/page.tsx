@@ -334,60 +334,42 @@ export default function DiarioCampoTimelinePage() {
       console.error('[diario] Erro ao ler configs do localStorage:', e);
     }
 
-    // 2. Sincronização com o servidor/nuvem (MERGE — nunca substitui dados locais não sincronizados)
+    // 2. Sincronização com o servidor/nuvem (dados da nuvem substituem de forma limpa, evitando ressuscitar chaves apagadas)
     offlineFetch('/api/etapas-config')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
-          if (data.configEtapas && Object.keys(data.configEtapas).length > 0) {
-            setConfigEtapas(prev => {
-              const rawMerged = { ...prev, ...data.configEtapas };
-              const merged = sanitizeConfigEtapas(rawMerged);
-              try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.configEtapas) {
+            const clean = sanitizeConfigEtapas(data.configEtapas);
+            setConfigEtapas(clean);
+            try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(clean)); } catch (_) {}
           }
-          if (data.projetoStartDates && Object.keys(data.projetoStartDates).length > 0) {
-            setProjetoStartDates(prev => {
-              const merged = { ...prev, ...data.projetoStartDates };
-              try { localStorage.setItem('diario_projeto_starts_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.projetoStartDates) {
+            setProjetoStartDates(data.projetoStartDates);
+            try { localStorage.setItem('diario_projeto_starts_v1', JSON.stringify(data.projetoStartDates)); } catch (_) {}
           }
-          if (data.responsaveisPorEtapa && Object.keys(data.responsaveisPorEtapa).length > 0) {
-            setResponsaveisPorEtapa(prev => {
-              const merged = { ...prev, ...data.responsaveisPorEtapa };
-              try { localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.responsaveisPorEtapa) {
+            setResponsaveisPorEtapa(data.responsaveisPorEtapa);
+            try { localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(data.responsaveisPorEtapa)); } catch (_) {}
           }
-          if (data.projetosPrazoFinal && Object.keys(data.projetosPrazoFinal).length > 0) {
-            setProjetosPrazoFinal(prev => {
-              const merged = { ...prev, ...data.projetosPrazoFinal };
-              try { localStorage.setItem('diario_projetos_prazo_final_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.projetosPrazoFinal) {
+            setProjetosPrazoFinal(data.projetosPrazoFinal);
+            try { localStorage.setItem('diario_projetos_prazo_final_v1', JSON.stringify(data.projetosPrazoFinal)); } catch (_) {}
           }
-          if (data.projetoJustificativas && Object.keys(data.projetoJustificativas).length > 0) {
-            setProjetoJustificativas(prev => {
-              const merged = { ...prev, ...data.projetoJustificativas };
-              try { localStorage.setItem('diario_projeto_justificativas_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.projetoJustificativas) {
+            setProjetoJustificativas(data.projetoJustificativas);
+            try { localStorage.setItem('diario_projeto_justificativas_v1', JSON.stringify(data.projetoJustificativas)); } catch (_) {}
           }
-          if (data.etapasProgresso && Object.keys(data.etapasProgresso).length > 0) {
-            setProgressoManual(prev => {
-              const merged = { ...prev, ...data.etapasProgresso };
-              try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(merged)); } catch (_) {}
-              return merged;
-            });
+          if (data.etapasProgresso) {
+            setProgressoManual(data.etapasProgresso);
+            try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(data.etapasProgresso)); } catch (_) {}
           }
         }
       })
       .catch(err => console.warn('[diario] Offline ou erro ao sincronizar configs:', err));
   }, []);
 
-  const saveEtapaConfigToStorage = (newConfigs: Record<string, EtapaConfig>) => {
+  const saveEtapaConfigToStorage = (newConfigs: Record<string, EtapaConfig>, projetoAlvo?: string) => {
     const clean = sanitizeConfigEtapas(newConfigs);
     setConfigEtapas(clean);
     try {
@@ -399,7 +381,7 @@ export default function DiarioCampoTimelinePage() {
     offlineFetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'etapas', dados: clean }),
+      body: JSON.stringify({ tipo: 'etapas', dados: clean, projeto: projetoAlvo || selectedProjeto }),
     }).catch(e => console.warn('[diario] Erro ao sincronizar metas com a nuvem:', e));
   };
 
@@ -418,7 +400,7 @@ export default function DiarioCampoTimelinePage() {
     }).catch(e => console.warn('[diario] Erro ao sincronizar starts com a nuvem:', e));
   };
 
-  const saveResponsaveisPorEtapaToStorage = (newResp: Record<string, string[]>) => {
+  const saveResponsaveisPorEtapaToStorage = (newResp: Record<string, string[]>, projetoAlvo?: string) => {
     setResponsaveisPorEtapa(newResp);
     try {
       localStorage.setItem('diario_responsaveis_por_etapa_v1', JSON.stringify(newResp));
@@ -429,7 +411,7 @@ export default function DiarioCampoTimelinePage() {
     offlineFetch('/api/etapas-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tipo: 'responsaveis', dados: newResp }),
+      body: JSON.stringify({ tipo: 'responsaveis', dados: newResp, projeto: projetoAlvo || selectedProjeto }),
     }).catch(e => console.warn('[diario] Erro ao sincronizar equipes com a nuvem:', e));
   };
 

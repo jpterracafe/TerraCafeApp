@@ -333,12 +333,30 @@ export async function POST(req: Request) {
     if (body.tipo && body.dados) {
       const { tipo, dados } = body;
       if (tipo === "etapas") {
+        if (body.projeto) {
+          const pNorm = String(body.projeto).trim().toLowerCase();
+          Object.keys(currentConfig.configEtapas).forEach((k) => {
+            const kNorm = k.trim().toLowerCase();
+            if (kNorm.startsWith(`${pNorm}::`) || kNorm === pNorm) {
+              delete currentConfig.configEtapas[k];
+            }
+          });
+        }
         currentConfig.configEtapas = { ...currentConfig.configEtapas, ...dados };
         dbUpdates.push({ chave: "diario_etapas_config_v1", valor: currentConfig.configEtapas });
       } else if (tipo === "starts") {
         currentConfig.projetoStartDates = { ...currentConfig.projetoStartDates, ...dados };
         dbUpdates.push({ chave: "diario_projeto_starts_v1", valor: currentConfig.projetoStartDates });
       } else if (tipo === "responsaveis") {
+        if (body.projeto) {
+          const pNorm = String(body.projeto).trim().toLowerCase();
+          Object.keys(currentConfig.responsaveisPorEtapa).forEach((k) => {
+            const kNorm = k.trim().toLowerCase();
+            if (kNorm.startsWith(`${pNorm}::`) || kNorm === pNorm) {
+              delete currentConfig.responsaveisPorEtapa[k];
+            }
+          });
+        }
         currentConfig.responsaveisPorEtapa = { ...currentConfig.responsaveisPorEtapa, ...dados };
         dbUpdates.push({ chave: "diario_responsaveis_por_etapa_v1", valor: currentConfig.responsaveisPorEtapa });
       } else if (tipo === "prazos_finais") {

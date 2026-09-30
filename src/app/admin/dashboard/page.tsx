@@ -85,6 +85,7 @@ interface DiarioLog {
   projetoCliente?: string;
   midiaUrl?: string;
   midiaTipo?: string;
+  is_deleted?: boolean;
 }
 
 function ChartInfoTooltip({ text }: { text: string }) {
@@ -281,7 +282,7 @@ export default function DashboardPage() {
       );
 
       const projetosDiario = allLogs
-        .filter(l => l.projetoCliente && l.projetoCliente.trim() !== '')
+        .filter(l => !l.is_deleted && l.projetoCliente && l.projetoCliente.trim() !== '')
         .map(l => l.projetoCliente as string);
 
       const unicos = Array.from(
@@ -290,7 +291,7 @@ export default function DashboardPage() {
 
       const filteredFases = allFases.filter(f => !f.isDeleted);
       setFases(filteredFases);
-      setLogs(allLogs);
+      setLogs(allLogs.filter(l => !l.is_deleted));
       setProjetosList(unicos);
       const agora = new Date();
       setLastUpdate(agora);
