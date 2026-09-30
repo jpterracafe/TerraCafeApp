@@ -153,6 +153,7 @@ export default function DiarioCampoTimelinePage() {
     userAssignedLoja, 
     isProjectInSelectedLoja, 
     atribuirProjetoLoja, 
+    getLojaDoProjeto,
     lojas, 
     projetosLojas, 
     canSwitchLoja,
@@ -2303,7 +2304,7 @@ export default function DiarioCampoTimelinePage() {
                 {filteredProjetosList.map(proj => {
                   const isSelected = selectedProjeto === proj;
                   const totalLogs = logsCountByProjeto[proj] || 0;
-                  const lojaDoProj = projetosLojas[proj] || projetosLojas[proj.trim()];
+                  const lojaDoProj = getLojaDoProjeto(proj);
                   return (
                     <button
                       key={proj}
@@ -2443,7 +2444,7 @@ export default function DiarioCampoTimelinePage() {
             {!loadingProjetos && filteredProjetosList.map(proj => {
               const isSelected = selectedProjeto === proj;
               const totalLogs = logsCountByProjeto[proj] || 0;
-              const lojaDoProj = projetosLojas[proj];
+              const lojaDoProj = getLojaDoProjeto(proj);
 
               return (
                 <button 
@@ -2583,7 +2584,7 @@ export default function DiarioCampoTimelinePage() {
                         );
                       })()}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 dark:text-white truncate">
                         {extractProjectBaseName(selectedProjeto)}
                       </h2>
@@ -2594,6 +2595,36 @@ export default function DiarioCampoTimelinePage() {
                       }`}>
                         {getProjectVersion(selectedProjeto)}
                       </span>
+
+                      {/* Seletor/Editor de Filial exclusivo do Diário de Campo */}
+                      <div className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs shadow-xs">
+                        <Building2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                        <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium">Filial:</span>
+                        <select
+                          value={getLojaDoProjeto(selectedProjeto)}
+                          onChange={async (e) => {
+                            const novaLoja = e.target.value;
+                            await atribuirProjetoLoja(selectedProjeto, novaLoja);
+                            const base = extractProjectBaseName(selectedProjeto);
+                            if (base && base !== selectedProjeto) {
+                              await atribuirProjetoLoja(base, novaLoja);
+                            }
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new CustomEvent('terracafe_lojas_updated'));
+                            }
+                            success(`Filial da obra atualizada para: ${novaLoja || 'Sem filial'}`);
+                          }}
+                          className="bg-transparent text-slate-800 dark:text-slate-200 font-bold focus:outline-none cursor-pointer pr-1 text-xs"
+                          title="Alterar filial desta obra"
+                        >
+                          <option value="" className="bg-white dark:bg-slate-900 text-slate-500">Sem filial definida</option>
+                          {lojas.map(l => (
+                            <option key={l.id} value={l.nome} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+                              {l.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
 
