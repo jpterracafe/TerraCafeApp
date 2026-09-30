@@ -29,7 +29,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { EtapaCampo, RegistroDiarioCampo } from '../types';
-import { offlineFetch, subscribe } from '@/lib/offline';
+import { offlineFetch, subscribe, invalidateOfflineCache } from '@/lib/offline';
 import {
   parseResponsavelEmails,
   normalizeName,
@@ -97,7 +97,7 @@ export default function PainelOperacionalObrasPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const { selectedLoja, isProjectInSelectedLoja, projetosLojas } = useLoja();
+  const { selectedLoja, setSelectedLoja, isProjectInSelectedLoja, projetosLojas } = useLoja();
 
   // Dados do sistema
   const [projetosList, setProjetosList] = useState<string[]>([]);
@@ -197,6 +197,7 @@ export default function PainelOperacionalObrasPage() {
   const handleRefresh = () => {
     triggerHaptic('light');
     setRefreshing(true);
+    invalidateOfflineCache();
     loadData();
   };
 
@@ -599,12 +600,35 @@ export default function PainelOperacionalObrasPage() {
             <p className="text-sm font-medium text-slate-500">Carregando painel operacional das obras...</p>
           </div>
         ) : projetosFiltrados.length === 0 ? (
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-12 text-center">
-            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Nenhum projeto encontrado com os filtros atuais</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-              Experimente limpar o campo de busca ou selecionar &quot;Todos os Projetos&quot;.
+          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-8 sm:p-12 text-center space-y-3">
+            <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto opacity-75" />
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              {selectedLoja !== 'TODAS'
+                ? `Nenhuma obra encontrada para a filial ${selectedLoja}`
+                : 'Nenhum projeto encontrado com os filtros atuais'}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Experimente limpar o campo de busca ou alternar para todas as filiais da empresa.
             </p>
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+              {selectedLoja !== 'TODAS' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedLoja('TODAS')}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-all"
+                >
+                  🌐 Ver Todas as Filiais
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleRefresh}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5 transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Sincronizar</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">

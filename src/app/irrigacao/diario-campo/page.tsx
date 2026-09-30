@@ -293,6 +293,7 @@ export default function DiarioCampoTimelinePage() {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDeadline, setNewProjectDeadline] = useState('');
+  const [newProjectLoja, setNewProjectLoja] = useState('');
   const [creatingProject, setCreatingProject] = useState(false);
 
   // Modal Excluir Projeto (Enviar para Lixeira)
@@ -1326,7 +1327,7 @@ export default function DiarioCampoTimelinePage() {
           nome: nomeLimpo,
           prazoFinal: newProjectDeadline,
           dataInicio: hoje,
-          lojaNome: (selectedLoja && selectedLoja !== 'TODAS') ? selectedLoja : (userAssignedLoja || undefined),
+          lojaNome: newProjectLoja || ((selectedLoja && selectedLoja !== 'TODAS') ? selectedLoja : (userAssignedLoja || undefined)),
         }),
       });
 
@@ -1349,7 +1350,7 @@ export default function DiarioCampoTimelinePage() {
       saveProjectStartsToStorage(novoStartObj);
 
       // Atribui obrigatoriamente a loja do usuário ao novo projeto
-      const lojaParaAtribuir = userAssignedLoja || (selectedLoja && selectedLoja !== 'TODAS' ? selectedLoja : '');
+      const lojaParaAtribuir = newProjectLoja || userAssignedLoja || (selectedLoja && selectedLoja !== 'TODAS' ? selectedLoja : '');
       if (lojaParaAtribuir) {
         atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
       }
@@ -2742,7 +2743,7 @@ export default function DiarioCampoTimelinePage() {
                         etapasNavRef.current.scrollLeft += e.deltaY;
                       }
                     }}
-                    className="flex-1 overflow-x-auto scroll-smooth py-1 px-0.5 flex items-center gap-1.5 sm:gap-2 min-w-0"
+                    className="flex-1 overflow-x-auto scroll-smooth py-1 px-0.5 flex items-center gap-1.5 sm:gap-2 min-w-0 touch-pan-x [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                   >
                     {ETAPAS_CAMPO.map((etapa, idx) => {
                       const isActive = selectedEtapa === etapa.key;
@@ -3798,10 +3799,28 @@ export default function DiarioCampoTimelinePage() {
                   required
                   value={newProjectDeadline}
                   onChange={(e) => setNewProjectDeadline(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-2.5 text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
                   style={{ colorScheme: 'dark' }}
                 />
               </div>
+
+              {lojas.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    3. Filial / Unidade Responsável:
+                  </label>
+                  <select
+                    value={newProjectLoja || (selectedLoja !== 'TODAS' ? selectedLoja : '')}
+                    onChange={(e) => setNewProjectLoja(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#070c18] border border-slate-200 dark:border-[#1e293b] rounded-xl p-2.5 text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="">Geral / Sem restrição de filial</option>
+                    {lojas.map(l => (
+                      <option key={l.id} value={l.nome}>{l.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-300 text-xs space-y-1">
                 <div className="font-bold flex items-center gap-1.5">
