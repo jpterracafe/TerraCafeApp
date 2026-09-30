@@ -24,7 +24,7 @@ import LojaSelector from '@/components/LojaSelector';
 
 export default function LixeiraPage() {
   const { success, error: toastError } = useToast();
-  const { isProjectInSelectedLoja, projetosLojas, selectedLoja } = useLoja();
+  const { isProjectInSelectedLoja, projetosLojas, selectedLoja, getLojaDoProjeto } = useLoja();
   const [deletedFases, setDeletedFases] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -456,9 +456,9 @@ export default function LixeiraPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
-                        {projetosLojas[nomeProjeto] && (
+                        {getLojaDoProjeto(nomeProjeto) && (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                            🏪 {projetosLojas[nomeProjeto]}
+                            🏪 {getLojaDoProjeto(nomeProjeto)}
                           </span>
                         )}
                       </div>

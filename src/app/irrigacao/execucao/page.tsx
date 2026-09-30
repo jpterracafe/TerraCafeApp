@@ -94,7 +94,7 @@ export default function PainelOperacionalObrasPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const { selectedLoja, setSelectedLoja, isProjectInSelectedLoja, projetosLojas } = useLoja();
+  const { selectedLoja, setSelectedLoja, isProjectInSelectedLoja, projetosLojas, getLojaDoProjeto } = useLoja();
 
   // Dados do sistema
   const [projetosList, setProjetosList] = useState<string[]>([]);
@@ -644,9 +644,9 @@ export default function PainelOperacionalObrasPage() {
                       <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
                         {projeto.baseName}
                       </h2>
-                      {projetosLojas[projeto.nome] && (
+                      {getLojaDoProjeto(projeto.nome, projeto.criadorEmail) && (
                         <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1">
-                          🏪 {projetosLojas[projeto.nome]}
+                          🏪 {getLojaDoProjeto(projeto.nome, projeto.criadorEmail)}
                         </span>
                       )}
                       {projeto.atrasadoTotal && (

@@ -11,6 +11,7 @@ import {
 import { exportToCSV } from '@/lib/export-csv';
 import { offlineFetch } from '@/lib/offline';
 import { getLocalISODate } from '@/lib/date-utils';
+import { extractProjectBaseName } from '@/lib/lojas';
 
 interface FaseAcaoItem {
   id: string;
@@ -107,11 +108,14 @@ function RelatorioContent() {
         const dataLojas = await resLojas.json();
         const mapProjLojas: Record<string, string> = dataLojas?.projetosLojas || {};
         const pTrim = (projeto || '').trim();
-        let lojaEncontrada = mapProjLojas[pTrim] || mapProjLojas[projeto];
+        const base = extractProjectBaseName(pTrim);
+        let lojaEncontrada = mapProjLojas[pTrim] || mapProjLojas[projeto] || (base ? mapProjLojas[base] : '');
         if (!lojaEncontrada && pTrim) {
           const pLc = pTrim.toLowerCase();
+          const bLc = base.toLowerCase();
           for (const [k, v] of Object.entries(mapProjLojas)) {
-            if (k.trim().toLowerCase() === pLc) {
+            const kLc = k.trim().toLowerCase();
+            if (kLc === pLc || (bLc && kLc === bLc)) {
               lojaEncontrada = v;
               break;
             }

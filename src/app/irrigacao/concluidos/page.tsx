@@ -44,7 +44,7 @@ function formatConcluidoEm(value?: string | null): string {
 
 export default function ProjetosConcluidosPage() {
   const { success, error: toastError } = useToast();
-  const { isProjectInSelectedLoja, projetosLojas, selectedLoja } = useLoja();
+  const { isProjectInSelectedLoja, projetosLojas, selectedLoja, getLojaDoProjeto } = useLoja();
   const [projetosInfo, setProjetosInfo] = useState<ProjetoConcluido[]>([]);
   const [fasesConcluidas, setFasesConcluidas] = useState<FaseAcao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -296,9 +296,9 @@ export default function ProjetosConcluidosPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-slate-900 dark:text-white truncate">{nomeProjeto}</h3>
-                        {projetosLojas[nomeProjeto] && (
+                        {getLojaDoProjeto(nomeProjeto, projeto.criador?.email) && (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                            🏪 {projetosLojas[nomeProjeto]}
+                            🏪 {getLojaDoProjeto(nomeProjeto, projeto.criador?.email)}
                           </span>
                         )}
                       </div>
