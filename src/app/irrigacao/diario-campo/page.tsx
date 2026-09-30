@@ -12,7 +12,7 @@ import {
   Paperclip, X, Video, Loader2, TrendingUp, TrendingDown, Settings2,
   Users, Check, Droplets, Layers, ChevronDown, ChevronUp, PlayCircle, Flag,
   FileText, Printer, Copy, CheckSquare, Square, Share2, Info, Building2,
-  FileSpreadsheet, CloudOff, ExternalLink, Camera
+  FileSpreadsheet, CloudOff, ExternalLink, Camera, RefreshCcw
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptic';
 import { RegistroDiarioCampo, StatusDiario, EtapaCampo } from '../types';
@@ -154,7 +154,11 @@ export default function DiarioCampoTimelinePage() {
     atribuirProjetoLoja, 
     lojas, 
     projetosLojas, 
-    canSwitchLoja 
+    canSwitchLoja,
+    isDiretor,
+    isCoordenador,
+    isAdmin,
+    isGerente
   } = useLoja();
 
   // Seleções do usuário
@@ -294,6 +298,14 @@ export default function DiarioCampoTimelinePage() {
   // Progresso manual editável por fase no Diário de Campo
   const [progressoManual, setProgressoManual] = useState<Record<string, number>>({});
   const [savingProgresso, setSavingProgresso] = useState(false);
+  const [etapasStatus, setEtapasStatus] = useState<Record<string, string>>({});
+  const [reabrindoFase, setReabrindoFase] = useState(false);
+
+  // Permissão para reabrir fase concluída (Diretor, Coordenador, Admin, Desenvolvedor)
+  const canReopenFase = useMemo(() => {
+    const role = (session?.user as any)?.role || '';
+    return isDiretor || isCoordenador || isAdmin || ['Diretor', 'Coordenador', 'Desenvolvedor', 'Admin'].includes(role);
+  }, [session, isDiretor, isCoordenador, isAdmin]);
 
   // Modal: Adicionar novo responsável ao sistema
   const [isAddResponsavelModalOpen, setIsAddResponsavelModalOpen] = useState(false);
@@ -301,43 +313,12 @@ export default function DiarioCampoTimelinePage() {
   const [novoResponsavelCargo, setNovoResponsavelCargo] = useState('');
   const [savingNovoResponsavel, setSavingNovoResponsavel] = useState(false);
 
-  // Carrega configurações de contadores, start de projetos e responsáveis por etapa (Nuvem + LocalStorage)
-  useEffect(() => {
-    // 1. Leitura rápida do cache local
+  // Carrega configurações de etapas, prazos e progresso do servidor
+  const loadEtapaConfigs = useCallback(async () => {
     try {
-      const savedConfig = localStorage.getItem('diario_etapas_config_v1');
-      if (savedConfig) {
-        const parsed = JSON.parse(savedConfig);
-        const clean = sanitizeConfigEtapas(parsed);
-        // Se houve mudança na sanitização, grava de volta a versão limpa
-        if (JSON.stringify(parsed) !== JSON.stringify(clean)) {
-          localStorage.setItem('diario_etapas_config_v1', JSON.stringify(clean));
-        }
-        setConfigEtapas(clean);
-      }
-
-      const savedStarts = localStorage.getItem('diario_projeto_starts_v1');
-      if (savedStarts) setProjetoStartDates(JSON.parse(savedStarts));
-
-      const savedRespEtapas = localStorage.getItem('diario_responsaveis_por_etapa_v1');
-      if (savedRespEtapas) setResponsaveisPorEtapa(JSON.parse(savedRespEtapas));
-
-      const savedPrazos = localStorage.getItem('diario_projetos_prazo_final_v1');
-      if (savedPrazos) setProjetosPrazoFinal(JSON.parse(savedPrazos));
-
-      const savedJust = localStorage.getItem('diario_projeto_justificativas_v1');
-      if (savedJust) setProjetoJustificativas(JSON.parse(savedJust));
-
-      const savedProgresso = localStorage.getItem('diario_etapas_progresso_v1');
-      if (savedProgresso) setProgressoManual(JSON.parse(savedProgresso));
-    } catch (e) {
-      console.error('[diario] Erro ao ler configs do localStorage:', e);
-    }
-
-    // 2. Sincronização com o servidor/nuvem (dados da nuvem substituem de forma limpa, evitando ressuscitar chaves apagadas)
-    offlineFetch('/api/etapas-config')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
+      const res = await offlineFetch('/api/etapas-config');
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
         if (data) {
           if (data.configEtapas) {
             const clean = sanitizeConfigEtapas(data.configEtapas);
@@ -364,10 +345,55 @@ export default function DiarioCampoTimelinePage() {
             setProgressoManual(data.etapasProgresso);
             try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(data.etapasProgresso)); } catch (_) {}
           }
+          if (data.etapasStatus) {
+            setEtapasStatus(data.etapasStatus);
+            try { localStorage.setItem('diario_etapas_status_v1', JSON.stringify(data.etapasStatus)); } catch (_) {}
+          }
         }
-      })
-      .catch(err => console.warn('[diario] Offline ou erro ao sincronizar configs:', err));
+      }
+    } catch (err) {
+      console.warn('[diario] Offline ou erro ao sincronizar configs:', err);
+    }
   }, []);
+
+  // Carrega configurações de contadores, start de projetos e responsáveis por etapa (Nuvem + LocalStorage)
+  useEffect(() => {
+    // 1. Leitura rápida do cache local
+    try {
+      const savedConfig = localStorage.getItem('diario_etapas_config_v1');
+      if (savedConfig) {
+        const parsed = JSON.parse(savedConfig);
+        const clean = sanitizeConfigEtapas(parsed);
+        if (JSON.stringify(parsed) !== JSON.stringify(clean)) {
+          localStorage.setItem('diario_etapas_config_v1', JSON.stringify(clean));
+        }
+        setConfigEtapas(clean);
+      }
+
+      const savedStarts = localStorage.getItem('diario_projeto_starts_v1');
+      if (savedStarts) setProjetoStartDates(JSON.parse(savedStarts));
+
+      const savedRespEtapas = localStorage.getItem('diario_responsaveis_por_etapa_v1');
+      if (savedRespEtapas) setResponsaveisPorEtapa(JSON.parse(savedRespEtapas));
+
+      const savedPrazos = localStorage.getItem('diario_projetos_prazo_final_v1');
+      if (savedPrazos) setProjetosPrazoFinal(JSON.parse(savedPrazos));
+
+      const savedJust = localStorage.getItem('diario_projeto_justificativas_v1');
+      if (savedJust) setProjetoJustificativas(JSON.parse(savedJust));
+
+      const savedProgresso = localStorage.getItem('diario_etapas_progresso_v1');
+      if (savedProgresso) setProgressoManual(JSON.parse(savedProgresso));
+
+      const savedStatus = localStorage.getItem('diario_etapas_status_v1');
+      if (savedStatus) setEtapasStatus(JSON.parse(savedStatus));
+    } catch (e) {
+      console.error('[diario] Erro ao ler configs do localStorage:', e);
+    }
+
+    // 2. Sincronização com o servidor/nuvem
+    loadEtapaConfigs();
+  }, [loadEtapaConfigs]);
 
   const saveEtapaConfigToStorage = (newConfigs: Record<string, EtapaConfig>, projetoAlvo?: string) => {
     const clean = sanitizeConfigEtapas(newConfigs);
@@ -490,22 +516,22 @@ export default function DiarioCampoTimelinePage() {
 
       if (resFases.ok) {
         const { fases } = await resFases.json();
-        const ativasSet = new Set(listaProjetos);
+        const ativasSet = new Set(listaProjetos.map(p => p.trim().toLowerCase()));
 
-        deletados = new Set<string>(
-          (fases ?? [])
-            .filter((f: any) => f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
-            .map((f: any) => f.projetoCliente as string)
-            .filter((p: string) => !ativasSet.has(p))
-        );
+        const deletadosNomes = (fases ?? [])
+          .filter((f: any) => f.isDeleted && f.projetoCliente && f.projetoCliente.trim() !== '')
+          .map((f: any) => (f.projetoCliente as string).trim())
+          .filter((p: string) => !ativasSet.has(p.toLowerCase()));
+        deletados = new Set<string>(deletadosNomes);
         setProjetosDeletados(deletados);
       }
 
-      const unicos = Array.from(new Set(listaProjetos.filter(p => !deletados.has(p)))).sort();
+      const deletadosLc = new Set(Array.from(deletados).map(d => d.toLowerCase()));
+      const unicos = Array.from(new Set(listaProjetos.filter(p => !deletadosLc.has(p.trim().toLowerCase())))).sort();
       setProjetos(unicos);
 
       if (unicos.length > 0) {
-        setSelectedProjeto(prev => prev && unicos.includes(prev) ? prev : unicos[0]);
+        setSelectedProjeto(prev => (prev && unicos.some(u => u.trim().toLowerCase() === prev.trim().toLowerCase())) ? prev : unicos[0]);
       } else {
         setSelectedProjeto('');
       }
@@ -520,7 +546,8 @@ export default function DiarioCampoTimelinePage() {
     loadUsers();
     loadLogs();
     loadProjetos();
-  }, [loadUsers, loadLogs, loadProjetos]);
+    loadEtapaConfigs();
+  }, [loadUsers, loadLogs, loadProjetos, loadEtapaConfigs]);
 
   useEffect(() => {
     refreshAll();
@@ -540,6 +567,7 @@ export default function DiarioCampoTimelinePage() {
           loadUsers();
           loadLogs();
           loadProjetos();
+          loadEtapaConfigs();
         }
       }, REFRESH_MS);
     };
@@ -557,6 +585,7 @@ export default function DiarioCampoTimelinePage() {
           loadUsers();
           loadLogs();
           loadProjetos();
+          loadEtapaConfigs();
         }
         startPolling();
       } else {
@@ -569,6 +598,7 @@ export default function DiarioCampoTimelinePage() {
         loadUsers();
         loadLogs();
         loadProjetos();
+        loadEtapaConfigs();
       }
     };
 
@@ -581,7 +611,7 @@ export default function DiarioCampoTimelinePage() {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('focus', onFocus);
     };
-  }, [loadLogs, loadProjetos, loadingLogs, loadingProjetos]);
+  }, [loadLogs, loadProjetos, loadUsers, loadEtapaConfigs, loadingLogs, loadingProjetos]);
 
   // ── Responsáveis da Etapa Atual (Vinculação por Etapa) ──────────────────────
   const etapaKey = `${selectedProjeto}::${selectedEtapa}`;
@@ -593,37 +623,46 @@ export default function DiarioCampoTimelinePage() {
   const isFaseConcluida = useMemo(() => {
     // 1. Verifica se há configuração de progresso salvo (100% ou status 'Concluída')
     const progressoSalvo = configEtapas[etapaKey];
+    const statusEtapa = etapasStatus[etapaKey];
     const concluidoPorConfig =
       (progressoSalvo?.hasStarted === true && progressoManual[etapaKey] === 100) ||
-      (progressoSalvo as any)?.status === 'Concluída';
+      (progressoSalvo as any)?.status === 'Concluída' ||
+      statusEtapa === 'Concluída' ||
+      statusEtapa === 'Concluído';
 
     // 2. Verifica logs com status "Concluído" (flexível, case-insensitive)
+    const pNomeLc = (selectedProjeto || '').trim().toLowerCase();
+    const eNomeLc = selectedEtapa.toLowerCase();
     const temLogConcluido = registros.some(r => 
-      r.projetoCliente === selectedProjeto &&
-      (r.atividade === selectedEtapa || r.atividade.toLowerCase().includes(selectedEtapa.toLowerCase())) &&
+      (r.projetoCliente || '').trim().toLowerCase() === pNomeLc &&
+      (r.atividade === selectedEtapa || (r.atividade || '').toLowerCase().includes(eNomeLc)) &&
       (r.status || '').toLowerCase().includes('concluído')
     );
 
     return concluidoPorConfig || temLogConcluido;
-  }, [configEtapas, etapaKey, progressoManual, registros, selectedProjeto, selectedEtapa]);
+  }, [configEtapas, etapaKey, progressoManual, etapasStatus, registros, selectedProjeto, selectedEtapa]);
 
   // ── Conta quantas fases oficiais do projeto já estão concluídas ──────────────
   const nFasesConcluidas = useMemo(() => {
     if (!selectedProjeto) return 0;
+    const pNomeLc = selectedProjeto.trim().toLowerCase();
     return ETAPAS_CAMPO.filter(et => {
       const chave = `${selectedProjeto}::${et.key}`;
       const cfg = configEtapas[chave];
+      const statusEtapa = etapasStatus[chave];
       const concluidoPorConfig =
         (cfg?.hasStarted === true && progressoManual[chave] === 100) ||
-        (cfg as any)?.status === 'Concluída';
+        (cfg as any)?.status === 'Concluída' ||
+        statusEtapa === 'Concluída' ||
+        statusEtapa === 'Concluído';
       const temLogConcluido = registros.some(r =>
-        r.projetoCliente === selectedProjeto &&
+        (r.projetoCliente || '').trim().toLowerCase() === pNomeLc &&
         (r.atividade === et.key || (r.atividade || '').toLowerCase().includes(et.key.toLowerCase())) &&
         (r.status || '').toLowerCase().includes('concluído')
       );
       return concluidoPorConfig || temLogConcluido;
     }).length;
-  }, [configEtapas, progressoManual, registros, selectedProjeto]);
+  }, [configEtapas, progressoManual, etapasStatus, registros, selectedProjeto]);
 
   const toggleResponsavelNaEtapa = (nome: string) => {
     const atuais = responsaveisPorEtapa[etapaKey] ?? [];
@@ -697,10 +736,14 @@ export default function DiarioCampoTimelinePage() {
     if (projetoStartDates[selectedProjeto]) {
       return projetoStartDates[selectedProjeto];
     }
-    const logsProjeto = registros.filter(r => r.projetoCliente === selectedProjeto);
+    const selProjNorm = (selectedProjeto || '').trim().toLowerCase();
+    for (const [k, v] of Object.entries(projetoStartDates)) {
+      if (k.trim().toLowerCase() === selProjNorm && v) return v;
+    }
+    const logsProjeto = registros.filter(r => (r.projetoCliente || '').trim().toLowerCase() === selProjNorm);
     if (logsProjeto.length > 0) {
-      const datas = logsProjeto.map(l => l.data).sort();
-      return datas[0];
+      const datas = logsProjeto.map(l => l.data).filter(Boolean).sort();
+      if (datas.length > 0) return datas[0];
     }
     return getLocalISODate();
   }, [projetoStartDates, selectedProjeto, registros]);
@@ -827,7 +870,7 @@ export default function DiarioCampoTimelinePage() {
       toastError('A data limite da fase não pode ser anterior à data de início.');
       return;
     }
-    const prazoTotalObra = projetosPrazoFinal[selectedProjeto];
+    const prazoTotalObra = projetosPrazoFinal[selectedProjeto] || Object.entries(projetosPrazoFinal).find(([k]) => k.trim().toLowerCase() === (selectedProjeto || '').trim().toLowerCase())?.[1];
     if (prazoTotalObra) {
       const dTotal = new Date(`${prazoTotalObra}T00:00:00`);
       if (dFim.getTime() > dTotal.getTime()) {
@@ -949,31 +992,125 @@ export default function DiarioCampoTimelinePage() {
         }
       }
 
-      // 4. Atualizar localStorage e estado local
+      // 4. Atualizar localStorage e estado local imediatamente (sem reload de tela)
       const updatedConfig = {
         ...configEtapas,
         [chaveEtapa]: {
           ...configEtapas[chaveEtapa],
           hasStarted: true,
+          status: 'Concluída',
         }
       };
       saveEtapaConfigToStorage(updatedConfig);
 
+      setEtapasStatus(prev => {
+        const cp = { ...prev, [chaveEtapa]: 'Concluída' };
+        try { localStorage.setItem('diario_etapas_status_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
+      setProgressoManual(prev => {
+        const cp = { ...prev, [chaveEtapa]: 100 };
+        try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
       setIsConcluirFaseModalOpen(false);
       setObservacaoConclusao('');
       success(`🎉 Fase "${selectedEtapa}" marcada como CONCLUÍDA! Progresso atualizado para 100%.`);
-      
-      // Recarregar dados para refletir mudanças (somente online — offline o app já
-      // atualiza o estado local e a sincronização acontece depois)
-      setTimeout(() => {
-        if (isOnline()) window.location.reload();
-      }, 1500);
+      invalidateOfflineCache();
 
     } catch (err) {
       console.error('[concluir-fase] Erro:', err);
       toastError('Erro ao marcar fase como concluída. Tente novamente.');
     } finally {
       setConcluindoFase(false);
+    }
+  };
+
+  // ── Handler para Reabrir Fase ──────────────────────────────────────────────
+  const handleReabrirFase = async () => {
+    if (!selectedProjeto || !selectedEtapa) return;
+    if (!confirm(`Deseja reabrir a fase "${selectedEtapa}" do projeto "${selectedProjeto}" para permitir novos apontamentos?`)) return;
+
+    setReabrindoFase(true);
+    try {
+      const chaveEtapa = `${selectedProjeto}::${selectedEtapa}`;
+      const hojeStr = getLocalISODate();
+      const userName = session?.user?.name || 'Diretoria';
+
+      // 1. Atualizar status da etapa para 'Em andamento'
+      await offlineFetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'status_etapas',
+          dados: { [chaveEtapa]: 'Em andamento' }
+        })
+      });
+
+      // 2. Redefinir progresso para 90%
+      await offlineFetch('/api/etapas-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipo: 'progresso',
+          dados: { [chaveEtapa]: 90 }
+        })
+      });
+
+      // 3. Registrar log no diário de campo
+      const respLog = await offlineFetch('/api/diario-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: hojeStr,
+          responsavel: userName,
+          atividade: selectedEtapa,
+          status: 'Dentro do programado',
+          observacoes: `🔓 Fase "${selectedEtapa}" reaberta por ${userName} para continuidade dos apontamentos de campo.`,
+          projetoCliente: selectedProjeto,
+        })
+      });
+
+      if (respLog.ok) {
+        const d = await respLog.json().catch(() => null);
+        if (d?.log) setRegistros(prev => [d.log, ...prev]);
+      }
+
+      // 4. Atualizar estados locais imediatamente
+      setEtapasStatus(prev => {
+        const cp = { ...prev };
+        delete cp[chaveEtapa];
+        try { localStorage.setItem('diario_etapas_status_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
+      setProgressoManual(prev => {
+        const cp = { ...prev, [chaveEtapa]: 90 };
+        try { localStorage.setItem('diario_etapas_progresso_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
+      setConfigEtapas(prev => {
+        const cp = { ...prev };
+        if (cp[chaveEtapa]) {
+          cp[chaveEtapa] = {
+            ...cp[chaveEtapa],
+            status: 'Dentro do programado'
+          } as any;
+        }
+        try { localStorage.setItem('diario_etapas_config_v1', JSON.stringify(cp)); } catch (_) {}
+        return cp;
+      });
+
+      invalidateOfflineCache();
+      success(`Fase "${selectedEtapa}" reaberta com sucesso! Formulário desbloqueado para novos registros.`);
+    } catch (err) {
+      console.error('[reabrir-fase] Erro:', err);
+      toastError('Erro ao reabrir a fase.');
+    } finally {
+      setReabrindoFase(false);
     }
   };
 
@@ -1672,20 +1809,23 @@ export default function DiarioCampoTimelinePage() {
   const filteredLogs = useMemo(() => {
     if (!selectedProjeto) return [];
     const q = deferredBuscaLog.toLowerCase().trim();
+    const selProjNorm = selectedProjeto.trim().toLowerCase();
+    const deletadosLc = new Set(Array.from(projetosDeletados).map(d => d.trim().toLowerCase()));
 
     return registros
       .filter(r => {
-        const matchProjeto = r.projetoCliente === selectedProjeto;
+        const rProjNorm = (r.projetoCliente || '').trim().toLowerCase();
+        const matchProjeto = rProjNorm === selProjNorm;
         if (!matchProjeto) return false;
-        if (projetosDeletados.has(r.projetoCliente || '')) return false;
+        if (deletadosLc.has(rProjNorm)) return false;
 
         const matchEtapa = filtroModoHistorico === 'todos' 
           ? true 
-          : (r.atividade === selectedEtapa || r.atividade.toLowerCase().includes(selectedEtapa.toLowerCase()));
+          : (r.atividade === selectedEtapa || (r.atividade || '').toLowerCase().includes(selectedEtapa.toLowerCase()));
 
         const matchBusca = !q ||
-          r.atividade.toLowerCase().includes(q) ||
-          r.responsavel.toLowerCase().includes(q) ||
+          (r.atividade || '').toLowerCase().includes(q) ||
+          (r.responsavel || '').toLowerCase().includes(q) ||
           (r.observacoes ?? '').toLowerCase().includes(q) ||
           (r.status ?? '').toLowerCase().includes(q);
 
@@ -1720,21 +1860,29 @@ export default function DiarioCampoTimelinePage() {
   // Contagem de logs por projeto
   const logsCountByProjeto = useMemo(() => {
     const counts: Record<string, number> = {};
+    const deletadosLc = new Set(Array.from(projetosDeletados).map(d => d.trim().toLowerCase()));
     registros.forEach(r => {
-      if (r.projetoCliente) {
-        counts[r.projetoCliente] = (counts[r.projetoCliente] || 0) + 1;
+      const p = (r.projetoCliente || '').trim();
+      if (p && !deletadosLc.has(p.toLowerCase())) {
+        counts[p] = (counts[p] || 0) + 1;
+        const pLc = p.toLowerCase();
+        if (pLc !== p) {
+          counts[pLc] = (counts[pLc] || 0) + 1;
+        }
       }
     });
     return counts;
-  }, [registros]);
+  }, [registros, projetosDeletados]);
 
   // Contagem de logs por etapa no projeto selecionado
   const logsCountByEtapa = useMemo(() => {
     const counts: Record<string, number> = {};
+    const selProjNorm = (selectedProjeto || '').trim().toLowerCase();
     registros.forEach(r => {
-      if (r.projetoCliente === selectedProjeto) {
+      const pNorm = (r.projetoCliente || '').trim().toLowerCase();
+      if (pNorm === selProjNorm) {
         ETAPAS_CAMPO.forEach(et => {
-          if (r.atividade === et.key || r.atividade.toLowerCase().includes(et.key.toLowerCase())) {
+          if (r.atividade === et.key || (r.atividade || '').toLowerCase().includes(et.key.toLowerCase())) {
             counts[et.key] = (counts[et.key] || 0) + 1;
           }
         });
@@ -1746,6 +1894,8 @@ export default function DiarioCampoTimelinePage() {
   // ── DADOS E AUXILIARES PARA O RESUMO DA DIRETORIA ──
   const logsResumoDiretoria = useMemo(() => {
     if (!selectedProjeto) return [];
+    const selProjNorm = selectedProjeto.trim().toLowerCase();
+    const deletadosLc = new Set(Array.from(projetosDeletados).map(d => d.trim().toLowerCase()));
     
     // Filtro por período
     const hoje = new Date();
@@ -1753,12 +1903,13 @@ export default function DiarioCampoTimelinePage() {
 
     return registros
       .filter(r => {
-        if (r.projetoCliente !== selectedProjeto) return false;
-        if (projetosDeletados.has(r.projetoCliente || '')) return false;
+        const rProjNorm = (r.projetoCliente || '').trim().toLowerCase();
+        if (rProjNorm !== selProjNorm) return false;
+        if (deletadosLc.has(rProjNorm)) return false;
 
         // Filtro de etapa selecionada no resumo
         const etapaMatch = resumoEtapas.some(et => 
-          r.atividade === et || r.atividade.toLowerCase().includes(et.toLowerCase())
+          r.atividade === et || (r.atividade || '').toLowerCase().includes(et.toLowerCase())
         );
         if (!etapaMatch) return false;
 
@@ -1913,12 +2064,14 @@ export default function DiarioCampoTimelinePage() {
     let list = projetos;
     if (selectedLoja !== 'TODAS') {
       list = list.filter(p => {
-        const criadorEmail = projetosCriadores[p]?.email;
+        const criador = projetosCriadores[p] || Object.entries(projetosCriadores).find(([k]) => k.trim().toLowerCase() === p.trim().toLowerCase())?.[1];
+        const criadorEmail = criador?.email;
         return isProjectInSelectedLoja(p, criadorEmail);
       });
     }
     if (!deferredSearchProjeto.trim()) return list;
-    return list.filter(p => p.toLowerCase().includes(deferredSearchProjeto.toLowerCase()));
+    const q = deferredSearchProjeto.toLowerCase().trim();
+    return list.filter(p => p.toLowerCase().includes(q));
   }, [projetos, selectedLoja, isProjectInSelectedLoja, projetosCriadores, deferredSearchProjeto]);
 
   // Sincroniza projeto selecionado com a lista filtrada por filial
@@ -2695,9 +2848,23 @@ export default function DiarioCampoTimelinePage() {
                       <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded-md">100%</span>
                     </button>
                   ) : (
-                    <div className="w-full sm:flex-1 min-h-[42px] px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      <span>✅ Fase Concluída</span>
+                    <div className="flex items-center gap-2 w-full sm:flex-1">
+                      <div className="flex-1 min-h-[42px] px-4 py-2.5 rounded-xl text-xs font-black bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-700 dark:text-emerald-300 flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>✅ Fase Concluída</span>
+                      </div>
+                      {canReopenFase && (
+                        <button
+                          type="button"
+                          onClick={handleReabrirFase}
+                          disabled={reabrindoFase}
+                          className="min-h-[42px] px-3.5 py-2.5 rounded-xl text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-700 dark:text-amber-300 flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0"
+                          title="Reabrir esta fase para novos apontamentos de campo"
+                        >
+                          {reabrindoFase ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+                          <span>Reabrir</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2849,16 +3016,29 @@ export default function DiarioCampoTimelinePage() {
                 {/* Aviso de fase concluída */}
                 {isFaseConcluida && (
                   <div className="bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-500/50 dark:border-emerald-500/30 rounded-xl p-4 mb-4">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100 mb-1">
-                          ✅ Fase Concluída - Registro Bloqueado
-                        </h4>
-                        <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
-                          Esta fase foi marcada como 100% concluída. Para fazer novos registros, entre em contato com o diretor para reabrir a fase.
-                        </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-100 mb-0.5">
+                            ✅ Fase Concluída - Registro Bloqueado
+                          </h4>
+                          <p className="text-xs text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                            Esta fase foi marcada como 100% concluída. {canReopenFase ? 'Como diretor/coordenador, você pode reabri-la quando necessário.' : 'Para fazer novos registros, solicite a reabertura à diretoria.'}
+                          </p>
+                        </div>
                       </div>
+                      {canReopenFase && (
+                        <button
+                          type="button"
+                          onClick={handleReabrirFase}
+                          disabled={reabrindoFase}
+                          className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95 shrink-0 self-start sm:self-auto"
+                        >
+                          {reabrindoFase ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+                          Reabrir Fase
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

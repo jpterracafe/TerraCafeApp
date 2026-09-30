@@ -471,19 +471,60 @@ export async function POST(req: Request) {
         }
 
         // Sincroniza diretamente na tabela fases_acao para que ambas as fontes fiquem alinhadas
+        const agoraIso = new Date().toISOString();
+
         if (body.tipo === "responsaveis" && body.dados) {
           for (const [chave, respList] of Object.entries(body.dados as Record<string, string[]>)) {
-            // Mesma convenção de filterConfigByAccess: projeto = antes do 1º "::"
             const [projNome, etapaKey] = chave.split("::", 2);
             if (projNome && etapaKey) {
               const respStr = Array.isArray(respList) && respList.length > 0 ? respList.join(", ") : "Não atribuído";
-              // Escapa curingas do ILIKE para não casar etapas além da desejada
               const etapaSegura = etapaKey.replace(/[\\%_]/g, (m) => `\\${m}`);
               await db
                 .from("fases_acao")
-                .update({ responsavel: respStr, updated_at: new Date().toISOString() })
-                .eq("projeto_cliente", projNome)
+                .update({ responsavel: respStr, updated_at: agoraIso })
+                .ilike("projeto_cliente", projNome.trim())
                 .ilike("gabarito", `%${etapaSegura}%`);
+            }
+          }
+        }
+
+        if (body.tipo === "status_etapas" && body.dados) {
+          for (const [chave, st] of Object.entries(body.dados as Record<string, string>)) {
+            const [projNome, etapaKey] = chave.split("::", 2);
+            if (projNome && etapaKey) {
+              const etapaSegura = etapaKey.replace(/[\\%_]/g, (m) => `\\${m}`);
+              const ehConcluido = st === "Concluída" || st === "Concluído";
+              const statusVal = ehConcluido ? "Concluído" : "Dentro do programado";
+              const acaoVal = ehConcluido ? "Concluído" : "Em execução";
+              await db
+                .from("fases_acao")
+                .update({ 
+                  status: statusVal, 
+                  acao: acaoVal, 
+                  updated_at: agoraIso 
+                })
+                .ilike("projeto_cliente", projNome.trim())
+                .ilike("gabarito", `%${etapaSegura}%`);
+            }
+          }
+        }
+
+        if (body.tipo === "progresso" && body.dados) {
+          for (const [chave, prog] of Object.entries(body.dados as Record<string, number>)) {
+            const [projNome, etapaKey] = chave.split("::", 2);
+            if (projNome && etapaKey && typeof prog === "number") {
+              const etapaSegura = etapaKey.replace(/[\\%_]/g, (m) => `\\${m}`);
+              if (prog >= 100) {
+                await db
+                  .from("fases_acao")
+                  .update({ 
+                    status: "Concluído", 
+                    acao: "Concluído", 
+                    updated_at: agoraIso 
+                  })
+                  .ilike("projeto_cliente", projNome.trim())
+                  .ilike("gabarito", `%${etapaSegura}%`);
+              }
             }
           }
         }

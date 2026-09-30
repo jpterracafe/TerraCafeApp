@@ -65,7 +65,15 @@ export async function GET(req: Request) {
     if (resStatus?.data?.valor) {
       mapStatus = { ...resStatus.data.valor };
     }
-    const ehConcluido = (nome: string): boolean => mapStatus[nome]?.status === "concluido";
+    const ehConcluido = (nome: string): boolean => {
+      if (!nome) return false;
+      if (mapStatus[nome]?.status === "concluido") return true;
+      const nLc = nome.trim().toLowerCase();
+      for (const [k, v] of Object.entries(mapStatus)) {
+        if (k.trim().toLowerCase() === nLc && v?.status === "concluido") return true;
+      }
+      return false;
+    };
 
     const userProjetosPermitidos = new Set<string>();
     if (resUserProjetos?.data && Array.isArray(resUserProjetos.data)) {
@@ -577,6 +585,12 @@ export async function PUT(req: Request) {
       mapStatus[nome] = { status: "concluido", concluidoEm: new Date().toISOString() };
     } else {
       delete mapStatus[nome];
+      const nLc = nome.trim().toLowerCase();
+      for (const k of Object.keys(mapStatus)) {
+        if (k.trim().toLowerCase() === nLc) {
+          delete mapStatus[k];
+        }
+      }
     }
 
     await db.from("configuracoes_sistema").upsert({
