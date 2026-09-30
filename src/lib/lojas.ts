@@ -449,7 +449,17 @@ export async function getProjectLojasMap(): Promise<Record<string, string>> {
 }
 
 /**
+ * Extrai o nome base de um projeto sem sufixos de versão como (V0), (V1), etc.
+ */
+export function extractProjectBaseName(name: string): string {
+  if (!name) return '';
+  return name.replace(/\s*\([vV]\d+\)$/, '').trim();
+}
+
+/**
  * Atribui ou altera a loja de um projeto específico.
+ * Armazena tanto o nome completo quanto a versão base (sem sufixo V0/V1)
+ * para garantir sincronia com todas as telas (Diretoria, Diário de Campo, Mobile).
  */
 export async function setProjectLoja(projetoNome: string, lojaNome: string): Promise<boolean> {
   invalidateLojasCache();
@@ -458,12 +468,26 @@ export async function setProjectLoja(projetoNome: string, lojaNome: string): Pro
   try {
     const currentMap = await getProjectLojasMap();
     const cleanProj = projetoNome.trim();
-    if (lojaNome) {
-      currentMap[cleanProj] = lojaNome.trim();
-      currentMap[projetoNome] = lojaNome.trim();
+    const baseProj = extractProjectBaseName(cleanProj);
+    const cleanLoja = (lojaNome || "").trim();
+
+    if (cleanLoja) {
+      currentMap[cleanProj] = cleanLoja;
+      currentMap[projetoNome] = cleanLoja;
+      if (baseProj) currentMap[baseProj] = cleanLoja;
     } else {
       delete currentMap[cleanProj];
       delete currentMap[projetoNome];
+      if (baseProj) delete currentMap[baseProj];
+      // Limpa também chaves em minúsculas
+      const pLc = cleanProj.toLowerCase();
+      const bLc = baseProj.toLowerCase();
+      for (const k of Object.keys(currentMap)) {
+        const kLc = k.trim().toLowerCase();
+        if (kLc === pLc || (bLc && kLc === bLc)) {
+          delete currentMap[k];
+        }
+      }
     }
 
     const { error } = await db

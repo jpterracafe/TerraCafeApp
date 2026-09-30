@@ -1319,6 +1319,8 @@ export default function DiarioCampoTimelinePage() {
     setCreatingProject(true);
     try {
       const hoje = getLocalISODate();
+      const lojaParaAtribuir = newProjectLoja || (selectedLoja && selectedLoja !== 'TODAS' ? selectedLoja : '') || userAssignedLoja || '';
+
       // (offline: fica na fila e sincroniza depois)
       const res = await offlineFetch('/api/projetos', {
         method: 'POST',
@@ -1327,7 +1329,7 @@ export default function DiarioCampoTimelinePage() {
           nome: nomeLimpo,
           prazoFinal: newProjectDeadline,
           dataInicio: hoje,
-          lojaNome: newProjectLoja || ((selectedLoja && selectedLoja !== 'TODAS') ? selectedLoja : (userAssignedLoja || undefined)),
+          lojaNome: lojaParaAtribuir || undefined,
         }),
       });
 
@@ -1349,10 +1351,15 @@ export default function DiarioCampoTimelinePage() {
       const novoStartObj = { ...projetoStartDates, [nomeLimpo]: hoje };
       saveProjectStartsToStorage(novoStartObj);
 
-      // Atribui obrigatoriamente a loja do usuário ao novo projeto
-      const lojaParaAtribuir = newProjectLoja || userAssignedLoja || (selectedLoja && selectedLoja !== 'TODAS' ? selectedLoja : '');
+      // Atribui obrigatoriamente a loja definida ao novo projeto (tanto o nome limpo quanto a versão digitada)
       if (lojaParaAtribuir) {
-        atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
+        await atribuirProjetoLoja(nomeLimpo, lojaParaAtribuir);
+        if (newProjectName.trim() && newProjectName.trim() !== nomeLimpo) {
+          await atribuirProjetoLoja(newProjectName.trim(), lojaParaAtribuir);
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('terracafe_lojas_updated'));
+        }
       }
 
       // Limpa rigorosamente do localStorage qualquer resquício de metadados deste nome

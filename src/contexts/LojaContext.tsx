@@ -3,8 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { isMasterDevSession } from "@/lib/client-roles";
-import { matchLojaNames } from "@/lib/lojas";
-import { offlineFetch } from "@/lib/offline";
+import { matchLojaNames, extractProjectBaseName } from "@/lib/lojas";
 
 export interface LojaItem {
   id: string;
@@ -27,6 +26,7 @@ interface LojaContextType {
   usuariosLojas: Record<string, string>;
   refreshLojas: () => Promise<void>;
   atribuirProjetoLoja: (projetoNome: string, lojaNome: string) => Promise<boolean>;
+  getLojaDoProjeto: (projetoNome: string, criadorEmail?: string) => string;
   isProjectInSelectedLoja: (projetoNome: string, criadorEmail?: string) => boolean;
 }
 
@@ -86,7 +86,10 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const loadLojasData = useCallback(async () => {
     try {
-      const res = await offlineFetch("/api/lojas");
+      const res = await fetch("/api/lojas", {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      });
       if (res.ok) {
         const data = await res.json();
         const listaLojas = data.lojas || [];
@@ -106,7 +109,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (err) {
-      console.warn("[LojaProvider] Dados carregados do cache offline:", err);
+      console.warn("[LojaProvider] Falha ao recarregar lojas da rede:", err);
     }
   }, []);
 
@@ -176,19 +179,39 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
 
   const atribuirProjetoLoja = useCallback(async (projetoNome: string, lojaNome: string): Promise<boolean> => {
     try {
+      const cleanLoja = (lojaNome || "").trim();
+      const cleanProj = (projetoNome || "").trim();
+      const baseProj = extractProjectBaseName(cleanProj);
+
+      // Otimisticamente atualiza o estado local e os dois storages
+      setProjetosLojas((prev) => {
+        const updated = { ...prev };
+        if (cleanLoja) {
+          updated[cleanProj] = cleanLoja;
+          updated[projetoNome] = cleanLoja;
+          if (baseProj) updated[baseProj] = cleanLoja;
+        } else {
+          delete updated[cleanProj];
+          delete updated[projetoNome];
+          if (baseProj) delete updated[baseProj];
+        }
+        try {
+          localStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(updated));
+          sessionStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
       const res = await fetch("/api/lojas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projetoNome, lojaNome }),
+        body: JSON.stringify({ projetoNome, lojaNome: cleanLoja }),
       });
+
       if (res.ok) {
-        setProjetosLojas((prev) => {
-          const updated = { ...prev, [projetoNome]: lojaNome };
-          try {
-            sessionStorage.setItem("terracafe_projetos_lojas_cache", JSON.stringify(updated));
-          } catch {}
-          return updated;
-        });
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("terracafe_lojas_updated"));
+        }
         return true;
       }
     } catch (e) {
@@ -196,6 +219,57 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
     }
     return false;
   }, []);
+
+  /**
+   * Retorna a filial oficial vinculada a um projeto com máxima resiliência:
+   * 1. Vínculo direto no mapa de projetos (nome exato, trimmed, base sem V0/V1, minúsculas)
+   * 2. Vínculo herdado do criador da obra (usuariosLojas)
+   * 3. Reconhecimento automático se o próprio nome do projeto cita a cidade da filial
+   */
+  const getLojaDoProjeto = useCallback(
+    (projetoNome: string, criadorEmail?: string): string => {
+      const pNomeTrim = (projetoNome || "").trim();
+      if (!pNomeTrim) return "";
+
+      const pBase = extractProjectBaseName(pNomeTrim);
+      const pNomeLc = pNomeTrim.toLowerCase();
+      const pBaseLc = pBase.toLowerCase();
+
+      // 1. Busca direta no mapa
+      if (projetosLojas[pNomeTrim]) return projetosLojas[pNomeTrim];
+      if (projetosLojas[projetoNome]) return projetosLojas[projetoNome];
+      if (pBase && projetosLojas[pBase]) return projetosLojas[pBase];
+
+      // Busca insensível a maiúsculas / espaços / versões
+      for (const [k, v] of Object.entries(projetosLojas)) {
+        if (!v) continue;
+        const kTrim = k.trim();
+        const kLc = kTrim.toLowerCase();
+        const kBase = extractProjectBaseName(kTrim).toLowerCase();
+        if (kLc === pNomeLc || (kBase && kBase === pBaseLc) || (kBase && kBase === pNomeLc) || kLc === pBaseLc) {
+          return v;
+        }
+      }
+
+      // 2. Vínculo herdado do criador da obra
+      if (criadorEmail) {
+        const cEmailLc = criadorEmail.toLowerCase().trim();
+        if (usuariosLojas[cEmailLc]) {
+          return usuariosLojas[cEmailLc];
+        }
+      }
+
+      // 3. Fallback: reconhecimento se o nome do projeto cita a cidade da filial
+      for (const loja of lojas) {
+        if (matchLojaNames(pNomeTrim, loja.nome)) {
+          return loja.nome;
+        }
+      }
+
+      return "";
+    },
+    [projetosLojas, usuariosLojas, lojas]
+  );
 
   /**
    * Verifica se um projeto pertence à loja atualmente selecionada.
@@ -207,48 +281,16 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       const pNomeTrim = (projetoNome || "").trim();
       if (!pNomeTrim) return false;
 
-      // 1. Vínculo direto projeto -> loja
-      let lojaDireta = projetosLojas[pNomeTrim] || projetosLojas[projetoNome];
-      if (!lojaDireta) {
-        // Tenta achar com chave insensível a maiúsculas / espaços
-        const pNomeLc = pNomeTrim.toLowerCase();
-        for (const [k, v] of Object.entries(projetosLojas)) {
-          if (k.trim().toLowerCase() === pNomeLc) {
-            lojaDireta = v;
-            break;
-          }
-        }
+      const lojaVinculada = getLojaDoProjeto(pNomeTrim, criadorEmail);
+      if (lojaVinculada) {
+        return matchLojaNames(lojaVinculada, selectedLoja);
       }
 
-      if (lojaDireta) {
-        return matchLojaNames(lojaDireta, selectedLoja);
-      }
-
-      // 2. Vínculo herdado do criador do projeto
-      if (criadorEmail) {
-        const emailLc = criadorEmail.toLowerCase().trim();
-        const lojaCriador = usuariosLojas[emailLc];
-        if (lojaCriador) {
-          return matchLojaNames(lojaCriador, selectedLoja);
-        }
-      }
-
-      // 3. Verifica se o próprio nome do projeto cita a cidade da filial selecionada
-      if (matchLojaNames(pNomeTrim, selectedLoja)) {
-        return true;
-      }
-
-      // 4. Se a obra NÃO possui nenhum vínculo com outra loja (sem filial direta nem filial do criador),
-      // ela pertence ao escopo geral da empresa e NÃO deve desaparecer no celular.
-      const criadorLoja = criadorEmail ? usuariosLojas[criadorEmail.toLowerCase().trim()] : null;
-      if (!lojaDireta && !criadorLoja) {
-        return true;
-      }
-
-      // Pertence comprovadamente a outra filial diferente da selecionada
-      return false;
+      // Se a obra NÃO possui nenhum vínculo com outra loja (sem filial direta nem filial do criador),
+      // pertence ao escopo geral da empresa
+      return true;
     },
-    [selectedLoja, projetosLojas, usuariosLojas]
+    [selectedLoja, getLojaDoProjeto]
   );
 
   const contextValue = useMemo<LojaContextType>(
@@ -266,6 +308,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       usuariosLojas,
       refreshLojas: loadLojasData,
       atribuirProjetoLoja,
+      getLojaDoProjeto,
       isProjectInSelectedLoja,
     }),
     [
@@ -282,6 +325,7 @@ export function LojaProvider({ children }: { children: React.ReactNode }) {
       usuariosLojas,
       loadLojasData,
       atribuirProjetoLoja,
+      getLojaDoProjeto,
       isProjectInSelectedLoja,
     ]
   );

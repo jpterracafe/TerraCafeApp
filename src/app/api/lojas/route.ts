@@ -14,23 +14,6 @@ const NO_CACHE_HEADERS = {
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      // Fallback gracioso: retorna lojas ativas sem mapeamentos confidenciais para não quebrar a UI nem disparar 401 em inicializações
-      const lojas = await getLojas();
-      return NextResponse.json(
-        {
-          lojas: lojas.filter((l) => l.ativo !== false),
-          projetosLojas: {},
-          usuariosLojas: {},
-        },
-        {
-          status: 200,
-          headers: NO_CACHE_HEADERS,
-        }
-      );
-    }
-
     const [lojas, projetosLojas, usuariosLojas] = await Promise.all([
       getLojas(),
       getProjectLojasMap(),

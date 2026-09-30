@@ -40,11 +40,8 @@ import { getLocalISODate } from '@/lib/date-utils';
 import InstallAppButton from '@/components/InstallPWA';
 import LojaSelector from '@/components/LojaSelector';
 
-// ── Helpers para controle de versões de projetos (mantidos para compatibilidade) ──
-export function extractProjectBaseName(name: string): string {
-  if (!name) return '';
-  return name.replace(/\s*\([vV]\d+\)$/, '').trim();
-}
+import { extractProjectBaseName } from '@/lib/lojas';
+export { extractProjectBaseName };
 
 export function getProjectVersion(name: string): string {
   if (!name) return 'V0';

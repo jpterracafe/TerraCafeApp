@@ -119,10 +119,7 @@ export async function GET(req: Request) {
     const emailAlvo = emailFiltro || (apenasMeus ? sessionEmail : "");
 
     // Carrega mapa de projetos para lojas (aproveita cache de servidor)
-    let mapProjetosLojas: Record<string, string> = {};
-    if (sessionLoja) {
-      mapProjetosLojas = await getProjectLojasMap();
-    }
+    const mapProjetosLojas = await getProjectLojasMap();
 
     const temAcessoAoProjeto = (nome: string): boolean => {
       // 👑 Diretor, Coordenador, Admin e Desenvolvedor vêem todos os projetos de todos os logins por padrão
@@ -216,6 +213,7 @@ export async function GET(req: Request) {
       return concluidos ? ehConcluido(n) : !ehConcluido(n);
     };
 
+
     if (detalhado) {
       const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; concluidoEm: string | null; criador: any }>();
       for (const r of (data ?? []) as any[]) {
@@ -240,7 +238,7 @@ export async function GET(req: Request) {
         }
       }
       const lista = Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome));
-      return NextResponse.json({ projetos: lista, criadores: mapCriadores }, { headers: NO_CACHE_HEADERS });
+      return NextResponse.json({ projetos: lista, criadores: mapCriadores, projetosLojas: mapProjetosLojas }, { headers: NO_CACHE_HEADERS });
     }
 
     let unicos = Array.from(
@@ -248,7 +246,7 @@ export async function GET(req: Request) {
     ).filter(n => temAcessoAoProjeto(n) && condicaoConcluido(n));
 
     unicos.sort();
-    return NextResponse.json({ projetos: unicos, criadores: mapCriadores }, { headers: NO_CACHE_HEADERS });
+    return NextResponse.json({ projetos: unicos, criadores: mapCriadores, projetosLojas: mapProjetosLojas }, { headers: NO_CACHE_HEADERS });
   } catch (e) {
     console.error("[GET /api/projetos]", e);
     return NextResponse.json({ error: "Erro ao buscar projetos." }, { status: 500, headers: NO_CACHE_HEADERS });
@@ -411,7 +409,10 @@ export async function POST(req: Request) {
 
       // Atribui loja ao novo projeto: prioriza loja informada no body, sessão ou criador
       const sessionLoja = ((session?.user as any)?.loja || "").trim();
-      const lojaAtribuida = body?.lojaNome || sessionLoja || await getUserAssignedLoja({ id: userId, email: userEmail });
+      const bodyLoja = (body?.lojaNome || "").trim();
+      const fallbackLoja = await getUserAssignedLoja({ id: userId, email: userEmail });
+      const lojaAtribuida = bodyLoja || sessionLoja || fallbackLoja || "";
+
       if (lojaAtribuida) {
         await setProjectLoja(nome, lojaAtribuida);
       }
@@ -428,6 +429,7 @@ export async function POST(req: Request) {
       projeto: nome,
       prazoFinal,
       dataInicio,
+      lojaNome: (body?.lojaNome || "").trim() || ((session?.user as any)?.loja || "").trim() || null,
       criador: {
         email: userEmail,
         nome: userName,
