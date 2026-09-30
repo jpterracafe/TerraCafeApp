@@ -384,8 +384,8 @@ export default function DashboardPage() {
 
   const logsFiltradosLoja = useMemo(() => {
     if (selectedLoja === 'TODAS') return logs;
-    const permitidos = new Set(projetosListFiltrados);
-    return logs.filter((l) => l.projetoCliente && permitidos.has(l.projetoCliente.trim()));
+    const permitidos = new Set(projetosListFiltrados.map(n => n.trim().toLowerCase()));
+    return logs.filter((l) => l.projetoCliente && permitidos.has(l.projetoCliente.trim().toLowerCase()));
   }, [logs, selectedLoja, projetosListFiltrados]);
 
   // ── Filtro por Período de Logs ──────────────────────────────────────────────
@@ -408,7 +408,8 @@ export default function DashboardPage() {
     hoje.setHours(0, 0, 0, 0);
 
     return projetosListFiltrados.map(nomeProjeto => {
-      const logsProjeto = logs.filter(l => (l.projetoCliente || '').trim() === nomeProjeto.trim());
+      const pNomeLc = nomeProjeto.trim().toLowerCase();
+      const logsProjeto = logs.filter(l => (l.projetoCliente || '').trim().toLowerCase() === pNomeLc);
       
       // Data de Start do Projeto
       let dataStart = projetoStartDates[nomeProjeto];
@@ -519,14 +520,14 @@ export default function DashboardPage() {
       const respFasesAcao = fases
         .filter(f =>
           !f.isDeleted &&
-          (f.projetoCliente || '').trim() === nomeProjeto.trim() &&
+          (f.projetoCliente || '').trim().toLowerCase() === pNomeLc &&
           f.responsavel &&
           !isResponsavelVazio(f.responsavel)
         )
-        .map(f => f.responsavel.trim());
+        .flatMap(f => parseResponsavelEmails(f.responsavel).filter(Boolean));
 
       const respOutrasEtapasDoProjeto = Object.entries(responsaveisPorEtapa)
-        .filter(([k]) => k.startsWith(`${nomeProjeto}::`))
+        .filter(([k]) => k.trim().toLowerCase().startsWith(`${pNomeLc}::`))
         .flatMap(([, v]) => v || []);
 
       const respTodosBruto = Array.from(
@@ -538,6 +539,11 @@ export default function DashboardPage() {
       const respReais = respTodosBruto.filter(r => !TERMOS_GENERICOS_RESP.has(normalizeName(r)));
       const respTodos = (respReais.length > 0 ? respReais : [])
         .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+      const prazoFinalProj =
+        projetosPrazoFinal[nomeProjeto] ||
+        Object.entries(projetosPrazoFinal).find(([k]) => k.trim().toLowerCase() === pNomeLc)?.[1] ||
+        null;
 
       return {
         nome: nomeProjeto,
@@ -556,7 +562,7 @@ export default function DashboardPage() {
         responsaveis: respTodos,
         ultimoLog: ultimoLogProjeto,
         historicoRendimento: rend,
-        prazoFinal: projetosPrazoFinal[nomeProjeto] || null,
+        prazoFinal: prazoFinalProj,
       };
     });
   }, [projetosListFiltrados, logs, fases, projetoStartDates, configEtapas, responsaveisPorEtapa, projetosPrazoFinal]);

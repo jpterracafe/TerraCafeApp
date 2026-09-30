@@ -168,12 +168,17 @@ export async function GET(req: Request) {
     };
 
 
+    const condicaoConcluido = (n: string) => {
+      if (todos) return true;
+      return concluidos ? ehConcluido(n) : !ehConcluido(n);
+    };
+
     if (detalhado) {
       const mapa = new Map<string, { nome: string; prazoFinal: string; excluidoEm: string | null; concluidoEm: string | null; criador: any }>();
       for (const r of (data ?? []) as any[]) {
         const n = r.projeto_cliente as string;
         if (!temAcessoAoProjeto(n)) continue;
-        if (concluidos ? !ehConcluido(n) : ehConcluido(n)) continue;
+        if (!condicaoConcluido(n)) continue;
 
         const criador = mapCriadores[n] || null;
         if (!mapa.has(n)) {
@@ -197,7 +202,7 @@ export async function GET(req: Request) {
 
     let unicos = Array.from(
       new Set((data ?? []).map((r: any) => r.projeto_cliente as string).filter(Boolean))
-    ).filter(n => temAcessoAoProjeto(n) && (concluidos ? ehConcluido(n) : !ehConcluido(n)));
+    ).filter(n => temAcessoAoProjeto(n) && condicaoConcluido(n));
 
     unicos.sort();
     return NextResponse.json({ projetos: unicos, criadores: mapCriadores });

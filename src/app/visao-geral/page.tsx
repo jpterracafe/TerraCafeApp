@@ -38,6 +38,7 @@ interface SystemConfigResponse {
   projetoJustificativas: Record<string, JustificativaItem[]>;
   etapasProgresso: Record<string, number>;
   etapasStatus: Record<string, string>;
+  projetosStatus?: Record<string, { status?: string; concluidoEm?: string }>;
 }
 
 // As 6 Fases Oficiais do Sistema de Irrigação
@@ -129,7 +130,7 @@ export default function VisaoGeralDiretorPage() {
   const carregarDados = useCallback(async () => {
     try {
       const [resProj, resConfig, resFases, resLogs] = await Promise.all([
-        offlineFetch('/api/projetos').then(r => r.ok ? r.json() : { projetos: [] }),
+        offlineFetch('/api/projetos?todos=true').then(r => r.ok ? r.json() : { projetos: [] }),
         offlineFetch('/api/etapas-config').then(r => r.ok ? r.json() : null),
         offlineFetch('/api/fases').then(r => r.ok ? r.json() : { fases: [] }),
         offlineFetch('/api/diario-logs').then(r => r.ok ? r.json() : { logs: [] }),
@@ -361,21 +362,6 @@ export default function VisaoGeralDiretorPage() {
            et.key.toLowerCase().includes(l.atividade.trim().toLowerCase()))
         ).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
-        let todosResponsaveis = Array.from(
-          new Set([
-            ...respConfig.map(r => (r || '').trim()).filter(Boolean),
-            ...nomesReaisFases,
-          ])
-        ).filter(Boolean);
-
-        // Se houver responsáveis reais, remove termos genéricos como "Equipe", "Administrador", etc.
-        const nomesReais = todosResponsaveis.filter(
-          r => !TERMOS_GENERICOS_RESPONSAVEL.has(normalizeName(r))
-        );
-
-        const responsaveis = (nomesReais.length > 0 ? nomesReais : [])
-          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
-
         // Detecção de início e prazos
         // REGRA ESTRITA: fase SÓ inicia quando cfgFase.hasStarted === true
         // (usuário clicou explicitamente em "Definir Início / Prazo da Fase")
@@ -429,6 +415,26 @@ export default function VisaoGeralDiretorPage() {
           }
         }
 
+        const respLogs = (hasStarted || pctProgresso > 0)
+          ? logsEtapa.flatMap(l => parseResponsavelEmails(l.responsavel)).filter(Boolean)
+          : [];
+
+        let todosResponsaveis = Array.from(
+          new Set([
+            ...respConfig.map(r => (r || '').trim()).filter(Boolean),
+            ...nomesReaisFases,
+            ...respLogs,
+          ])
+        ).filter(Boolean);
+
+        // Se houver responsáveis reais, remove termos genéricos como "Equipe", "Administrador", etc.
+        const nomesReais = todosResponsaveis.filter(
+          r => !TERMOS_GENERICOS_RESPONSAVEL.has(normalizeName(r))
+        );
+
+        const responsaveis = (nomesReais.length > 0 ? nomesReais : [])
+          .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
         somaProgresso += pctProgresso;
 
         let diasRestantesFase = 0;
@@ -478,7 +484,8 @@ export default function VisaoGeralDiretorPage() {
       });
 
       const progressoGeral = Math.round(somaProgresso / ETAPAS_OFICIAIS.length);
-      const concluidoGeral = progressoGeral >= 100;
+      const ehConcluidoOficial = config.projetosStatus?.[nomeProjeto]?.status === 'concluido';
+      const concluidoGeral = progressoGeral >= 100 || ehConcluidoOficial;
       const temAtraso = atrasado || qtdFasesAtrasadas > 0;
 
       return {

@@ -6,6 +6,7 @@ import { getSupabase } from "@/lib/supabase";
 import fs from "fs";
 import path from "path";
 import { getUserProjectAccess, filterConfigByAccess } from "@/lib/project-access";
+import { parseResponsavelEmails } from "@/lib/responsaveis";
 
 const CONFIG_FILE = path.join(process.cwd(), ".etapas_config.json");
 
@@ -17,6 +18,7 @@ interface SystemConfig {
   projetoJustificativas: Record<string, Array<{ id: string; data: string; autor: string; motivo: string; observacao: string }>>;
   etapasProgresso: Record<string, number>;
   etapasStatus: Record<string, string>;
+  projetosStatus?: Record<string, { status?: string; concluidoEm?: string }>;
 }
 
 // 🔒 SANITIZAÇÃO OBRIGATÓRIA NO SERVIDOR:
@@ -60,6 +62,7 @@ function getLocalConfig(): SystemConfig {
       projetoJustificativas: {},
       etapasProgresso: {},
       etapasStatus: {},
+      projetosStatus: {},
     };
   }
   try {
@@ -74,6 +77,7 @@ function getLocalConfig(): SystemConfig {
         projetoJustificativas: parsed.projetoJustificativas || {},
         etapasProgresso: parsed.etapasProgresso || {},
         etapasStatus: parsed.etapasStatus || {},
+        projetosStatus: parsed.projetosStatus || {},
       };
     }
   } catch {
@@ -111,6 +115,7 @@ const CHAVES_CONFIG_ETAPAS = [
   "diario_projeto_justificativas_v1",
   "diario_etapas_progresso_v1",
   "diario_etapas_status_v1",
+  "diario_projetos_status_v1",
 ];
 
 interface ConfigCacheEntry {
@@ -196,6 +201,9 @@ export async function GET() {
           if (row.chave === "diario_etapas_status_v1" && row.valor) {
             config.etapasStatus = { ...config.etapasStatus, ...row.valor };
           }
+          if (row.chave === "diario_projetos_status_v1" && row.valor) {
+            config.projetosStatus = { ...(config.projetosStatus || {}), ...row.valor };
+          }
         });
       }
 
@@ -233,6 +241,25 @@ export async function GET() {
             updated_at: new Date().toISOString(),
           })
         ).catch(() => {});
+      }
+
+      // Preenche responsaveisPorEtapa se fases_acao tiver responsável atribuído e o mapa estiver vazio
+      for (const [pNome, fList] of fasesPorProjeto.entries()) {
+        for (const f of fList) {
+          const resp = (f.responsavel || "").trim();
+          if (resp && resp !== "Não atribuído") {
+            const etapaKey = f.gabarito?.trim();
+            if (etapaKey) {
+              const chave = `${pNome}::${etapaKey}`;
+              if (!config.responsaveisPorEtapa[chave] || config.responsaveisPorEtapa[chave].length === 0) {
+                const parsed = parseResponsavelEmails(resp).filter(Boolean);
+                if (parsed.length > 0) {
+                  config.responsaveisPorEtapa[chave] = parsed;
+                }
+              }
+            }
+          }
+        }
       }
 
       serverConfigCache = {
