@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useDeferredValue } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useDeferredValue, useRef } from 'react';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { 
-  ChevronRight, Calendar, Plus, User, Clock, Briefcase,
+  ChevronRight, ChevronLeft, Calendar, Plus, User, Clock, Briefcase,
   CheckCircle2, AlertCircle, CloudRain, Wrench, Search, Trash2, Filter,
   Paperclip, X, Video, Loader2, TrendingUp, TrendingDown, Settings2,
   Users, Check, Droplets, Layers, ChevronDown, ChevronUp, PlayCircle, Flag,
@@ -165,6 +165,30 @@ export default function DiarioCampoTimelinePage() {
   const [selectedProjeto, setSelectedProjeto] = useState<string>('');
   const [selectedEtapa, setSelectedEtapa] = useState<EtapaCampo>('Valetas');
   const [isMobileProjectSelectorOpen, setIsMobileProjectSelectorOpen] = useState(false);
+
+  // Referência para rolagem horizontal suave da barra de fases
+  const etapasNavRef = useRef<HTMLDivElement>(null);
+  const etapaButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const scrollEtapas = (direction: 'left' | 'right') => {
+    if (etapasNavRef.current) {
+      const scrollAmount = direction === 'left' ? -260 : 260;
+      etapasNavRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // Garante que a etapa selecionada fique visível e centralizada
+  useEffect(() => {
+    if (selectedEtapa && etapaButtonRefs.current[selectedEtapa]) {
+      try {
+        etapaButtonRefs.current[selectedEtapa]?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      } catch (_) {}
+    }
+  }, [selectedEtapa]);
 
   // Responsáveis mapeados por Etapa: { [projeto::etapa]: string[] }
   const [responsaveisPorEtapa, setResponsaveisPorEtapa] = useState<Record<string, string[]>>({});
@@ -2615,87 +2639,124 @@ export default function DiarioCampoTimelinePage() {
               </div>
 
               {/* ── NAVEGAÇÃO DAS 6 ETAPAS DO DIÁRIO DE CAMPO (ORDEM FIXA) ── */}
-              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-1.5 sm:p-2 shadow-xl overflow-x-auto no-scrollbar touch-pan-x">
-                <div className="flex items-center gap-1.5 sm:gap-2 min-w-max p-0.5">
-                  {ETAPAS_CAMPO.map((etapa, idx) => {
-                    const isActive = selectedEtapa === etapa.key;
-                    const count = logsCountByEtapa[etapa.key] || 0;
-                    const respDestaEtapa = responsaveisPorEtapa[`${selectedProjeto}::${etapa.key}`] || [];
-                    
-                    // Verifica se esta etapa específica está concluída (MESMO algoritmo do isFaseConcluida)
-                    const etapaConfigKey = `${selectedProjeto}::${etapa.key}`;
-                    const etapaCfg = configEtapas[etapaConfigKey];
-                    const concluidoPorConfigTab =
-                      (etapaCfg?.hasStarted === true && progressoManual[etapaConfigKey] === 100) ||
-                      (etapaCfg as any)?.status === 'Concluída';
-                    const temLogConcluidoTab = registros.some(r =>
-                      r.projetoCliente === selectedProjeto &&
-                      (r.atividade === etapa.key || r.atividade.toLowerCase().includes(etapa.key.toLowerCase())) &&
-                      (r.status || '').toLowerCase().includes('concluído')
-                    );
-                    const etapaFaseConcluida = concluidoPorConfigTab || temLogConcluidoTab;
+              <div className="relative bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-1.5 sm:p-2 shadow-xl">
+                <div className="flex items-center gap-1.5">
+                  {/* Botão anterior / esquerda */}
+                  <button
+                    type="button"
+                    onClick={() => scrollEtapas('left')}
+                    className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111a30] dark:hover:bg-[#1a2644] text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all shrink-0 flex items-center justify-center border border-slate-200/80 dark:border-[#1e293b] active:scale-95 shadow-sm"
+                    title="Rolar fases para a esquerda"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
 
-                    return (
-                      <button
-                        key={etapa.key}
-                        type="button"
-                        onClick={() => {
-                          triggerHaptic('tap');
-                          setSelectedEtapa(etapa.key);
-                        }}
-                        className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium text-xs sm:text-sm transition-all border relative ${
-                          isActive
-                            ? etapaFaseConcluida
-                              ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/30'
-                              : 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/30'
-                            : etapaFaseConcluida
-                            ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-400'
-                            : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 hover:border-blue-400/50 hover:bg-slate-100 dark:hover:bg-[#111a30]'
-                        }`}
-                      >
-                        {etapaFaseConcluida && (
-                          <CheckCircle2 className={`w-4 h-4 absolute top-1 right-1 ${isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
-                        )}
-                        <span className="text-base">{etapa.icon}</span>
-                        <div className="text-left">
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${
-                              isActive 
-                                ? 'bg-white/20 text-white' 
-                                : etapaFaseConcluida
-                                ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-300'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                            }`}>
-                              0{idx + 1}
-                            </span>
-                            <span className="font-semibold">{etapa.label}</span>
+                  {/* Container rolável com scroll suave, suporte a mouse wheel e toque */}
+                  <div
+                    ref={etapasNavRef}
+                    onWheel={(e) => {
+                      if (e.deltaY !== 0 && etapasNavRef.current) {
+                        etapasNavRef.current.scrollLeft += e.deltaY;
+                      }
+                    }}
+                    className="flex-1 overflow-x-auto scroll-smooth py-1 px-0.5 flex items-center gap-1.5 sm:gap-2 min-w-0"
+                  >
+                    {ETAPAS_CAMPO.map((etapa, idx) => {
+                      const isActive = selectedEtapa === etapa.key;
+                      const count = logsCountByEtapa[etapa.key] || 0;
+                      const respDestaEtapa = responsaveisPorEtapa[`${selectedProjeto}::${etapa.key}`] || [];
+                      
+                      // Verifica se esta etapa específica está concluída
+                      const etapaConfigKey = `${selectedProjeto}::${etapa.key}`;
+                      const etapaCfg = configEtapas[etapaConfigKey];
+                      const statusEtapaTab = etapasStatus[etapaConfigKey];
+                      const concluidoPorConfigTab =
+                        (etapaCfg?.hasStarted === true && progressoManual[etapaConfigKey] === 100) ||
+                        (etapaCfg as any)?.status === 'Concluída' ||
+                        statusEtapaTab === 'Concluída' ||
+                        statusEtapaTab === 'Concluído';
+                      const pNomeTab = (selectedProjeto || '').trim().toLowerCase();
+                      const eNomeTab = etapa.key.toLowerCase();
+                      const temLogConcluidoTab = registros.some(r =>
+                        (r.projetoCliente || '').trim().toLowerCase() === pNomeTab &&
+                        (r.atividade === etapa.key || (r.atividade || '').toLowerCase().includes(eNomeTab)) &&
+                        (r.status || '').toLowerCase().includes('concluído')
+                      );
+                      const etapaFaseConcluida = concluidoPorConfigTab || temLogConcluidoTab;
+
+                      return (
+                        <button
+                          key={etapa.key}
+                          ref={el => { etapaButtonRefs.current[etapa.key] = el; }}
+                          type="button"
+                          onClick={() => {
+                            triggerHaptic('tap');
+                            setSelectedEtapa(etapa.key);
+                          }}
+                          className={`flex items-center gap-2 sm:gap-2.5 px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium text-xs sm:text-sm transition-all border relative shrink-0 ${
+                            isActive
+                              ? etapaFaseConcluida
+                                ? 'bg-emerald-600 border-emerald-500 text-white shadow-lg shadow-emerald-900/30'
+                                : 'bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-900/30'
+                              : etapaFaseConcluida
+                              ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:border-emerald-400'
+                              : 'bg-slate-50 dark:bg-[#070c18] border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-300 hover:border-blue-400/50 hover:bg-slate-100 dark:hover:bg-[#111a30]'
+                          }`}
+                        >
+                          {etapaFaseConcluida && (
+                            <CheckCircle2 className={`w-4 h-4 absolute top-1 right-1 ${isActive ? 'text-white' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                          )}
+                          <span className="text-base">{etapa.icon}</span>
+                          <div className="text-left">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded ${
+                                isActive 
+                                  ? 'bg-white/20 text-white' 
+                                  : etapaFaseConcluida
+                                  ? 'bg-emerald-200 dark:bg-emerald-800 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                              }`}>
+                                0{idx + 1}
+                              </span>
+                              <span className="font-semibold">{etapa.label}</span>
+                            </div>
+                            {respDestaEtapa.length > 0 && (
+                              <span className={`text-[10px] block truncate max-w-[130px] mt-0.5 ${
+                                isActive 
+                                  ? 'text-blue-100' 
+                                  : etapaFaseConcluida
+                                  ? 'text-emerald-600 dark:text-emerald-400'
+                                  : 'text-slate-400'
+                              }`}>
+                                {respDestaEtapa.join(', ')}
+                              </span>
+                            )}
                           </div>
-                          {respDestaEtapa.length > 0 && (
-                            <span className={`text-[10px] block truncate max-w-[130px] mt-0.5 ${
+                          {count > 0 && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ml-1 ${
                               isActive 
-                                ? 'text-blue-100' 
+                                ? 'bg-white text-blue-700' 
                                 : etapaFaseConcluida
-                                ? 'text-emerald-600 dark:text-emerald-400'
-                                : 'text-slate-400'
+                                ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
+                                : 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
                             }`}>
-                              {respDestaEtapa.join(', ')}
+                              {count}
                             </span>
                           )}
-                        </div>
-                        {count > 0 && (
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ml-1 ${
-                            isActive 
-                              ? 'bg-white text-blue-700' 
-                              : etapaFaseConcluida
-                              ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
-                              : 'bg-blue-500/10 text-blue-500 dark:text-blue-400'
-                          }`}>
-                            {count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Botão próxima / direita */}
+                  <button
+                    type="button"
+                    onClick={() => scrollEtapas('right')}
+                    className="p-2 sm:p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-[#111a30] dark:hover:bg-[#1a2644] text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all shrink-0 flex items-center justify-center border border-slate-200/80 dark:border-[#1e293b] active:scale-95 shadow-sm"
+                    title="Rolar fases para a direita (ver todas as fases)"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
@@ -2717,11 +2778,44 @@ export default function DiarioCampoTimelinePage() {
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Clock className={`w-4 h-4 ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : statsContador.hasStarted ? 'text-blue-500' : 'text-amber-500'}`} />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                        Contador da Etapa: <strong className={`capitalize ${isFaseConcluida ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>{selectedEtapa}</strong>
-                      </span>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Clock className={`w-4 h-4 ${isFaseConcluida ? 'text-emerald-600 dark:text-emerald-400' : statsContador.hasStarted ? 'text-blue-500' : 'text-amber-500'}`} />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Contador da Etapa: <strong className={`capitalize ${isFaseConcluida ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-900 dark:text-white'}`}>{selectedEtapa}</strong>
+                        </span>
+                      </div>
+
+                      {/* Navegação Rápida Direta entre as 6 Fases */}
+                      <div className="flex items-center gap-1 bg-white/80 dark:bg-[#070c18]/80 border border-slate-200 dark:border-[#1e293b] rounded-lg p-0.5 shadow-sm">
+                        <button
+                          type="button"
+                          disabled={ETAPAS_CAMPO.findIndex(e => e.key === selectedEtapa) <= 0}
+                          onClick={() => {
+                            const idx = ETAPAS_CAMPO.findIndex(e => e.key === selectedEtapa);
+                            if (idx > 0) setSelectedEtapa(ETAPAS_CAMPO[idx - 1].key);
+                          }}
+                          className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#111a30] disabled:opacity-25 disabled:pointer-events-none transition-all"
+                          title="Fase anterior"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 px-1.5 whitespace-nowrap">
+                          {ETAPAS_CAMPO.findIndex(e => e.key === selectedEtapa) + 1} de {ETAPAS_CAMPO.length}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={ETAPAS_CAMPO.findIndex(e => e.key === selectedEtapa) >= ETAPAS_CAMPO.length - 1}
+                          onClick={() => {
+                            const idx = ETAPAS_CAMPO.findIndex(e => e.key === selectedEtapa);
+                            if (idx < ETAPAS_CAMPO.length - 1) setSelectedEtapa(ETAPAS_CAMPO[idx + 1].key);
+                          }}
+                          className="p-1 rounded text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-[#111a30] disabled:opacity-25 disabled:pointer-events-none transition-all"
+                          title="Próxima fase (avançar até a última etapa)"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
                       <span className={`text-xl sm:text-2xl md:text-4xl font-extrabold tracking-tight leading-tight ${
