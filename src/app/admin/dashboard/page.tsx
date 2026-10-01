@@ -12,13 +12,14 @@ import BackButton from '@/components/BackButton';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Legend, Area, AreaChart,
+  Legend, Area, AreaChart, ComposedChart, Line, ReferenceLine,
 } from 'recharts';
 import {
   ChevronRight, Layers, AlertTriangle, CheckCircle2,
   Users, Activity, TrendingUp, BarChart2, RefreshCw, Briefcase,
   FileDown, Calendar, Info, Sparkles, X, Wrench, Eye, ArrowUpRight, CloudRain, Clock,
-  Search, Copy, Check, Filter, Zap, ArrowRight, ChevronDown, SlidersHorizontal, CheckCircle
+  Search, Copy, Check, Filter, Zap, ArrowRight, ChevronDown, SlidersHorizontal, CheckCircle,
+  Timer, Gauge
 } from 'lucide-react';
 import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
 import { hojeSP } from '@/lib/validators';
@@ -767,10 +768,18 @@ export default function DashboardPage() {
     ];
   }, [kpisDiretor]);
 
-  // 3. Atividade Diária nos Últimos 14 Dias
+  // 3. Atividade Diária nos Últimos 14 Dias (Produtividade, Chuva e Desvios)
   const dadosTimelineAtividade = useMemo(() => {
     const dias = 14;
-    const resultado: { dia: string; dataCompleta: string; registros: number; acima: number; abaixo: number }[] = [];
+    const resultado: {
+      dia: string;
+      dataCompleta: string;
+      registros: number;
+      noRitmo: number;
+      abaixo: number;
+      chuva: number;
+      eficienciaPct: number | null;
+    }[] = [];
     const fmtSP = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' });
 
     for (let i = dias - 1; i >= 0; i--) {
@@ -780,16 +789,101 @@ export default function DashboardPage() {
       const logsDoDia = logsVisiveis.filter(l => l.data === dStr);
 
       const label = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+      const total = logsDoDia.length;
+      const chuva = logsDoDia.filter(l => (l.status || '').toLowerCase().includes('chuva')).length;
+      const abaixo = logsDoDia.filter(l => {
+        const s = (l.status || '').toLowerCase();
+        return s.includes('abaixo') || s.includes('problema') || s.includes('atras');
+      }).length;
+      const noRitmo = Math.max(0, total - abaixo - chuva);
+      const eficienciaPct = total > 0 ? Math.round((noRitmo / total) * 100) : null;
+
       resultado.push({
         dia: label,
         dataCompleta: dStr,
-        registros: logsDoDia.length,
-        acima: logsDoDia.filter(l => (l.status || '').toLowerCase().includes('acima')).length,
-        abaixo: logsDoDia.filter(l => (l.status || '').toLowerCase().includes('abaixo')).length,
+        registros: total,
+        noRitmo,
+        abaixo,
+        chuva,
+        eficienciaPct,
       });
     }
     return resultado;
   }, [logsVisiveis]);
+
+  // 4. Termômetro de Ritmo: Avanço Físico Real (%) vs. Consumo do Prazo (%)
+  const dadosProgressoVsTempo = useMemo(() => {
+    return obrasCampo.slice(0, 7).map(obra => {
+      let metaTotalDias = 0;
+      ETAPAS_CAMPO_ORDEM.forEach(etp => {
+        const cfg = configEtapas[`${obra.nome}::${etp.key}`];
+        metaTotalDias += cfg?.metaDias || 20;
+      });
+      if (metaTotalDias <= 0) metaTotalDias = 90;
+
+      // % de consumo do prazo da obra
+      const pctTempo = Math.min(100, Math.max(0, Math.round((obra.diaAtual / metaTotalDias) * 100)));
+
+      // % de avanço físico ponderado pelo ciclo técnico
+      const etapasCompletas = obra.fasesStatusList.filter(f => f.status === 'concluida').length;
+      const fracaoAtual = (obra.pctEtapa / 100) * (100 / 6);
+      const pctAvanco = Math.min(100, Math.max(0, Math.round((etapasCompletas / 6) * 100 + fracaoAtual)));
+
+      const diferenca = pctAvanco - pctTempo;
+      const statusRitmo = diferenca >= 0 ? 'No Ritmo / Adiantada' : 'Atrasada em Ritmo';
+
+      return {
+        nome: extractProjectBaseName(obra.nome),
+        nomeCompleto: obra.nome,
+        avanco: pctAvanco,
+        tempoConsumido: pctTempo,
+        diferenca,
+        statusRitmo,
+        diaAtual: obra.diaAtual,
+        metaTotalDias,
+        etapaAtual: obra.etapaAtual,
+        saude: obra.saude,
+      };
+    });
+  }, [obrasCampo, configEtapas]);
+
+  // 5. Diagnóstico de Gargalos: Duração Média Real vs. Meta por Etapa Técnica (Lead Time)
+  const dadosLeadTimeEtapas = useMemo(() => {
+    return ETAPAS_CAMPO_ORDEM.map(etp => {
+      let totalDiasGastos = 0;
+      let countObras = 0;
+      let totalMeta = 0;
+
+      obrasCampo.forEach(obra => {
+        const cfg = configEtapas[`${obra.nome}::${etp.key}`];
+        const meta = cfg?.metaDias || 20;
+        totalMeta += meta;
+
+        if (obra.etapaAtualOrder === etp.order) {
+          totalDiasGastos += obra.diasDecorridosEtapa;
+          countObras++;
+        } else if (obra.etapaAtualOrder > etp.order) {
+          totalDiasGastos += meta;
+          countObras++;
+        }
+      });
+
+      const mediaDiasReal = countObras > 0 ? Math.round(totalDiasGastos / countObras) : 0;
+      const mediaMeta = obrasCampo.length > 0 ? Math.round(totalMeta / obrasCampo.length) : 20;
+      const desvio = mediaDiasReal - mediaMeta;
+
+      return {
+        etapa: etp.label,
+        key: etp.key,
+        icon: etp.icon,
+        diasReal: mediaDiasReal,
+        diasMeta: mediaMeta,
+        desvio,
+        color: etp.color,
+        isGargalo: desvio > 0,
+      };
+    });
+  }, [obrasCampo, configEtapas]);
 
   // ── Projetos por Agricultor ─────────────────────────────────────────────────
   const projetosPorAgricultor = useMemo(() => {
@@ -1768,85 +1862,199 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Gráfico 2: Timeline de Atividade e Assiduidade (Area Chart) */}
+              {/* Gráfico 2: Balanço Diário e Eficiência Operacional (Composed Chart) */}
               <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm lg:col-span-2 flex flex-col">
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-blue-500" />
-                    Ritmo Diário de Relatos de Campo
+                    <Activity className="w-4 h-4 text-blue-500" />
+                    Balanço Diário: Produtividade vs. Impedimentos
                   </h3>
-                  <ChartInfoTooltip text="Mede o volume diário de registros preenchidos pelas equipes no diário nos últimos 14 dias para garantir a assiduidade do acompanhamento." />
+                  <div className="flex items-center gap-3 text-[11px] font-semibold flex-wrap">
+                    <span className="flex items-center gap-1.5 text-emerald-500">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" /> No Ritmo
+                    </span>
+                    <span className="flex items-center gap-1.5 text-cyan-500">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-cyan-500" /> Chuva
+                    </span>
+                    <span className="flex items-center gap-1.5 text-rose-500">
+                      <span className="w-2.5 h-2.5 rounded-xs bg-rose-500" /> Desvio
+                    </span>
+                    <span className="flex items-center gap-1.5 text-amber-500">
+                      <span className="w-3 h-0.5 bg-amber-400" /> Eficiência (%)
+                    </span>
+                    <ChartInfoTooltip text="Mede o volume diário de apontamentos regulares, paradas por chuva e relatos de atraso nos últimos 14 dias, acompanhado pela linha de taxa de eficiência." />
+                  </div>
                 </div>
                 <p className="text-xs text-slate-400 mb-3">
-                  Assiduidade técnica dos últimos 14 dias • regularidade e dias de aceleração
+                  Volume diário de frentes de trabalho ativas e taxa de rendimento geral
                 </p>
 
                 <div className="flex-1 min-h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={dadosTimelineAtividade} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="gradAtividade" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
-                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
-                        </linearGradient>
-                        <linearGradient id="gradAcima" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                        </linearGradient>
-                        <linearGradient id="gradAbaixo" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
+                    <ComposedChart data={dadosTimelineAtividade} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.5} />
                       <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 9, fill: '#f59e0b' }} unit="%" axisLine={false} tickLine={false} />
                       <RTooltip
                         contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 8, fontSize: 11 }}
                         labelStyle={{ color: '#fff' }}
-                        formatter={(v) => [`${Number(v)} relato(s)`, 'Diário']}
                       />
-                      <Area
+                      <Bar yAxisId="left" dataKey="noRitmo" name="No Ritmo / Acima" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="chuva" name="Parada por Chuva" stackId="a" fill="#06b6d4" radius={[0, 0, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="abaixo" name="Abaixo / Desvios" stackId="a" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                      <Line
+                        yAxisId="right"
                         type="monotone"
-                        dataKey="registros"
-                        name="Registros"
-                        stroke="#3b82f6"
+                        dataKey="eficienciaPct"
+                        name="Eficiência (%)"
+                        stroke="#f59e0b"
                         strokeWidth={2.5}
-                        fill="url(#gradAtividade)"
-                        dot={{ fill: '#3b82f6', r: 3, strokeWidth: 0 }}
-                        activeDot={{ r: 5, fill: '#60a5fa' }}
+                        dot={{ fill: '#f59e0b', r: 3 }}
+                        activeDot={{ r: 5, fill: '#fbbf24' }}
                       />
-                      <Area
-                        type="monotone"
-                        dataKey="acima"
-                        name="Acima"
-                        stroke="#10b981"
-                        strokeWidth={1.5}
-                        strokeDasharray="4 3"
-                        fill="url(#gradAcima)"
-                        dot={false}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="abaixo"
-                        name="Abaixo"
-                        stroke="#f43f5e"
-                        strokeWidth={1.5}
-                        strokeDasharray="4 3"
-                        fill="url(#gradAbaixo)"
-                        dot={false}
-                      />
-                    </AreaChart>
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-100 dark:border-[#1e293b] mt-2">
-                  <span>Total de relatos nos últimos 14 dias: <strong className="text-slate-900 dark:text-white">{dadosTimelineAtividade.reduce((acc, d) => acc + d.registros, 0)}</strong></span>
+                  <span>Total de relatos no ciclo: <strong className="text-slate-900 dark:text-white">{dadosTimelineAtividade.reduce((acc, d) => acc + d.registros, 0)}</strong></span>
                   <span className="text-emerald-500 font-semibold flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" /> Frentes ativas em campo
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* SEÇÃO 2.1: OS 2 NOVOS GRÁFICOS ESTRATÉGICOS DA DIRETORIA */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* NOVO GRÁFICO 1: CURVA DE RITMO (AVANÇO REAL % VS CONSUMO DO PRAZO %) */}
+              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-indigo-500" />
+                    Curva de Ritmo: Avanço Físico vs. Consumo do Prazo
+                  </h3>
+                  <ChartInfoTooltip text="Compara o % de avanço físico concluído no ciclo das 6 fases contra o % de tempo já consumido do prazo total estimado. Se o tempo consumido for maior que o avanço, a obra está consumindo mais dias do que entregando etapas." />
+                </div>
+                <p className="text-xs text-slate-400 mb-3">
+                  Diagnóstico de velocidade: a obra avança mais rápido do que o tempo decorrido?
+                </p>
+
+                {dadosProgressoVsTempo.length > 0 ? (
+                  <>
+                    <div className="flex-1 min-h-[260px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={dadosProgressoVsTempo}
+                          layout="vertical"
+                          margin={{ top: 10, right: 30, left: 20, bottom: 0 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} opacity={0.4} />
+                          <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                          <YAxis dataKey="nome" type="category" width={110} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                          <RTooltip
+                            contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 8, fontSize: 11 }}
+                            labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                            formatter={(value, name) => [
+                              `${value}%`,
+                              name === 'avanco' ? 'Avanço do Ciclo (%)' : 'Tempo Consumido (%)'
+                            ]}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 11 }} />
+                          <Bar dataKey="avanco" name="Avanço do Ciclo (%)" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={9} />
+                          <Bar dataKey="tempoConsumido" name="Tempo Consumido (%)" fill="#f59e0b" radius={[0, 4, 4, 0]} barSize={9} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-3 border-t border-slate-100 dark:border-[#1e293b] mt-2">
+                      <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {dadosProgressoVsTempo.filter(d => d.diferenca >= 0).length} fazenda(s) no ritmo ideal
+                      </span>
+                      <span className="flex items-center gap-1.5 text-rose-500 font-bold">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {dadosProgressoVsTempo.filter(d => d.diferenca < 0).length} com consumo de tempo acelerado
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex items-center justify-center text-xs text-slate-400">
+                    Nenhuma obra ativa no filtro atual.
+                  </div>
+                )}
+              </div>
+
+              {/* NOVO GRÁFICO 2: DIAGNÓSTICO DE GARGALOS POR ETAPA (LEAD TIME REAL VS META) */}
+              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Gauge className="w-4 h-4 text-cyan-500" />
+                    Diagnóstico de Gargalos: Dias Reais vs. Meta por Etapa
+                  </h3>
+                  <ChartInfoTooltip text="Média de dias reais despendidos pelas equipes em cada uma das 6 fases em relação à meta contratual planejada. Permite identificar cirurgicamente qual etapa técnica está gerando maior retenção de cronograma." />
+                </div>
+                <p className="text-xs text-slate-400 mb-3">
+                  Lead time das 6 fases • onde a operação gasta mais tempo do que o planejado
+                </p>
+
+                <div className="flex-1 min-h-[260px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dadosLeadTimeEtapas}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 25 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.4} />
+                      <XAxis
+                        dataKey="etapa"
+                        tick={{ fontSize: 10, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={0}
+                        angle={-15}
+                        textAnchor="end"
+                      />
+                      <YAxis unit="d" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                      <RTooltip
+                        contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 8, fontSize: 11 }}
+                        labelStyle={{ color: '#fff', fontWeight: 'bold' }}
+                        formatter={(val, name) => [`${val} dias`, name === 'diasReal' ? 'Média Real' : 'Meta Planejada']}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      <Bar dataKey="diasReal" name="Média Real (Dias)" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={16}>
+                        {dadosLeadTimeEtapas.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.isGargalo ? '#f43f5e' : entry.color} />
+                        ))}
+                      </Bar>
+                      <Bar dataKey="diasMeta" name="Meta Planejada (Dias)" fill="#64748b" radius={[4, 4, 0, 0]} barSize={16} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px] text-slate-400 pt-3 border-t border-slate-100 dark:border-[#1e293b] mt-2">
+                  {(() => {
+                    const maiorGargalo = [...dadosLeadTimeEtapas].sort((a, b) => b.desvio - a.desvio)[0];
+                    if (maiorGargalo && maiorGargalo.desvio > 0) {
+                      return (
+                        <span className="text-rose-500 font-bold flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Maior Gargalo: {maiorGargalo.icon} {maiorGargalo.etapa} (+{maiorGargalo.desvio}d acima da meta)
+                        </span>
+                      );
+                    }
+                    return (
+                      <span className="text-emerald-500 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Todas as etapas dentro ou abaixo do prazo de meta
+                      </span>
+                    );
+                  })()}
+                  <span className="text-slate-400">Referência: Ciclo Técnico 6 Fases</span>
+                </div>
+              </div>
+
             </div>
 
             {/* SEÇÃO 3: RAIO-X DAS FAZENDAS (CARDS COM MINI STEPPER DAS 6 ETAPAS) */}
