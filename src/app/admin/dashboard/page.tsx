@@ -19,7 +19,7 @@ import {
   Users, Activity, TrendingUp, BarChart2, RefreshCw, Briefcase,
   FileDown, Calendar, Info, Sparkles, X, Wrench, Eye, ArrowUpRight, CloudRain, Clock,
   Search, Copy, Check, Filter, Zap, ArrowRight, ChevronDown, SlidersHorizontal, CheckCircle,
-  Timer, Gauge
+  Timer, Gauge, Share2, Tv
 } from 'lucide-react';
 import { ADMIN_MASTER_EMAIL } from '@/lib/client-roles';
 import { hojeSP } from '@/lib/validators';
@@ -202,6 +202,7 @@ export default function DashboardPage() {
   // Modal / Lightbox de Foto
   const [fotoModal, setFotoModal] = useState<DiarioLog | null>(null);
   const [copiandoBriefing, setCopiandoBriefing] = useState<boolean>(false);
+  const [modoTV, setModoTV] = useState<boolean>(false);
 
   // Acesso restrito: só logins de Admin, Diretor ou Desenvolvedor/master.
   const podeVerDiretor = useMemo(() => {
@@ -813,38 +814,41 @@ export default function DashboardPage() {
 
   // 4. Termômetro de Ritmo: Avanço Físico Real (%) vs. Consumo do Prazo (%)
   const dadosProgressoVsTempo = useMemo(() => {
-    return obrasCampo.slice(0, 7).map(obra => {
-      let metaTotalDias = 0;
-      ETAPAS_CAMPO_ORDEM.forEach(etp => {
-        const cfg = configEtapas[`${obra.nome}::${etp.key}`];
-        metaTotalDias += cfg?.metaDias || 20;
-      });
-      if (metaTotalDias <= 0) metaTotalDias = 90;
+    return obrasCampo
+      .map(obra => {
+        let metaTotalDias = 0;
+        ETAPAS_CAMPO_ORDEM.forEach(etp => {
+          const cfg = configEtapas[`${obra.nome}::${etp.key}`];
+          metaTotalDias += cfg?.metaDias || 20;
+        });
+        if (metaTotalDias <= 0) metaTotalDias = 90;
 
-      // % de consumo do prazo da obra
-      const pctTempo = Math.min(100, Math.max(0, Math.round((obra.diaAtual / metaTotalDias) * 100)));
+        // % de consumo do prazo da obra
+        const pctTempo = Math.min(100, Math.max(0, Math.round((obra.diaAtual / metaTotalDias) * 100)));
 
-      // % de avanço físico ponderado pelo ciclo técnico
-      const etapasCompletas = obra.fasesStatusList.filter(f => f.status === 'concluida').length;
-      const fracaoAtual = (obra.pctEtapa / 100) * (100 / 6);
-      const pctAvanco = Math.min(100, Math.max(0, Math.round((etapasCompletas / 6) * 100 + fracaoAtual)));
+        // % de avanço físico ponderado pelo ciclo técnico
+        const etapasCompletas = obra.fasesStatusList.filter(f => f.status === 'concluida').length;
+        const fracaoAtual = (obra.pctEtapa / 100) * (100 / 6);
+        const pctAvanco = Math.min(100, Math.max(0, Math.round((etapasCompletas / 6) * 100 + fracaoAtual)));
 
-      const diferenca = pctAvanco - pctTempo;
-      const statusRitmo = diferenca >= 0 ? 'No Ritmo / Adiantada' : 'Atrasada em Ritmo';
+        const diferenca = pctAvanco - pctTempo;
+        const statusRitmo = diferenca >= 0 ? 'No Ritmo / Adiantada' : 'Atrasada em Ritmo';
 
-      return {
-        nome: extractProjectBaseName(obra.nome),
-        nomeCompleto: obra.nome,
-        avanco: pctAvanco,
-        tempoConsumido: pctTempo,
-        diferenca,
-        statusRitmo,
-        diaAtual: obra.diaAtual,
-        metaTotalDias,
-        etapaAtual: obra.etapaAtual,
-        saude: obra.saude,
-      };
-    });
+        return {
+          nome: extractProjectBaseName(obra.nome),
+          nomeCompleto: obra.nome,
+          avanco: pctAvanco,
+          tempoConsumido: pctTempo,
+          diferenca,
+          statusRitmo,
+          diaAtual: obra.diaAtual,
+          metaTotalDias,
+          etapaAtual: obra.etapaAtual,
+          saude: obra.saude,
+        };
+      })
+      .sort((a, b) => a.diferenca - b.diferenca)
+      .slice(0, 8);
   }, [obrasCampo, configEtapas]);
 
   // 5. Diagnóstico de Gargalos: Duração Média Real vs. Meta por Etapa Técnica (Lead Time)
@@ -1205,6 +1209,32 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-700 dark:text-slate-300 p-3 sm:p-5 md:p-6 lg:p-8 font-sans transition-colors">
       <div className="max-w-[1600px] mx-auto w-full">
 
+        {/* Banner do Modo Telão / Apresentação Executiva */}
+        {modoTV && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white flex items-center justify-between shadow-xl shadow-blue-500/25 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <span className="p-2 rounded-xl bg-white/20">
+                <Tv className="w-5 h-5 text-white" />
+              </span>
+              <div>
+                <p className="text-sm font-black leading-tight flex items-center gap-2">
+                  Modo Telão Executivo Ativo
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/25 uppercase">Apresentação</span>
+                </p>
+                <p className="text-xs text-white/85 mt-0.5">
+                  Painel de alta visibilidade com atualização automática de 30s para reuniões de diretoria
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setModoTV(false)}
+              className="px-3 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-bold transition-all shadow-xs"
+            >
+              Sair do Telão
+            </button>
+          </div>
+        )}
+
         {/* ── HEADER EXECUTIVO COM DESIGN GLASSMORPHIC PREMIUM ────────────────── */}
         <div className="relative mb-6 rounded-2xl bg-white/90 dark:bg-[#0d1527]/90 border border-slate-200/80 dark:border-[#1e293b] p-4 sm:p-6 shadow-sm backdrop-blur-md overflow-hidden">
           {/* Luz ambiente de destaque no topo */}
@@ -1259,6 +1289,19 @@ export default function DashboardPage() {
 
             {/* Barra de Ações Rápidas Executivas */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <button
+                onClick={() => setModoTV(!modoTV)}
+                title={modoTV ? "Sair do Modo Telão / Apresentação" : "Ativar Modo Telão / Reunião de Diretoria"}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  modoTV
+                    ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-500/20'
+                    : 'bg-slate-100 dark:bg-[#1e293b] text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Tv className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{modoTV ? 'Sair do Telão' : 'Modo Telão'}</span>
+              </button>
+
               <InstallAppButton />
 
               <button
@@ -1586,11 +1629,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── PLACAR DE KPIS DO DIRETOR (SCORECARD EXECUTIVO) ──────────────────── */}
+        {/* ── PLACAR DE KPIS DO DIRETOR (SCORECARD EXECUTIVO INTERATIVO) ─────── */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
           
           {/* KPI 1: Obras Ativas */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-blue-500/40 transition-all">
+          <div
+            onClick={() => {
+              setStatusFilter('todos');
+              setEtapaFilter(null);
+            }}
+            title="Clique para listar todas as fazendas"
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+              statusFilter === 'todos' && !etapaFilter
+                ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
+                : 'border-slate-200 dark:border-[#1e293b]'
+            }`}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Obras Ativas</span>
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
@@ -1607,7 +1661,15 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI 2: Índice de Saúde do Portfólio */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'normal' ? 'todos' : 'normal')}
+            title="Clique para filtrar apenas fazendas com saúde No Ritmo"
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+              statusFilter === 'normal'
+                ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md'
+                : 'border-slate-200 dark:border-[#1e293b]'
+            }`}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saúde Geral</span>
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
@@ -1626,7 +1688,15 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI 3: Ritmo Operacional */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-blue-400/40 transition-all">
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'excelente' ? 'todos' : 'excelente')}
+            title="Clique para filtrar apenas fazendas com ritmo Acelerado"
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+              statusFilter === 'excelente'
+                ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
+                : 'border-slate-200 dark:border-[#1e293b]'
+            }`}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eficiência</span>
               <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
@@ -1645,7 +1715,15 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI 4: Obras em Alerta / Atrasadas */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-rose-500/40 transition-all">
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'alerta' ? 'todos' : 'alerta')}
+            title="Clique para filtrar apenas fazendas em Risco ou Alerta"
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+              statusFilter === 'alerta'
+                ? 'border-rose-500 ring-2 ring-rose-500/30 shadow-md'
+                : 'border-slate-200 dark:border-[#1e293b]'
+            }`}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Risco & Alerta</span>
               <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
@@ -1662,7 +1740,15 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI 5: Dias Parados por Chuva */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-cyan-400/40 transition-all">
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'chuva' ? 'todos' : 'chuva')}
+            title="Clique para filtrar apenas fazendas com paralisação por Chuva"
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+              statusFilter === 'chuva'
+                ? 'border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                : 'border-slate-200 dark:border-[#1e293b]'
+            }`}
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paradas Clima</span>
               <div className="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
@@ -1679,7 +1765,11 @@ export default function DashboardPage() {
           </div>
 
           {/* KPI 6: Apontamentos Hoje / Assiduidade */}
-          <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group hover:border-amber-500/40 transition-all">
+          <div
+            onClick={() => setActiveTab('campo')}
+            title="Ver atividades do diário de campo"
+            className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md"
+          >
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Diário Hoje</span>
               <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
@@ -2182,30 +2272,36 @@ export default function DashboardPage() {
                         {/* Corpo do Card */}
                         <div className="p-4 space-y-4 flex-1 flex flex-col justify-between">
                           
-                          {/* ── NOVO: MINI ESTEIRA DAS 6 ETAPAS TÉCNICAS (VISÃO DO CICLO COMPLETO) ── */}
+                          {/* ── MINI ESTEIRA DAS 6 ETAPAS TÉCNICAS (CONECTADA & CIRCULAR) ── */}
                           <div>
                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
                               <span>Ciclo Técnico (Etapa {obra.etapaAtualOrder} de 6)</span>
                               <span className="text-slate-900 dark:text-white font-bold">{etapaObj.label}</span>
                             </div>
 
-                            <div className="grid grid-cols-6 gap-1 bg-slate-100/70 dark:bg-[#070c18] p-1.5 rounded-xl border border-slate-200/60 dark:border-[#1e293b]">
+                            <div className="relative flex items-center justify-between bg-slate-100/70 dark:bg-[#070c18] p-2 rounded-xl border border-slate-200/60 dark:border-[#1e293b]">
+                              {/* Linha conectora de fundo */}
+                              <div className="absolute left-5 right-5 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 dark:bg-slate-800 pointer-events-none z-0" />
+                              
                               {obra.fasesStatusList.map((st) => (
                                 <div
                                   key={st.key}
                                   title={`${st.order}. ${st.label}: ${st.status === 'concluida' ? 'Concluída' : st.status === 'atual' ? 'Fase Atual' : 'Pendente'}`}
-                                  className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-center transition-all ${
+                                  className={`relative z-10 flex flex-col items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-center transition-all ${
                                     st.status === 'concluida'
-                                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                                      ? 'bg-emerald-500 text-white shadow-xs font-bold text-xs ring-2 ring-emerald-500/20'
                                       : st.status === 'atual'
-                                      ? 'bg-blue-600 text-white font-bold shadow-xs ring-2 ring-blue-500/30'
-                                      : 'text-slate-400 dark:text-slate-600'
+                                      ? 'bg-blue-600 text-white font-black text-xs shadow-md ring-4 ring-blue-500/30 scale-105'
+                                      : 'bg-white dark:bg-slate-800 text-slate-400 border border-slate-200 dark:border-slate-700 text-[10px]'
                                   }`}
                                 >
-                                  <span className="text-xs">{st.icon}</span>
-                                  <span className="text-[9px] font-black leading-none mt-0.5">
-                                    {st.status === 'concluida' ? '✓' : st.order}
-                                  </span>
+                                  {st.status === 'concluida' ? (
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  ) : st.status === 'atual' ? (
+                                    <span className="text-xs">{st.icon}</span>
+                                  ) : (
+                                    <span>{st.order}</span>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -2298,11 +2394,21 @@ export default function DashboardPage() {
 
                           {/* Rodapé do Card com Ações */}
                           <div className="pt-2 border-t border-slate-100 dark:border-[#1e293b] flex items-center justify-between text-xs">
-                            <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[170px]" title={obra.responsaveis.join(', ')}>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[150px]" title={obra.responsaveis.join(', ')}>
                               Equipe: <strong>{obra.responsaveis.length > 0 ? obra.responsaveis.slice(0, 2).join(', ') + (obra.responsaveis.length > 2 ? ` +${obra.responsaveis.length - 2}` : '') : 'Não atribuída'}</strong>
                             </span>
 
                             <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => {
+                                  const texto = `🚜 *TerraCafé - Status da Obra*\n📍 *Fazenda:* ${extractProjectBaseName(obra.nome)}\n⚙️ *Etapa Atual:* ${etapaObj.icon} ${etapaObj.label} (${obra.diasDecorridosEtapa}/${obra.metaDiasEtapa}d)\n📊 *Saúde:* ${obra.saude.toUpperCase()}\n📅 *Prazo:* ${obra.prazoFinalFormatado || 'Não definido'}\n👷 *Equipe:* ${obra.responsaveis.join(', ') || 'Não atribuída'}`;
+                                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`, '_blank');
+                                }}
+                                title="Compartilhar status desta fazenda no WhatsApp"
+                                className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 border border-emerald-200 dark:border-emerald-800 transition-colors"
+                              >
+                                <Share2 className="w-3.5 h-3.5" />
+                              </button>
                               <button
                                 onClick={() => window.open(`/relatorio?projeto=${encodeURIComponent(obra.nome)}`, '_blank')}
                                 className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 dark:bg-[#1e293b] text-slate-700 dark:text-slate-300 hover:text-blue-500 hover:bg-slate-200 transition-colors"
