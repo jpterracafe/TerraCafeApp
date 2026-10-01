@@ -1206,7 +1206,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#070c18] text-slate-700 dark:text-slate-300 p-3 sm:p-5 md:p-6 lg:p-8 font-sans transition-colors">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100/60 to-blue-50/30 dark:from-[#060b16] dark:via-[#070c18] dark:to-[#060d1f] text-slate-700 dark:text-slate-300 p-3 sm:p-5 md:p-6 lg:p-8 font-sans transition-colors">
       <div className="max-w-[1600px] mx-auto w-full">
 
         {/* Banner do Modo Telão / Apresentação Executiva */}
@@ -1234,12 +1234,11 @@ export default function DashboardPage() {
             </button>
           </div>
         )}
-
-        {/* ── HEADER EXECUTIVO COM DESIGN GLASSMORPHIC PREMIUM ────────────────── */}
-        <div className="relative mb-6 rounded-2xl bg-white/90 dark:bg-[#0d1527]/90 border border-slate-200/80 dark:border-[#1e293b] p-4 sm:p-6 shadow-sm backdrop-blur-md overflow-hidden">
+        <div className="relative mb-6 rounded-2xl bg-white/95 dark:bg-[#0d1527]/95 border border-slate-200/80 dark:border-[#1e293b]/80 p-4 sm:p-6 shadow-lg shadow-slate-900/5 dark:shadow-black/30 backdrop-blur-xl overflow-hidden">
           {/* Luz ambiente de destaque no topo */}
-          <div className="absolute -top-24 -left-24 w-72 h-72 bg-blue-500/10 dark:bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 dark:bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/8 dark:bg-blue-600/12 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -top-32 -right-32 w-96 h-96 bg-emerald-500/8 dark:bg-emerald-600/12 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 opacity-60" />
 
           <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
@@ -1252,17 +1251,17 @@ export default function DashboardPage() {
               </nav>
 
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 shrink-0 ring-2 ring-blue-500/20">
-                  <BarChart2 className="w-5 h-5" />
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-xl shadow-blue-500/30 shrink-0 ring-2 ring-blue-500/20">
+                  <BarChart2 className="w-6 h-6" />
                 </div>
                 <div>
                   <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2 flex-wrap">
                     Visão do Diretor
-                    <span className="text-base font-normal text-slate-400 dark:text-slate-500">|</span>
-                    <span className="text-base sm:text-lg font-medium text-slate-600 dark:text-slate-300">
-                      Irrigação & Obras de Campo
+                    <span className="text-base font-normal text-slate-300 dark:text-slate-600">|</span>
+                    <span className="text-base sm:text-lg font-semibold text-slate-500 dark:text-slate-300">
+                      Irrigação &amp; Obras de Campo
                     </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 shadow-sm shadow-emerald-500/10">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       Ao Vivo
                     </span>
@@ -1274,11 +1273,11 @@ export default function DashboardPage() {
                         Sincronizado às {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
-                    <span>•</span>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
                     <span className="font-semibold text-slate-700 dark:text-slate-200">
-                      {obrasCampo.length} fazendas ativas
+                      {obrasCampo.length} fazendas monitoradas
                     </span>
-                    <span>•</span>
+                    <span className="text-slate-300 dark:text-slate-700">•</span>
                     <span className="text-slate-500 dark:text-slate-400">
                       Gestor: <strong className="text-slate-800 dark:text-white">{currentUser}</strong>
                     </span>
@@ -1295,7 +1294,7 @@ export default function DashboardPage() {
                 className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
                   modoTV
                     ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-500/20'
-                    : 'bg-slate-100 dark:bg-[#1e293b] text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                    : 'bg-slate-100 dark:bg-[#1e293b] text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700/80 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 dark:hover:bg-blue-900/20 dark:hover:text-blue-400'
                 }`}
               >
                 <Tv className="w-3.5 h-3.5" />
@@ -1307,16 +1306,16 @@ export default function DashboardPage() {
               <button
                 onClick={handleCopiarBriefing}
                 title="Copiar resumo executivo formatado para WhatsApp ou E-mail"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#1e293b] hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#1e293b] hover:bg-slate-200 dark:hover:bg-[#253048] text-slate-800 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700/80 shadow-sm transition-all"
               >
                 {copiandoBriefing ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
-                <span>Copiar Briefing</span>
+                <span>{copiandoBriefing ? 'Copiado!' : 'Copiar Briefing'}</span>
               </button>
 
               <button
                 onClick={() => void loadData()}
                 title="Recarregar dados do servidor agora"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-[#111c33] border border-slate-200 dark:border-[#1e293b] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e293b] text-xs font-semibold shadow-sm transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white dark:bg-[#111c33] border border-slate-200 dark:border-[#253048] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e293b] text-xs font-semibold shadow-sm transition-all"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
                 Atualizar
@@ -1324,7 +1323,7 @@ export default function DashboardPage() {
 
               <Link
                 href="/irrigacao/diario-campo"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-md shadow-amber-500/20 transition-all"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-md shadow-amber-500/25 transition-all"
               >
                 <Calendar className="w-3.5 h-3.5" />
                 Diário de Campo
@@ -1335,16 +1334,14 @@ export default function DashboardPage() {
                   const param = selectedProjetoFilter === '__todos__' ? '__todos__' : encodeURIComponent(selectedProjetoFilter);
                   window.open(`/relatorio?projeto=${param}`, '_blank');
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-lg shadow-blue-600/25 transition-all"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold shadow-lg shadow-blue-600/30 transition-all"
               >
                 <FileDown className="w-4 h-4" />
                 Relatório PDF
               </button>
             </div>
           </div>
-        </div>
-
-        {/* ── RADAR DE INTELIGÊNCIA EXECUTIVA (STRIP DE INSIGHTS RÁPIDOS) ───────── */}
+        </div>ar        {/* ── RADAR DE INTELIGÊNCIA EXECUTIVA (STRIP DE INSIGHTS RÁPIDOS) ───────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {/* Card 1: Gargalo Atual */}
           <div 
@@ -1354,20 +1351,22 @@ export default function DashboardPage() {
                 setActiveTab('campo');
               }
             }}
-            className="cursor-pointer group p-3.5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-blue-500/40 shadow-sm transition-all flex items-start gap-3"
+            className="cursor-pointer group p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 hover:border-blue-500/50 hover:shadow-md hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10 shadow-sm transition-all flex items-start gap-3 relative overflow-hidden"
           >
-            <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 text-base">
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 text-blue-500 flex items-center justify-center shrink-0 text-lg border border-blue-500/20 group-hover:scale-110 transition-transform">
               {radarInsights.principalGargalo?.etapa.icon || '⚙️'}
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
                 Frente Mais Concentrada
               </span>
-              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                 {radarInsights.principalGargalo?.etapa.label || 'Sem obras ativas'}
               </p>
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-medium">
-                {radarInsights.principalGargalo?.count || 0} fazenda(s) nesta etapa • Ver
+              <p className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5 flex items-center gap-1">
+                <ArrowRight className="w-3 h-3" />
+                {radarInsights.principalGargalo?.count || 0} fazenda(s) nesta etapa
               </p>
             </div>
           </div>
@@ -1378,19 +1377,27 @@ export default function DashboardPage() {
               setStatusFilter('alerta');
               setActiveTab('campo');
             }}
-            className="cursor-pointer group p-3.5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-rose-500/40 shadow-sm transition-all flex items-start gap-3"
+            className="cursor-pointer group p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 hover:border-rose-500/50 hover:shadow-md hover:shadow-rose-500/5 dark:hover:shadow-rose-500/10 shadow-sm transition-all flex items-start gap-3 relative overflow-hidden"
           >
-            <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
-              <Clock className="w-4 h-4" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-rose-500 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-110 ${
+              kpisDiretor.obrasPrazoCriticoCount > 0
+                ? 'bg-gradient-to-br from-rose-500/20 to-red-500/10 text-rose-500 border-rose-500/20'
+                : 'bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-500 border-emerald-500/20'
+            }`}>
+              <Clock className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Prazos & Atenção
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                Prazos &amp; Atenção
               </span>
-              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                 {kpisDiretor.obrasPrazoCriticoCount > 0 ? `${kpisDiretor.obrasPrazoCriticoCount} obra(s) críticas` : 'Sem estouro de prazo'}
               </p>
-              <p className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+              <p className={`text-[11px] font-semibold mt-0.5 flex items-center gap-1 ${
+                kpisDiretor.obrasPrazoCriticoCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'
+              }`}>
+                <ArrowRight className="w-3 h-3" />
                 {kpisDiretor.obrasPrazoCriticoCount > 0 ? 'Exigem alinhamento imediato' : 'Tudo dentro do prazo oficial'}
               </p>
             </div>
@@ -1402,47 +1409,50 @@ export default function DashboardPage() {
               setStatusFilter('chuva');
               setActiveTab('campo');
             }}
-            className="cursor-pointer group p-3.5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-cyan-500/40 shadow-sm transition-all flex items-start gap-3"
+            className="cursor-pointer group p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 hover:border-cyan-500/50 hover:shadow-md hover:shadow-cyan-500/5 dark:hover:shadow-cyan-500/10 shadow-sm transition-all flex items-start gap-3 relative overflow-hidden"
           >
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center shrink-0">
-              <CloudRain className="w-4 h-4" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 text-cyan-500 flex items-center justify-center shrink-0 border border-cyan-500/20 group-hover:scale-110 transition-transform">
+              <CloudRain className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
                 Impacto de Chuvas
               </span>
-              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                 {kpisDiretor.countChuva} registros de chuva
               </p>
-              <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-medium">
-                {kpisDiretor.obrasChuva > 0 ? `${kpisDiretor.obrasChuva} obra(s) paradas hoje` : 'Tempo firme nas frentes'}
+              <p className="text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold mt-0.5 flex items-center gap-1">
+                <ArrowRight className="w-3 h-3" />
+                {kpisDiretor.obrasChuva > 0 ? `${kpisDiretor.obrasChuva} obra(s) paradas` : 'Tempo firme nas frentes'}
               </p>
             </div>
           </div>
 
           {/* Card 4: Assiduidade & Hoje */}
           <div 
-            onClick={() => {
-              setActiveTab('campo');
-            }}
-            className="p-3.5 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] shadow-sm flex items-start gap-3"
+            onClick={() => setActiveTab('campo')}
+            className="cursor-pointer group p-4 rounded-2xl bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 hover:border-emerald-500/50 hover:shadow-md hover:shadow-emerald-500/5 dark:hover:shadow-emerald-500/10 shadow-sm transition-all flex items-start gap-3 relative overflow-hidden"
           >
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-              <Activity className="w-4 h-4" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-500 flex items-center justify-center shrink-0 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+              <Activity className="w-4.5 h-4.5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
                 Assiduidade Hoje
               </span>
-              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
                 {kpisDiretor.logsHoje} apontamento(s) hoje
               </p>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                {kpisDiretor.totalLogsPeriodo} relatos no ciclo ({periodoFilter})
+              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
+                <ArrowRight className="w-3 h-3" />
+                {kpisDiretor.totalLogsPeriodo} relatos ({periodoFilter})
               </p>
             </div>
           </div>
         </div>
+
 
         {/* ── BARRA DE CONTROLE, FILTROS INTELIGENTES E ABAS ───────────────────── */}
         <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 mb-6 shadow-sm space-y-3.5">
@@ -1634,155 +1644,166 @@ export default function DashboardPage() {
           
           {/* KPI 1: Obras Ativas */}
           <div
-            onClick={() => {
-              setStatusFilter('todos');
-              setEtapaFilter(null);
-            }}
+            onClick={() => { setStatusFilter('todos'); setEtapaFilter(null); }}
             title="Clique para listar todas as fazendas"
-            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10 ${
               statusFilter === 'todos' && !etapaFilter
                 ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
-                : 'border-slate-200 dark:border-[#1e293b]'
+                : 'border-slate-200/80 dark:border-[#1e293b]/80'
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Obras Ativas</span>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                <Briefcase className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Obras Ativas</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/10 text-blue-500 flex items-center justify-center border border-blue-500/15">
+                <Briefcase className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none mb-1">
               {kpisDiretor.totalObras}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {selectedProjetoFilter === '__todos__' ? 'Fazendas monitoradas' : 'Fazenda isolada'}
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-600 to-indigo-600 rounded-b-2xl" />
           </div>
 
           {/* KPI 2: Índice de Saúde do Portfólio */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'normal' ? 'todos' : 'normal')}
             title="Clique para filtrar apenas fazendas com saúde No Ritmo"
-            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-emerald-500/5 dark:hover:shadow-emerald-500/10 ${
               statusFilter === 'normal'
                 ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md'
-                : 'border-slate-200 dark:border-[#1e293b]'
+                : 'border-slate-200/80 dark:border-[#1e293b]/80'
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saúde Geral</span>
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                <Sparkles className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Saúde Geral</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/15">
+                <Sparkles className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+            <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight leading-none mb-1">
               {kpisDiretor.indiceSaude === null ? '—' : `${kpisDiretor.indiceSaude}%`}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            {kpisDiretor.indiceSaude !== null && (
+              <div className="h-1 w-full bg-slate-100 dark:bg-[#1a2440] rounded-full overflow-hidden mb-1">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700" style={{ width: `${kpisDiretor.indiceSaude}%` }} />
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {kpisDiretor.totalObras > 0
-                ? `${kpisDiretor.obrasNoRitmo + kpisDiretor.obrasAceleradas} de ${kpisDiretor.totalObras} no ritmo ideal`
+                ? `${kpisDiretor.obrasNoRitmo + kpisDiretor.obrasAceleradas}/${kpisDiretor.totalObras} no ritmo`
                 : 'Sem obras no escopo'}
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 rounded-b-2xl" />
           </div>
 
-          {/* KPI 3: Ritmo Operacional */}
+          {/* KPI 3: Eficiência Operacional */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'excelente' ? 'todos' : 'excelente')}
             title="Clique para filtrar apenas fazendas com ritmo Acelerado"
-            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/5 dark:hover:shadow-blue-500/10 ${
               statusFilter === 'excelente'
                 ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-md'
-                : 'border-slate-200 dark:border-[#1e293b]'
+                : 'border-slate-200/80 dark:border-[#1e293b]/80'
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Eficiência</span>
-              <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-                <TrendingUp className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Eficiência</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/10 text-blue-500 flex items-center justify-center border border-blue-500/15">
+                <TrendingUp className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
+            <p className="text-3xl font-black text-blue-600 dark:text-blue-400 tracking-tight leading-none mb-1">
               {kpisDiretor.taxaRendimentoBom === null ? '—' : `${kpisDiretor.taxaRendimentoBom}%`}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            {kpisDiretor.taxaRendimentoBom !== null && (
+              <div className="h-1 w-full bg-slate-100 dark:bg-[#1a2440] rounded-full overflow-hidden mb-1">
+                <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-700" style={{ width: `${kpisDiretor.taxaRendimentoBom}%` }} />
+              </div>
+            )}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {kpisDiretor.totalLogsPeriodo > 0
-                ? `${kpisDiretor.countAcima + kpisDiretor.countDentro} relatos normais/acima`
+                ? `${kpisDiretor.countAcima + kpisDiretor.countDentro} relatos bons`
                 : 'Sem relatos no período'}
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 to-cyan-500 rounded-b-2xl" />
           </div>
 
-          {/* KPI 4: Obras em Alerta / Atrasadas */}
+          {/* KPI 4: Obras em Alerta */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'alerta' ? 'todos' : 'alerta')}
             title="Clique para filtrar apenas fazendas em Risco ou Alerta"
-            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-rose-500/5 dark:hover:shadow-rose-500/10 ${
               statusFilter === 'alerta'
                 ? 'border-rose-500 ring-2 ring-rose-500/30 shadow-md'
-                : 'border-slate-200 dark:border-[#1e293b]'
+                : 'border-slate-200/80 dark:border-[#1e293b]/80'
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Risco & Alerta</span>
-              <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                <AlertTriangle className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Risco &amp; Alerta</span>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
+                kpisDiretor.obrasAlerta > 0
+                  ? 'bg-gradient-to-br from-rose-500/20 to-red-500/10 text-rose-500 border-rose-500/15'
+                  : 'bg-gradient-to-br from-slate-200/50 to-slate-100/30 dark:from-slate-700/30 dark:to-slate-800/20 text-slate-400 border-slate-200/50 dark:border-slate-700/30'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 ${kpisDiretor.obrasAlerta > 0 ? 'animate-pulse' : ''}`} />
               </div>
             </div>
-            <p className={`text-2xl sm:text-3xl font-black tracking-tight ${kpisDiretor.obrasAlerta > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
+            <p className={`text-3xl font-black tracking-tight leading-none mb-1 ${kpisDiretor.obrasAlerta > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>
               {kpisDiretor.obrasAlerta}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-              {kpisDiretor.obrasAlerta > 0 ? 'Exigem ação imediata' : 'Nenhuma em atraso'}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              {kpisDiretor.obrasAlerta > 0 ? 'Exigem ação imediata' : 'Nenhuma em atraso ✓'}
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-500 to-red-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-rose-500 to-red-600 rounded-b-2xl" />
           </div>
 
-          {/* KPI 5: Dias Parados por Chuva */}
+          {/* KPI 5: Paralisações por Chuva */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'chuva' ? 'todos' : 'chuva')}
             title="Clique para filtrar apenas fazendas com paralisação por Chuva"
-            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md ${
+            className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-cyan-500/5 dark:hover:shadow-cyan-500/10 ${
               statusFilter === 'chuva'
                 ? 'border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                : 'border-slate-200 dark:border-[#1e293b]'
+                : 'border-slate-200/80 dark:border-[#1e293b]/80'
             }`}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Paradas Clima</span>
-              <div className="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
-                <CloudRain className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Paralisações</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/10 text-cyan-500 flex items-center justify-center border border-cyan-500/15">
+                <CloudRain className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight">
+            <p className="text-3xl font-black text-cyan-600 dark:text-cyan-400 tracking-tight leading-none mb-1">
               {kpisDiretor.countChuva}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-              relatos com chuva
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              registros de chuva/clima
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-cyan-400 to-blue-500 rounded-b-2xl" />
           </div>
 
-          {/* KPI 6: Apontamentos Hoje / Assiduidade */}
+          {/* KPI 6: Apontamentos Hoje */}
           <div
             onClick={() => setActiveTab('campo')}
             title="Ver atividades do diário de campo"
-            className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-md"
+            className="bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 rounded-2xl p-4 shadow-sm relative overflow-hidden group transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/5 dark:hover:shadow-amber-500/10"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Diário Hoje</span>
-              <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                <Activity className="w-3.5 h-3.5" />
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Diário Hoje</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 text-amber-500 flex items-center justify-center border border-amber-500/15">
+                <Activity className="w-4 h-4" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+            <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-none mb-1">
               {kpisDiretor.logsHoje}
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
               {kpisDiretor.totalLogsPeriodo} no ciclo ({periodoFilter})
             </p>
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-500 to-orange-500 rounded-b-2xl" />
           </div>
         </div>
 
@@ -1882,7 +1903,7 @@ export default function DashboardPage() {
             </div>
 
             {/* SEÇÃO 2: GRÁFICOS DE MONITORAMENTO EXECUTIVO */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
               {/* Gráfico 1: Termômetro de Rendimento Operacional (Donut) */}
               <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col">
@@ -1953,7 +1974,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Gráfico 2: Balanço Diário e Eficiência Operacional (Composed Chart) */}
-              <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm lg:col-span-2 flex flex-col">
+              <div className="bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 rounded-2xl p-5 sm:p-6 shadow-sm lg:col-span-2 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-1 gap-2">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                     <Activity className="w-4 h-4 text-blue-500" />
@@ -1979,20 +2000,36 @@ export default function DashboardPage() {
                   Volume diário de frentes de trabalho ativas e taxa de rendimento geral
                 </p>
 
-                <div className="flex-1 min-h-[220px]">
+                <div className="flex-1 min-h-[230px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={dadosTimelineAtividade} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.5} />
+                      <defs>
+                        <linearGradient id="gradNoRitmo" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.9} />
+                          <stop offset="95%" stopColor="#059669" stopOpacity={0.8} />
+                        </linearGradient>
+                        <linearGradient id="gradChuva" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.9} />
+                          <stop offset="95%" stopColor="#0891b2" stopOpacity={0.8} />
+                        </linearGradient>
+                        <linearGradient id="gradAbaixo" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.9} />
+                          <stop offset="95%" stopColor="#e11d48" stopOpacity={0.8} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} opacity={0.4} />
                       <XAxis dataKey="dia" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
                       <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
                       <YAxis yAxisId="right" orientation="right" domain={[0, 100]} tick={{ fontSize: 9, fill: '#f59e0b' }} unit="%" axisLine={false} tickLine={false} />
                       <RTooltip
-                        contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 8, fontSize: 11 }}
-                        labelStyle={{ color: '#fff' }}
+                        contentStyle={{ background: '#0d1527', border: '1px solid #1e293b', borderRadius: 10, fontSize: 11, boxShadow: '0 10px 30px rgba(0,0,0,0.4)' }}
+                        labelStyle={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}
+                        itemStyle={{ color: '#94a3b8' }}
                       />
-                      <Bar yAxisId="left" dataKey="noRitmo" name="No Ritmo / Acima" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
-                      <Bar yAxisId="left" dataKey="chuva" name="Parada por Chuva" stackId="a" fill="#06b6d4" radius={[0, 0, 0, 0]} />
-                      <Bar yAxisId="left" dataKey="abaixo" name="Abaixo / Desvios" stackId="a" fill="#f43f5e" radius={[3, 3, 0, 0]} />
+                      <ReferenceLine yAxisId="right" y={80} stroke="#f59e0b" strokeDasharray="4 2" strokeWidth={1} strokeOpacity={0.5} />
+                      <Bar yAxisId="left" dataKey="noRitmo" name="No Ritmo / Acima" stackId="a" fill="url(#gradNoRitmo)" radius={[0, 0, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="chuva" name="Parada por Chuva" stackId="a" fill="url(#gradChuva)" radius={[0, 0, 0, 0]} />
+                      <Bar yAxisId="left" dataKey="abaixo" name="Abaixo / Desvios" stackId="a" fill="url(#gradAbaixo)" radius={[3, 3, 0, 0]} />
                       <Line
                         yAxisId="right"
                         type="monotone"
@@ -2000,8 +2037,8 @@ export default function DashboardPage() {
                         name="Eficiência (%)"
                         stroke="#f59e0b"
                         strokeWidth={2.5}
-                        dot={{ fill: '#f59e0b', r: 3 }}
-                        activeDot={{ r: 5, fill: '#fbbf24' }}
+                        dot={{ fill: '#f59e0b', r: 3, strokeWidth: 0 }}
+                        activeDot={{ r: 5, fill: '#fbbf24', strokeWidth: 2, stroke: '#fff' }}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -2017,7 +2054,7 @@ export default function DashboardPage() {
             </div>
 
             {/* SEÇÃO 2.1: OS 2 NOVOS GRÁFICOS ESTRATÉGICOS DA DIRETORIA */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
               {/* NOVO GRÁFICO 1: CURVA DE RITMO (AVANÇO REAL % VS CONSUMO DO PRAZO %) */}
               <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col">
@@ -2197,10 +2234,18 @@ export default function DashboardPage() {
                     const etapaObj = ETAPAS_CAMPO_ORDEM.find(e => e.key === obra.etapaAtual) || ETAPAS_CAMPO_ORDEM[0];
                     const temFoto = !!obra.ultimoLog?.midiaUrl;
 
+                    const cardBorderColor = obra.saude === 'alerta'
+                      ? 'border-l-rose-500'
+                      : obra.saude === 'excelente'
+                      ? 'border-l-blue-500'
+                      : obra.saude === 'chuva'
+                      ? 'border-l-cyan-500'
+                      : 'border-l-emerald-500';
+
                     return (
                       <div
                         key={obra.nome}
-                        className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] hover:border-blue-500/50 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col"
+                        className={`bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 border-l-4 ${cardBorderColor} hover:border-l-[5px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:shadow-slate-900/5 dark:hover:shadow-black/20 transition-all flex flex-col`}
                       >
                         {/* Linha superior com status e versão */}
                         <div className="p-4 border-b border-slate-100 dark:border-[#1e293b] flex items-start justify-between gap-3 bg-slate-50/50 dark:bg-[#0a1020]/40">
@@ -2433,7 +2478,7 @@ export default function DashboardPage() {
             </div>
 
             {/* SEÇÃO 4: PROJETOS POR AGRICULTOR */}
-            <div className="bg-white dark:bg-[#0d1527] border border-slate-200 dark:border-[#1e293b] rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div className="bg-white dark:bg-[#0d1527] border border-slate-200/80 dark:border-[#1e293b]/80 rounded-2xl p-5 sm:p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-1">
