@@ -6,18 +6,18 @@ import { useRouter } from 'next/navigation';
 import BackButton from '@/components/BackButton';
 import { useToast } from '@/components/Toast';
 import { triggerHaptic } from '@/lib/haptic';
-import { 
-  Calendar, 
-  Search, 
-  X, 
-  User, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  FileText, 
-  Briefcase, 
-  Layers, 
-  Activity, 
+import {
+  Calendar,
+  Search,
+  X,
+  User,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  FileText,
+  Briefcase,
+  Layers,
+  Activity,
   RefreshCw,
   ExternalLink,
   ChevronRight,
@@ -62,12 +62,12 @@ export function incrementProjectVersion(name: string): string {
 
 // ── As 6 Fases Oficiais do Diário de Campo ──────────────────────────────────
 export const ETAPAS_OFICIAIS: { key: EtapaCampo; label: string; icon: string; desc: string; order: number }[] = [
-  { key: 'Valetas',                     label: 'Valetas',                     icon: '⛏️', desc: 'Abertura e nivelamento de valas', order: 1 },
-  { key: 'montagem campo',              label: 'Montagem Campo',              icon: '🌱', desc: 'Tubulações, gotejadores e conexões', order: 2 },
-  { key: 'casa de bombas',              label: 'Casa de Bombas',              icon: '⚙️', desc: 'Bombas, filtros e cabeçal', order: 3 },
-  { key: 'elétrica',                    label: 'Elétrica',                    icon: '⚡', desc: 'Quadros elétricos e automação', order: 4 },
-  { key: 'lavagem do sistema e testes',  label: 'Lavagem & Testes',            icon: '💧', desc: 'Limpeza, teste de pressão e estanqueidade', order: 5 },
-  { key: 'entrega técnica',             label: 'Entrega Técnica',             icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
+  { key: 'Valetas', label: 'Valetas', icon: '⛏️', desc: 'Abertura e nivelamento de valas', order: 1 },
+  { key: 'montagem campo', label: 'Montagem Campo', icon: '🌱', desc: 'Tubulações, gotejadores e conexões', order: 2 },
+  { key: 'casa de bombas', label: 'Casa de Bombas', icon: '⚙️', desc: 'Bombas, filtros e cabeçal', order: 3 },
+  { key: 'elétrica', label: 'Elétrica', icon: '⚡', desc: 'Quadros elétricos e automação', order: 4 },
+  { key: 'lavagem do sistema e testes', label: 'Lavagem & Testes', icon: '💧', desc: 'Limpeza, teste de pressão e estanqueidade', order: 5 },
+  { key: 'entrega técnica', label: 'Entrega Técnica', icon: '📋', desc: 'Checklist final e treinamento ao cliente', order: 6 },
 ];
 
 interface EtapaConfigItem {
@@ -244,8 +244,8 @@ export default function PainelOperacionalObrasPage() {
           l.projetoCliente.trim().toLowerCase() === nomeProjeto.trim().toLowerCase() &&
           l.atividade &&
           (l.atividade.toLowerCase() === et.key.toLowerCase() ||
-           l.atividade.toLowerCase().includes(et.key.toLowerCase()) ||
-           et.key.toLowerCase().includes(l.atividade.toLowerCase()))
+            l.atividade.toLowerCase().includes(et.key.toLowerCase()) ||
+            et.key.toLowerCase().includes(l.atividade.toLowerCase()))
         ).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
 
         const ultimoLog = logsEtapa[0] || null;
@@ -254,8 +254,8 @@ export default function PainelOperacionalObrasPage() {
         const respConfig = config.responsaveisPorEtapa[chaveEtapa] || [];
         const respLogs = (hasStarted || pctProgresso > 0)
           ? logsEtapa
-              .flatMap(l => parseResponsavelEmails(l.responsavel))
-              .filter(Boolean)
+            .flatMap(l => parseResponsavelEmails(l.responsavel))
+            .filter(Boolean)
           : [];
 
         let todosResp = Array.from(new Set([...respConfig, ...respLogs])).filter(Boolean);
@@ -494,11 +494,10 @@ export default function PainelOperacionalObrasPage() {
             <span className="text-[11px] text-blue-500/80">em andamento normal</span>
           </div>
 
-          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm ${
-            kpis.totalFasesAtrasadas > 0 
-              ? 'border-rose-500/40 bg-gradient-to-br from-rose-500/10 to-transparent' 
+          <div className={`bg-white dark:bg-[#0d1527] border rounded-2xl p-4 shadow-sm ${kpis.totalFasesAtrasadas > 0
+              ? 'border-rose-500/40 bg-gradient-to-br from-rose-500/10 to-transparent'
               : 'border-slate-200 dark:border-[#1e293b]'
-          }`}>
+            }`}>
             <div className="flex items-center justify-between text-rose-500 mb-1">
               <span className="text-xs font-bold">Fases em Atraso</span>
               <AlertTriangle className={`w-4 h-4 ${kpis.totalFasesAtrasadas > 0 ? 'animate-bounce text-rose-500' : 'text-slate-400'}`} />
@@ -683,9 +682,8 @@ export default function PainelOperacionalObrasPage() {
 
                     <div className="w-24 h-2.5 bg-slate-100 dark:bg-[#16203a] rounded-full overflow-hidden shrink-0 border border-slate-200/50 dark:border-[#1e293b]">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          projeto.concluidoGeral ? 'bg-emerald-500' : projeto.atrasadoTotal ? 'bg-rose-500' : 'bg-blue-500'
-                        }`}
+                        className={`h-full rounded-full transition-all duration-500 ${projeto.concluidoGeral ? 'bg-emerald-500' : projeto.atrasadoTotal ? 'bg-rose-500' : 'bg-blue-500'
+                          }`}
                         style={{ width: `${projeto.progressoGeral}%` }}
                       />
                     </div>
@@ -753,15 +751,14 @@ export default function PainelOperacionalObrasPage() {
                     return (
                       <div
                         key={fase.key}
-                        className={`rounded-xl p-3.5 border transition-all flex flex-col justify-between ${
-                          isAtrasada
+                        className={`rounded-xl p-3.5 border transition-all flex flex-col justify-between ${isAtrasada
                             ? 'bg-rose-50/50 dark:bg-rose-950/10 border-rose-500/40'
                             : isConcluida
-                            ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/30'
-                            : isAndamento
-                            ? 'bg-blue-50/30 dark:bg-blue-950/10 border-blue-500/30'
-                            : 'bg-slate-50/50 dark:bg-[#0c1324] border-slate-200 dark:border-[#1e293b]'
-                        }`}
+                              ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/30'
+                              : isAndamento
+                                ? 'bg-blue-50/30 dark:bg-blue-950/10 border-blue-500/30'
+                                : 'bg-slate-50/50 dark:bg-[#0c1324] border-slate-200 dark:border-[#1e293b]'
+                          }`}
                       >
                         <div>
                           {/* Cabeçalho da Fase */}
@@ -777,22 +774,21 @@ export default function PainelOperacionalObrasPage() {
                             </div>
 
                             {/* Badge de Situação */}
-                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide shrink-0 ${
-                              isConcluida
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide shrink-0 ${isConcluida
                                 ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                                 : isAtrasada
-                                ? 'bg-rose-600 text-white shadow-sm'
-                                : isAndamento
-                                ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
-                            }`}>
+                                  ? 'bg-rose-600 text-white shadow-sm'
+                                  : isAndamento
+                                    ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30'
+                                    : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                              }`}>
                               {isConcluida
                                 ? 'Concluída'
                                 : isAtrasada
-                                ? `+${fase.diasAtraso}d Atraso`
-                                : isAndamento
-                                ? `Restam ${fase.diasRestantesFase}d`
-                                : 'Não Iniciada'}
+                                  ? `+${fase.diasAtraso}d Atraso`
+                                  : isAndamento
+                                    ? `Restam ${fase.diasRestantesFase}d`
+                                    : 'Não Iniciada'}
                             </span>
                           </div>
 
@@ -853,9 +849,8 @@ export default function PainelOperacionalObrasPage() {
                           </div>
                           <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden mb-2.5">
                             <div
-                              className={`h-full rounded-full transition-all duration-500 ${
-                                isConcluida ? 'bg-emerald-500' : isAtrasada ? 'bg-rose-500' : 'bg-blue-500'
-                              }`}
+                              className={`h-full rounded-full transition-all duration-500 ${isConcluida ? 'bg-emerald-500' : isAtrasada ? 'bg-rose-500' : 'bg-blue-500'
+                                }`}
                               style={{ width: `${fase.progresso}%` }}
                             />
                           </div>
